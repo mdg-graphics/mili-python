@@ -1013,14 +1013,13 @@ class Mili:
     
     Arguments (all arrays):
     1. names: short names for all the shortnames you are interested in
-            Empty: Ignore shortnames
-    2. materials: string name of materials you are interested in
+    2. class: class name interested in
+    3. material: string name of material you are interested in
             Empty: Ignore material
-    3. labels: labels that you are interested in
-            Empty: Ignore labels
-    4. class: class name interested in
+    4. labels: labels that you are interested in
+            Empty: Find all possible labels
     5. state_numbers: States you are interested in
-            Empty: ALL states
+            Empty: all states
     
     The following is the structure of the result that is passed to create answer
     res[state][name][label] = value
