@@ -341,37 +341,70 @@ to access this data.
 """
 class Mili:
     def __init__(self):
-        self.state_maps = []
-        self.directories = []
-        self.names = []
+        self.__state_maps = []
+        self.__directories = []
+        self.__names = []
         self.__params = {} # maps param name: [value]
-        self.state_variables = {} # map to state variable, list of subrecords it is in
-        self.mesh_object_class_datas = {} #shortname to object
-        self.labels = {} # maps from label : elem_id
-        self.label_keys = []
-        self.int_points = {}
-        self.nodes = []
-        self.materials = {} # map from material number to list of element number
-        self.matname = {} # from material name to number
-        self.connectivity = {} # shortname : {mo_id : node}
-        self.dim = None # dimensions from mesh dimensions
-        self.srec_container = None
-        self.header_version = None
-        self.directory_version = None
-        self.endian_flag = None
-        self.precision_flag = None
-        self.state_file_suffix_length = None
-        self.partition_flag = None
-        self.tag = None
-        self.null_termed_names_bytes = None
-        self.number_of_commits = None
-        self.number_of_directories = None
-        self.number_of_state_maps = None
-        self.filename = None
-        self.state_map_filename = None
+        self.__state_variables = {} # map to state variable, list of subrecords it is in
+        self.__mesh_object_class_datas = {} #shortname to object
+        self.__labels = {} # maps from label : elem_id
+        self.__label_keys = []
+        self.__int_points = {}
+        self.__nodes = []
+        self.__materials = {} # map from material number to list of element number
+        self.__matname = {} # from material name to number
+        self.__connectivity = {} # shortname : {mo_id : node}
+        self.__dim = None # dimensions from mesh dimensions
+        self.__srec_container = None
+        self.__header_version = None
+        self.__directory_version = None
+        self.__endian_flag = None
+        self.__precision_flag = None
+        self.__state_file_suffix_length = None
+        self.__partition_flag = None
+        self.__tag = None
+        self.__null_termed_names_bytes = None
+        self.__number_of_commits = None
+        self.__number_of_directories = None
+        self.__number_of_state_maps = None
+        self.__filename = None
+        self.__state_map_filename = None
     
+    """
+    Getter for params
+    """
     def getParams(self):
         return self.__params
+    
+    """
+    Getter for state maps
+    """
+    def getStateMaps(self):
+        return self.__state_maps
+    
+    """
+    Getter for directories
+    """
+    def getDirectories(self):
+        return self.__directories
+    
+    """
+    Getter for state variables
+    """
+    def getStateVariables(self):
+        return self.__state_variables
+    
+    """
+    Getter for labels
+    """
+    def getLabels(self):
+        return self.__labels
+    
+    """
+    Getter for materials
+    """
+    def getMaterials(self):
+        return self.__materials
     
     """
     Reads the data for statemap locations from the Mili file.
@@ -382,11 +415,11 @@ class Mili:
         offset = -16
         state_map_length = 20
         f.seek(offset, os.SEEK_END)
-        for i in range(1, 1 + self.number_of_state_maps):
+        for i in range(1, 1 + self.__number_of_state_maps):
             f.seek(-1 * state_map_length, 1)
             byte_array = f.read(state_map_length)
-            file_number, file_offset, time, state_map_id = struct.unpack(self.tag + 'iqfi', byte_array)
-            self.state_maps = [StateMap(file_number, file_offset, time, state_map_id)] + self.state_maps
+            file_number, file_offset, time, state_map_id = struct.unpack(self.__tag + 'iqfi', byte_array)
+            self.__state_maps = [StateMap(file_number, file_offset, time, state_map_id)] + self.__state_maps
             f.seek(-1 * state_map_length, 1)
         return offset
     
@@ -396,24 +429,24 @@ class Mili:
     def readStateVariablesAndParams(self, f, offset):
         type_to_str = {'M_STRING' : 's', 'M_FLOAT' : 'f', 'M_FLOAT4' : 'f', 'M_FLOAT8' : 'd', 'M_INT' : 'i', 'M_INT4' : 'i', 'M_INT8' : 'q'}
         
-        offset -= self.null_termed_names_bytes
+        offset -= self.__null_termed_names_bytes
         f.seek(offset, os.SEEK_END)
-        fmt = str(self.null_termed_names_bytes) + "s"
-        byte_array = struct.unpack(self.tag + fmt, f.read(self.null_termed_names_bytes))[0]
+        fmt = str(self.__null_termed_names_bytes) + "s"
+        byte_array = struct.unpack(self.__tag + fmt, f.read(self.__null_termed_names_bytes))[0]
         #strings = str(byte_array)[2:].split('\\x00') # only works for Python3
         strings = byte_array.split(b'\x00')
         nnames = 0
         file_number = 0
         
-        for i in range(len(self.directories)):
-            directory = self.directories[i]
+        for i in range(len(self.__directories)):
+            directory = self.__directories[i]
             for j in range(directory.string_qty_idx):
                 name = strings[nnames]
-                self.names.append(name)
+                self.__names.append(name)
                 nnames += 1
     
             if directory.type_idx == DirectoryType.MILI_PARAM.value or directory.type_idx == DirectoryType.APPLICATION_PARAM.value or \
-                self.directory_version >= 2 and directory.type_idx == DirectoryType.TI_PARAM.value:
+                self.__directory_version >= 2 and directory.type_idx == DirectoryType.TI_PARAM.value:
                 self.__params[name] = file_number, i
                 f.seek(directory.offset_idx)
                 byte_array = f.read(directory.length_idx)
@@ -424,31 +457,31 @@ class Mili:
                 type_value = ExtSize[DataType(type).name].value
                                 
                 if type_to_str[DataType(type).name] == 's':
-                    self.__params[name] = struct.unpack(self.tag + str(directory.length_idx/type_value) + type_rep, byte_array)[0].split(b'\x00')[0]
+                    self.__params[name] = struct.unpack(self.__tag + str(directory.length_idx/type_value) + type_rep, byte_array)[0].split(b'\x00')[0]
                 else:
-                    self.__params[name] = struct.unpack(self.tag + str(directory.length_idx/type_value) + type_rep, byte_array)                                  
+                    self.__params[name] = struct.unpack(self.__tag + str(directory.length_idx/type_value) + type_rep, byte_array)                                  
                 
                 if name == "mesh dimensions":
                     f.seek(directory.offset_idx)
                     byte_array = f.read(directory.length_idx)
-                    self.dim = struct.unpack(self.tag + str(directory.length_idx/4) + 'i', byte_array)[0]
+                    self.__dim = struct.unpack(self.__tag + str(directory.length_idx/4) + 'i', byte_array)[0]
                 
                 if "Node Labels" in name:
                     f.seek(directory.offset_idx)
                     byte_array = f.read(directory.length_idx)
-                    ints = struct.unpack(self.tag + str(directory.length_idx/4) + 'i', byte_array)
+                    ints = struct.unpack(self.__tag + str(directory.length_idx/4) + 'i', byte_array)
                     first, last, node_labels = ints[0], ints[1], ints[2:]
                     
-                    self.labels[('M_NODE', 'node')] = {}
+                    self.__labels[('M_NODE', 'node')] = {}
                     for j in range (first, last):
-                        self.labels[('M_NODE', 'node')][j] = node_labels[j]
+                        self.__labels[('M_NODE', 'node')][j] = node_labels[j]
                          
                     # do this
                 
                 if "Element Label" in name:
                     f.seek(directory.offset_idx)
                     byte_array = f.read(directory.length_idx)
-                    ints = struct.unpack(self.tag + str(directory.length_idx/4) + 'i', byte_array)                    
+                    ints = struct.unpack(self.__tag + str(directory.length_idx/4) + 'i', byte_array)                    
                     first, total, ints = ints[0], ints[1], ints[2:]
                     
                     sup_class_idx = name.index("Scls-") + len("Scls-")
@@ -458,32 +491,35 @@ class Mili:
                     
                     sup_class = name[sup_class_idx : sup_class_end_idx]
                     clas = name[class_idx : class_end_idx]
-                    self.labels[(sup_class, clas)] = {}
+                    self.__labels[(sup_class, clas)] = {}
                     
                     for j in range(len(ints)):
                         if "ElemIds" in name:
                                 #print label_keys[i]
-                            self.labels[(sup_class, clas)][self.label_keys[j]] = ints[j] 
+                            self.__labels[(sup_class, clas)][self.__label_keys[j]] = ints[j] 
                         else:
-                            self.label_keys.append(ints[j])
+                            self.__label_keys.append(ints[j])
                         
                     if "ElemIds" in name:
-                        self.label_keys = []
+                        self.__label_keys = []
                 
                 if "MAT_NAME" in name:
                     f.seek(directory.offset_idx)
                     byte_array = f.read(directory.length_idx)
                     matname = struct.unpack(str(directory.length_idx) + 's', byte_array)[0].split(b'\x00')[0]
                     num = name[-1:]
-                    self.matname[matname] = int(num)
+                    if matname in self.__matname:
+                        self.__matname[matname].append(int(num))
+                    else:
+                        self.__matname[matname] = [int(num)]
                     
                 if "es_" in name:
                     f.seek(directory.offset_idx)
                     byte_array = f.read(directory.length_idx)
-                    i_points = struct.unpack(self.tag + str(directory.length_idx/4) + 'i', byte_array)  
+                    i_points = struct.unpack(self.__tag + str(directory.length_idx/4) + 'i', byte_array)  
                     first, total, i_points, num_i_ponts = i_points[0], i_points[1], i_points[2:len(i_points)- 1], i_points[len(i_points) - 1]    
                     index = name.find('es_')
-                    self.int_points[name[index:]] = [i_points, num_i_ponts]
+                    self.__int_points[name[index:]] = [i_points, num_i_ponts]
                     # determine stress or strain
                     
                                               
@@ -532,37 +568,37 @@ class Mili:
                             sv_names.append(s[c_pos])
                             c_pos += 1
                         for sv_name_inner in sv_names:
-                            if sv_name_inner in self.state_variables:
-                                sv = self.state_variables[sv_name_inner]
+                            if sv_name_inner in self.__state_variables:
+                                sv = self.__state_variables[sv_name_inner]
                             else:
                                 sv_name_inner, title = s[c_pos], s[c_pos + 1]
                                 agg_type, data_type = ints[int_pos], ints[int_pos + 1]
                                 int_pos += 2
                                 c_pos += 2
                                 sv = StateVariable(sv_name_inner, title, agg_type, data_type)
-                                self.state_variables[sv_name_inner] = [sv, []]
+                                self.__state_variables[sv_name_inner] = [sv, []]
                         state_variable.svars = sv_names
                     
-                    self.state_variables[sv_name] = [state_variable, []]
+                    self.__state_variables[sv_name] = [state_variable, []]
                     
                     if sv_name == "es_1a" or sv_name == "es_3a" or sv_name == "es_3c":
                         stresscount = straincount = 0
                         stress = strain = []
                         
-                        if 'stress' in self.state_variables: stress = self.state_variables['stress'][0].svars
-                        if 'strain' in self.state_variables: strain = self.state_variables['strain'][0].svars
+                        if 'stress' in self.__state_variables: stress = self.__state_variables['stress'][0].svars
+                        if 'strain' in self.__state_variables: strain = self.__state_variables['strain'][0].svars
                         
                         for p in sv_names:
                             if p in stress: stresscount += 1
                             if p in strain: straincount += 1
                                                     
                         if stresscount == 6:
-                            if not "stress" in self.int_points: self.int_points["stress"] = {}
-                            self.int_points["stress"][sv_name] = self.int_points[sv_name[:-1]]
+                            if not "stress" in self.__int_points: self.__int_points["stress"] = {}
+                            self.__int_points["stress"][sv_name] = self.__int_points[sv_name[:-1]]
                         
                         if straincount == 6:
-                            if not "strain" in self.int_points: self.int_points["strain"] = {}
-                            self.int_points["strain"][sv_name] = self.int_points[sv_name[:-1]]                                        
+                            if not "strain" in self.__int_points: self.__int_points["strain"] = {}
+                            self.__int_points["strain"][sv_name] = self.__int_points[sv_name[:-1]]                                        
                         
     """
     Reads in directory information from the Mili file
@@ -572,16 +608,16 @@ class Mili:
         directory_length = 4 * 6
         state_map_length = 20
         int_long = 'i'
-        if self.directory_version > 2:
+        if self.__directory_version > 2:
             directory_length = 8 * 6
             int_long = 'q'
-        offset -=  state_map_length * self.number_of_state_maps + directory_length * self.number_of_directories # make this not a hard coded 6 eventually
+        offset -=  state_map_length * self.__number_of_state_maps + directory_length * self.__number_of_directories # make this not a hard coded 6 eventually
         f.seek(offset, os.SEEK_END)
-        for i in range(1, 1 + self.number_of_directories):
+        for i in range(1, 1 + self.__number_of_directories):
             byte_array = f.read(directory_length)
             type_idx, modifier_idx1, modifier_idx2, string_qty_idx, offset_idx, length_idx = \
-                struct.unpack(self.tag + '6' + int_long, byte_array)
-            self.directories.append(Directory(type_idx, modifier_idx1, modifier_idx2, string_qty_idx, offset_idx, length_idx))
+                struct.unpack(self.__tag + '6' + int_long, byte_array)
+            self.__directories.append(Directory(type_idx, modifier_idx1, modifier_idx2, string_qty_idx, offset_idx, length_idx))
             number_of_strings += string_qty_idx
         return offset
         
@@ -590,54 +626,54 @@ class Mili:
     """
     def readMesh(self, f):
         name_cnt = 0 
-        for i in range(len(self.directories)):
-            directory = self.directories[i]     
+        for i in range(len(self.__directories)):
+            directory = self.__directories[i]     
             
                 
             if directory.type_idx == DirectoryType.CLASS_DEF.value:
                 superclass = directory.modifier_idx2
-                short_name = self.names[name_cnt]
-                long_name = self.names[name_cnt + 1]
+                short_name = self.__names[name_cnt]
+                long_name = self.__names[name_cnt + 1]
                 mocd = MeshObjectClassData(short_name, long_name, superclass)
-                self.mesh_object_class_datas[short_name]= mocd
+                self.__mesh_object_class_datas[short_name]= mocd
             
             if directory.type_idx == DirectoryType.CLASS_IDENTS.value:
                 f.seek(directory.offset_idx)
-                short_name = self.names[name_cnt]
+                short_name = self.__names[name_cnt]
                 superclass, start, stop = struct.unpack('3i', f.read(12))
-                self.mesh_object_class_datas[short_name].add_block(start, stop)
+                self.__mesh_object_class_datas[short_name].add_block(start, stop)
                 superclass = Superclass(superclass).name
-                if (superclass, short_name) not in self.labels:
-                    self.labels[(superclass, short_name)] = {}
+                if (superclass, short_name) not in self.__labels:
+                    self.__labels[(superclass, short_name)] = {}
                 for label in range(start, stop + 1):
-                    self.labels[(superclass, short_name)][label] = label
+                    self.__labels[(superclass, short_name)][label] = label
             
             if directory.type_idx == DirectoryType.NODES.value:
                 f.seek(directory.offset_idx)
-                short_name = self.names[name_cnt]
+                short_name = self.__names[name_cnt]
                 start, stop = struct.unpack('2i', f.read(8))
-                num_coordinates = self.dim * (stop - start + 1)
+                num_coordinates = self.__dim * (stop - start + 1)
                 floats = struct.unpack(str(num_coordinates) + 'f', f.read(4 * num_coordinates))
-                class_name = self.names[name_cnt]
-                sup_class = self.mesh_object_class_datas[class_name].superclass
+                class_name = self.__names[name_cnt]
+                sup_class = self.__mesh_object_class_datas[class_name].superclass
                 sup_class = Superclass(sup_class).name
-                self.labels[sup_class, class_name] = {}
+                self.__labels[sup_class, class_name] = {}
                 
-                for n in range(0, len(floats), self.dim):
-                    self.nodes.append([floats[n:n+self.dim]])
-                    self.labels[(sup_class, class_name)][n/self.dim] = n/self.dim
+                for n in range(0, len(floats), self.__dim):
+                    self.__nodes.append([floats[n:n+self.__dim]])
+                    self.__labels[(sup_class, class_name)][n/self.__dim] = n/self.__dim
                 
-                self.mesh_object_class_datas[short_name].add_block(start, stop)
+                self.__mesh_object_class_datas[short_name].add_block(start, stop)
             
             if directory.type_idx == DirectoryType.ELEM_CONNS.value:
                 f.seek(directory.offset_idx)
-                short_name = self.names[name_cnt]
-                self.connectivity[short_name] = {}
+                short_name = self.__names[name_cnt]
+                self.__connectivity[short_name] = {}
                 superclass, qty_blocks = struct.unpack('2i', f.read(8))
                 # print short_name, superclass, qty_blocks
                 elem_blocks = struct.unpack(str(2 * qty_blocks) + 'i', f.read(8 * qty_blocks))
                 for j in range(0,len(elem_blocks),2):
-                    self.mesh_object_class_datas[short_name].add_block(elem_blocks[j], elem_blocks[j+1])
+                    self.__mesh_object_class_datas[short_name].add_block(elem_blocks[j], elem_blocks[j+1])
                     #print elem_blocks[j], elem_blocks[j+1]
                
                 elem_qty = directory.modifier_idx2
@@ -656,26 +692,26 @@ class Mili:
                 
                     mo_id = 1
                     for k in range(index, len(ebuf), word_qty):
-                        self.connectivity[short_name][mo_id] = []
+                        self.__connectivity[short_name][mo_id] = []
                         mat = ebuf[k + conn_qty]
                         for m in range(0, conn_qty):
                             node = ebuf[k + m]
-                            self.connectivity[short_name][mo_id].append(node)
+                            self.__connectivity[short_name][mo_id].append(node)
                         part = ebuf[k + mat_offset]
-                        if mat not in self.materials:
-                            self.materials[mat] = []
-                        self.materials[mat].append([mo_id, short_name])
+                        if mat not in self.__materials:
+                            self.__materials[mat] = []
+                        self.__materials[mat].append([mo_id, short_name])
                         mo_id += 1
                     index = word_qty * elem_qty
-#                 print self.materials
+#                 print self.__materials
             name_cnt += directory.string_qty_idx
          
     """
     Reads in all the subrecords for a Mili file
     """     
     def readSubrecords(self, f):
-        for i in range(len(self.directories)):
-            directory = self.directories[i]          
+        for i in range(len(self.__directories)):
+            directory = self.__directories[i]          
             if directory.type_idx == DirectoryType.STATE_REC_DATA.value:
                 srec_int_data = directory.modifier_idx1 - 4
                 srec_c_data = directory.modifier_idx2
@@ -686,7 +722,7 @@ class Mili:
                 
                 int_pos = 0
                 c_pos = 0
-                self.srec_container = SubrecordContainer()
+                self.__srec_container = SubrecordContainer()
                 
                 
                 for k in range(srec_qty_subrecs):
@@ -699,7 +735,7 @@ class Mili:
                     svars = cdata[c_pos:c_pos+qty_svars]
                     c_pos += qty_svars
                     
-                    superclass = self.mesh_object_class_datas[class_name].superclass
+                    superclass = self.__mesh_object_class_datas[class_name].superclass
                     
                     sub = Subrecord(name, class_name, org, qty_svars, svars)
                                             
@@ -723,18 +759,18 @@ class Mili:
                     
                     # Handle Aggregate Types
                     for sv in svars:
-                        sv = self.state_variables[sv][0]
+                        sv = self.__state_variables[sv][0]
                         for sv_sv in sv.svars:
-                            self.state_variables[sv_sv][1].append(k)
+                            self.__state_variables[sv_sv][1].append(k)
                                         
                     if org == DataOrganization.OBJECT.value:
                         for sv in svars:
                             #print sv
-                            state_var = self.state_variables[sv][0]
-                            self.state_variables[sv][1].append(k)
+                            state_var = self.__state_variables[sv][0]
+                            self.__state_variables[sv][1].append(k)
 
                             atom_size = ExtSize[DataType(state_var.data_type).name].value
-                            atoms = state_var.atom_qty(self.state_variables) # define this 
+                            atoms = state_var.atom_qty(self.__state_variables) # define this 
                             
                             ### stuff about surface here
     
@@ -751,10 +787,10 @@ class Mili:
                         
                     elif org == DataOrganization.RESULT.value:
                         for sv in svars:
-                            state_var = self.state_variables[sv][0]
-                            self.state_variables[sv][1].append(k)
+                            state_var = self.__state_variables[sv][0]
+                            self.__state_variables[sv][1].append(k)
 
-                            atoms = state_var.atom_qty(self.state_variables)
+                            atoms = state_var.atom_qty(self.__state_variables)
                             ### stuff about surface here
                             total_atoms = atoms
                             
@@ -769,9 +805,9 @@ class Mili:
                         sub.size = lump_offsets[j] + lump_sizes[j]
                     
 
-                    sub.offset = self.srec_container.size
-                    self.srec_container.size += sub.size
-                    self.srec_container.subrecs.append(sub)
+                    sub.offset = self.__srec_container.size
+                    self.__srec_container.size += sub.size
+                    self.__srec_container.subrecs.append(sub)
         
     """
     This function returns the string representation of a subrecord, to be used
@@ -782,9 +818,9 @@ class Mili:
         type_to_str = {'M_STRING' : 's', 'M_FLOAT' : 'f', 'M_FLOAT4' : 'f', 'M_FLOAT8' : 'd', 'M_INT' : 'i', 'M_INT4' : 'i', 'M_INT8' : 'q'}
                 
         for sv_name in subrecord.svar_names:
-            sv, sub = self.state_variables[sv_name]
+            sv, sub = self.__state_variables[sv_name]
             datatype = DataType(sv.data_type).name
-            ret += type_to_str[datatype] * sv.atom_qty(self.state_variables)
+            ret += type_to_str[datatype] * sv.atom_qty(self.__state_variables)
 
                 
         if subrecord.organization == DataOrganization.OBJECT.value:
@@ -800,26 +836,47 @@ class Mili:
     This function calls the other reader functions one at a time, spanning the entire
     Mili file.
     """
-    def read(self, file_name, state_map_file_name):
-        self.filename = file_name
-        self.state_map_filename = state_map_file_name
+    def read(self, file_name):
+        # Handle case of multiple state files
+        end_dir = file_name.rfind(os.sep)
+        dir_name = os.getcwd()
+        if end_dir != -1:
+            dir_name += os.sep + file_name[:end_dir]
+            file_name = file_name[end_dir + 1:]
+        
+        state_files = []
+        for f in os.listdir(dir_name):
+            if file_name + ".plt" in f:
+                f_end = f.rfind('.plt') + 4
+                if str.isdigit(f[f_end:]):
+                    state_files.append(f)
+        state_files.sort()
+        
+        if end_dir != -1:
+            for i in range(len(state_files)):
+                state_files[i] = dir_name + os.sep + state_files[i]
+            file_name = dir_name + os.sep + file_name
+        file_name += ".pltA"
+        self.__filename = file_name
+        self.__state_map_filename = state_files
+        
     # Open file with 'b' to specify binary mode
         with open(file_name, 'rb') as f:
             ### Read Header ###
             header = f.read(16)
             mili_taur = struct.unpack('4s', header[:4])[0].decode('ascii')
-            self.header_version, self.directory_version, self.endian_flag, self.precision_flag, self.state_file_suffix_length, self.partition_flag = \
+            self.__header_version, self.__directory_version, self.__endian_flag, self.__precision_flag, self.__state_file_suffix_length, self.__partition_flag = \
                struct.unpack('6b', header[4:10])
             
-            if self.endian_flag == 1:
-                self.tag = ">"
+            if self.__endian_flag == 1:
+                self.__tag = ">"
             else:
-                self.tag = "<"
+                self.__tag = "<"
             
             ### Read Indexing ###
             offset = -16
             f.seek(offset, os.SEEK_END)
-            self.null_termed_names_bytes, self.number_of_commits,  self.number_of_directories, self.number_of_state_maps = \
+            self.__null_termed_names_bytes, self.__number_of_commits,  self.__number_of_directories, self.__number_of_state_maps = \
                 struct.unpack('4i', f.read(16))
        
             ### Read State Maps ####
@@ -829,7 +886,7 @@ class Mili:
             offset = self.readDirectories(f, offset)
             
             
-            if self.null_termed_names_bytes > 0:
+            if self.__null_termed_names_bytes > 0:
                  ### DIRECTORY AND SV DATA #
                 self.readStateVariablesAndParams(f, offset)
             
@@ -881,18 +938,18 @@ class Mili:
         if not name: return False
         
         if 'stress' in name:
-            elem_sets = self.int_points['stress']
-            vars = self.state_variables['stress'][0].svars
+            elem_sets = self.__int_points['stress']
+            vars = self.__state_variables['stress'][0].svars
         elif 'strain' in name: 
-            elem_sets = self.int_points['strain']
-            vars = self.state_variables['strain'][0].svars
+            elem_sets = self.__int_points['strain']
+            vars = self.__state_variables['strain'][0].svars
         else:
             return False
         
         set_names = elem_sets.keys()
         for set_name in set_names:
-            temp_sv, temp_subrecords = self.state_variables[set_name]
-            temp_subrecord = self.srec_container.subrecs[temp_subrecords[0]]
+            temp_sv, temp_subrecords = self.__state_variables[set_name]
+            temp_subrecord = self.__srec_container.subrecs[temp_subrecords[0]]
             if temp_subrecord.class_name == class_name:
                 return elem_sets[set_name][0]
         
@@ -912,7 +969,10 @@ class Mili:
                 
         # These are the mo_ids we are interested in for this subrecord
         for label in labels:
-            mo_search_arr.append([label, self.labels[(sup_class, clas)][label]])
+            if label not in self.__labels[(sup_class, clas)]:
+                print "label " + str(label) + " was not found in " + clas
+            else:
+                mo_search_arr.append([label, self.__labels[(sup_class, clas)][label]])
                       
         mo_index = 0
         mo_idx_found = []
@@ -929,12 +989,12 @@ class Mili:
         indices[sub] = []
         
         # Deal with aggregate types and create list of state variable names
-        if name in self.state_variables and AggregateType(self.state_variables[name][0].agg_type).name == 'VECTOR':
-            variables = self.state_variables[name][0].svars
+        if name in self.__state_variables and AggregateType(self.__state_variables[name][0].agg_type).name == 'VECTOR':
+            variables = self.__state_variables[name][0].svars
        
         sv_names = []
         for sv in subrecord.svar_names:
-            sv_var = self.state_variables[sv][0]
+            sv_var = self.__state_variables[sv][0]
             if len(sv_var.svars) > 0:
                 for sv_name in sv_var.svars:
                     sv_names.append(sv_name)
@@ -943,6 +1003,9 @@ class Mili:
         
         var_indexes = []
         for child in variables:
+            if child not in sv_names:
+                print child + " not a valid variable name"
+                return
             var_indexes.append(sv_names.index(child))       
                 
         # Add correct values given organizational structure and correct indexing    
@@ -977,7 +1040,7 @@ class Mili:
                         values[label][sv_name][int_point] = vars[indexes[index][int_point]]
                         indices[sub].append(indexes[index][int_point])
                     v_index += 1
-            elif name in self.state_variables and AggregateType(self.state_variables[name][0].agg_type).name == 'VECTOR':
+            elif name in self.__state_variables and AggregateType(self.__state_variables[name][0].agg_type).name == 'VECTOR':
                 values[label] = []
                 for index in indexes:
                     values[label].append(vars[index])
@@ -991,14 +1054,16 @@ class Mili:
         
         return values
     
-    '''
+    """
     Turn a class name and element list into the appropriate label array
-    '''
+    """
     def getLabelsFromClassElems(self, class_name, elems):
         ret = []
-        sup_class = self.mesh_object_class_datas[class_name].superclass
+        if class_name not in self.__mesh_object_class_datas:
+            return ret
+        sup_class = self.__mesh_object_class_datas[class_name].superclass
         sup_class = Superclass(sup_class).name
-        labels = self.labels[(sup_class, class_name)]
+        labels = self.__labels[(sup_class, class_name)]
         for elem in elems:
             id, class_name_elem = elem
             for k in labels.keys():
@@ -1011,47 +1076,98 @@ class Mili:
     """
     Single query function that given inputs can call the other functions
     
-    Arguments (all arrays):
+    Arguments:
     1. names: short names for all the shortnames you are interested in
-    2. class: class name interested in
+    2. class: class name interesteds in
     3. material: string name of material you are interested in
             Empty: Ignore material
     4. labels: labels that you are interested in
             Empty: Find all possible labels
     5. state_numbers: States you are interested in
             Empty: all states
+    6. modify: whether or not this is part of a modfication call
+    7. int_points: if this is a vectory array, which integration points
+    8. raw_data: whether the user wants raw data or Answer object
+            
     
     The following is the structure of the result that is passed to create answer
     res[state][name][label] = value
     """
-    def query(self, names, class_name, material=None, labels=None, state_numbers=None, modify=False, int_points=False, raw_data=False):
+    def query(self, names, class_name, material=None, labels=None, state_numbers=None, modify=False, int_points=False, raw_data=True):
         # Parse Arguments
         if not state_numbers:
-            state_numbers = [i for i in range(1, self.number_of_state_maps + 1)]
+            state_numbers = [i-1 for i in range(1, self.__number_of_state_maps + 1)]
+        elif type(state_numbers) is int:
+            state_numbers = [state_numbers]
         
+        if type(labels) is int:
+            labels = [labels]
+            
         if material:
-            elems = self.materials[self.matname[material]]            
-            labels = self.getLabelsFromClassElems(class_name, elems)
-           
+            if type(material) is not str:
+                print "material must be string"
+                return
+            if material not in self.__matname:
+                print "There is no " + material + " material"
+                return
+            elems = []
+            for mat in self.__matname[material]:
+                elems += self.__materials[mat]            
+            labels_mat = self.getLabelsFromClassElems(class_name, elems)
+            if labels:
+                for label in labels:
+                    if label not in labels_mat:
+                        labels.remove(label)
+            else:
+                labels = labels_mat
+                
             if not len(labels):
-                return "There are no elements from class " + str(class_name) + " of material " + material
-        
+                print "There are no elements from class " + str(class_name) + " of material " + material + " with class " + class_name
+                return
+        if labels:
+            if type(labels) is not list or type(labels[0]) is not int:
+                print "labels must of a list of ints or an int", labels
+                return
         if not labels:
-            sup_class = self.mesh_object_class_datas[class_name].superclass
+            sup_class = self.__mesh_object_class_datas[class_name].superclass
             sup_class = Superclass(sup_class).name
-            labels = self.labels[(sup_class, class_name)]
+            labels = self.__labels[(sup_class, class_name)]
+        
+        if type(names) is str:
+            names = [names]
+        if type(names) is not list or type(names[0]) is not str:
+            print "state variables names must be a string or list of strings"
+            return
+        if modify and type(modify) is not bool:
+            print "modify must be boolean"
+            return
+        if raw_data and type(raw_data) is not bool:
+            print "raw data must be boolean"
+            return
+        if type(int_points) is int:
+            int_points = [int_points]
+        if int_points and type(int_points) is not list:
+            print "int point must be an integer or list of integers"
+            return
+        if type(state_numbers) is not list or type(state_numbers[0]) is not int:
+            print "state numbers must be an integer or list of integers"
+            return
+        
                 
         # Run Correct Function
         res = {}
                 
         for state in state_numbers:
-            state_map = self.state_maps[state]
+            if state < 0 or state >= len(self.__state_maps):
+                print "There is no state " + str(state)
+                return
+            state_map = self.__state_maps[state]
             res[state] = {}
-            
-            with open(self.state_map_filename, 'rb') as f:
+                
+            with open(self.__state_map_filename[state_map.file_number], 'rb') as f:
                 f.seek(state_map.file_offset)
                 byte_array = f.read(8)
-                time, state_map_id = struct.unpack(self.tag + 'fi', byte_array)
+                time, state_map_id = struct.unpack(self.__tag + 'fi', byte_array)
                 
                 for name in names:
                     # Handle case of vector[component]
@@ -1059,12 +1175,12 @@ class Mili:
                     if not vector: vector = variables
                     
                     if self.is_vec_array(vector, class_name):
-                        if 'stress' in name: elem_sets = self.int_points['stress']
-                        elif 'strain' in name: elem_sets = self.int_points['strain']
+                        if 'stress' in name: elem_sets = self.__int_points['stress']
+                        elif 'strain' in name: elem_sets = self.__int_points['strain']
                         
                         for set_name in elem_sets.keys():
-                            temp_sv, temp_subrecords = self.state_variables[set_name]
-                            temp_subrecord = self.srec_container.subrecs[temp_subrecords[0]]
+                            temp_sv, temp_subrecords = self.__state_variables[set_name]
+                            temp_subrecord = self.__srec_container.subrecs[temp_subrecords[0]]
                             if temp_subrecord.class_name == class_name:
                                 sv, subrecords = temp_sv, temp_subrecords
                                 set_name_chosen = set_name
@@ -1080,26 +1196,33 @@ class Mili:
                                 int_points[i] = ip
                         int_points.append(len(self.is_vec_array(vector, class_name)))
                                                                     
-                    elif vector:    
-                        sv, subrecords = self.state_variables[vector]
-                    else:    
-                        sv, subrecords = self.state_variables[name]
+                    elif vector:
+                        if vector not in self.__state_variables:
+                            print "There is no variable " + vector
+                            return
+                        sv, subrecords = self.__state_variables[vector]
+                    else:
+                        if name not in self.__state_variables:
+                            print "There is no variable " + name
+                            return
+                        sv, subrecords = self.__state_variables[name]
                     
                     for sub in subrecords:
-                        subrecord = self.srec_container.subrecs[sub]
+                        subrecord = self.__srec_container.subrecs[sub]
                         f.seek(subrecord.offset, 1)
                         byte_array = f.read(subrecord.size)
                         s = self.set_string(subrecord)
 
-                        vars = struct.unpack(self.tag + s, byte_array)
-                        class_name = subrecord.class_name
-                        sup_class = self.mesh_object_class_datas[class_name].superclass
-                        sup_class = Superclass(sup_class).name
+                        vars = struct.unpack(self.__tag + s, byte_array)
                         
-                        if modify:
-                            return self.variable_at_state(subrecord, labels, name, vars, sup_class, class_name, sub, res, modify, int_points)
-                        else:
-                            res[state][name] = self.variable_at_state(subrecord, labels, name, vars, sup_class, class_name, sub, res, modify, int_points)
+                        if class_name == subrecord.class_name:
+                            sup_class = self.__mesh_object_class_datas[subrecord.class_name].superclass
+                            sup_class = Superclass(sup_class).name
+                            
+                            if modify:
+                                return self.variable_at_state(subrecord, labels, name, vars, sup_class, subrecord.class_name, sub, res, modify, int_points)
+                            else:
+                                res[state][name] = self.variable_at_state(subrecord, labels, name, vars, sup_class, subrecord.class_name, sub, res, modify, int_points)
         
         return self.create_answer(res, names, material, labels, class_name, state_numbers, modify, raw_data)
     
@@ -1108,10 +1231,16 @@ class Mili:
     their values.
     """
     def elements_of_material(self, material, raw_data=False):
-        matnumber = self.matname[material]
-        mod_id_class = self.materials[matnumber]
-        mo_ids = [item[0] for item in mod_id_class]
-        class_names = [item[1] for item in mod_id_class]
+        if material not in self.__matname:
+            print "There is no material " + material
+            return
+        
+        matnumbers = self.__matname[material]
+        mo_ids = []
+        for matnumber in matnumbers:
+            mod_id_class = self.__materials[matnumber]
+            mo_ids += [item[0] for item in mod_id_class]
+            class_names = [item[1] for item in mod_id_class]
         
         if raw_data:
             return mo_ids
@@ -1128,10 +1257,13 @@ class Mili:
     def nodes_of_material(self, material, class_name, raw_data=False):
         nodes = set()
         elements = self.elements_of_material(material)
+        if not elements:
+            print "There are no elements with material " + material
+            return
         for item in elements.items:
             mo_id, entry_class_name = item.mo_id, item.class_name
             if entry_class_name == class_name:
-                for node in self.connectivity[class_name][mo_id]:
+                for node in self.__connectivity[class_name][mo_id]:
                     nodes.add(node)
         
         if raw_data:
@@ -1147,10 +1279,17 @@ class Mili:
     AND CLASSNAME FOR NOW
     """
     def nodes_of_elem(self, label, class_name, raw_data=False):
-        sup_class = self.mesh_object_class_datas[class_name].superclass
+        if class_name not in self.__mesh_object_class_datas:
+            print "Class name " + class_name + " not found"
+            return
+        sup_class = self.__mesh_object_class_datas[class_name].superclass
         sup_class = Superclass(sup_class).name
-        mo_id = self.labels[(sup_class, class_name)][label]
-        labels = self.connectivity[class_name][mo_id]
+        
+        if label not in self.__labels[(sup_class, class_name)]:
+            print "label " + str(label) + " not found"
+            return
+        mo_id = self.__labels[(sup_class, class_name)][label]
+        labels = self.__connectivity[class_name][mo_id]
         
         if raw_data:
             return labels
@@ -1165,43 +1304,61 @@ class Mili:
     
     The order of the values list (only do this if you're crazy):
     first sort by name, then sort by label, then by component name, then by integration point
+    
+    It is simpler to modify variables one at a time
     """
-    def modify_state_variable(self, state_variables, class_name, value, label, state_numbers, int_points=False):
-        res, indices = self.query(state_variables, class_name, None, label, state_numbers, True, int_points)
+    def modify_state_variable(self, state_variables, class_name, value, labels, state_numbers, int_points=False):
+        res, indices = self.query(state_variables, class_name, None, labels, state_numbers, True, int_points)
         type_to_str = {'s' : 'M_STRING', 'f' : 'M_FLOAT', 'd' : 'M_FLOAT8', 'i' : 'M_INT', 'q' : 'M_INT8'}
-        # print res, indices
+        
+        if not state_numbers:
+            state_numbers = [i-1 for i in range(1, self.__number_of_state_maps + 1)]
+        elif type(state_numbers) is int:
+            state_numbers = [state_numbers]
+        if type(labels) is int:
+            labels = [labels]
         
         for state in state_numbers:
-            state_map = self.state_maps[state]
+            if state < 0 or state >= len(self.__state_maps):
+                print "There is no state " + str(state)
+                return
+            
+            state_map = self.__state_maps[state]
         
-            with open(self.state_map_filename, 'r+') as f:
+            with open(self.__state_map_filename[state_map.file_number], 'r+') as f:
                 f.seek(state_map.file_offset)
                 byte_array = f.read(8)
-                time, state_map_id = struct.unpack(self.tag + 'fi', byte_array)
+                time, state_map_id = struct.unpack(self.__tag + 'fi', byte_array)
         
                 for name in state_variables:
                     vector, variables = self.parse_name(name)
                     if not vector: vector = variables 
                     if self.is_vec_array(vector, class_name):
-                        if 'stress' in name: elem_sets = self.int_points['stress']
-                        elif 'strain' in name: elem_sets = self.int_points['strain']
+                        if 'stress' in name: elem_sets = self.__int_points['stress']
+                        elif 'strain' in name: elem_sets = self.__int_points['strain']
                                             
                         for set_name in elem_sets.keys():
-                            temp_sv, temp_subrecords = self.state_variables[set_name]
-                            temp_subrecord = self.srec_container.subrecs[temp_subrecords[0]]
+                            temp_sv, temp_subrecords = self.__state_variables[set_name]
+                            temp_subrecord = self.__srec_container.subrecs[temp_subrecords[0]]
                             if temp_subrecord.class_name == class_name:
                                 sv, subrecords = temp_sv, temp_subrecords
                                 set_name_chosen = set_name
                         if not int_points:
                             int_points = list(self.is_vec_array(vector, class_name))
                         int_points.append(len(self.is_vec_array(vector, class_name)))                                              
-                    elif vector:    
-                        sv, subrecords = self.state_variables[vector]
-                    else:    
-                        sv, subrecords = self.state_variables[name]
+                    elif vector:
+                        if vector not in self.__state_variables:
+                            print "There is no variable " + vector
+                            return
+                        sv, subrecords = self.__state_variables[vector]
+                    else:
+                        if name not in self.__state_variables:
+                            print "There is no variable " + name
+                            return
+                        sv, subrecords = self.__state_variables[name]
                     
                     for sub in subrecords:
-                        subrecord = self.srec_container.subrecs[sub]
+                        subrecord = self.__srec_container.subrecs[sub]
                         f.seek(subrecord.offset, 1)
                         s = self.set_string(subrecord)
                         
@@ -1215,7 +1372,7 @@ class Mili:
                             
                             # Seek to variable location and write in the byte array
                             f.seek(offset, 1)
-                            byte_array = struct.pack(self.tag + s[indices[sub][j]], value[j])
+                            byte_array = struct.pack(self.__tag + s[indices[sub][j]], value[j % (len(indices[sub]) / len(labels))])
                             f.write(byte_array)
                             f.seek(-offset - len(byte_array), 1)                        
                              
@@ -1223,21 +1380,11 @@ class Mili:
 """
 This function is an example of how a user could use the Mili reader
 """    
-def main():
-    
-    file_name = '../../Mili/MILI-toss_3_x86_64_ib-RZGENIE/d3samp6new.pltA'
-    file_name_state_map = '../../Mili/MILI-toss_3_x86_64_ib-RZGENIE/d3samp6new.plt00'
-    
-    '''
-    Could add more files later
-    '''
-    
+def main():    
     
     mili = Mili()
-    mili.read(file_name, file_name_state_map)
-    
-    print mili.query(['stress'], None, None, "brick", [70])
-
+    mili.read("d3samp6")
+    #mili.read("states/d3samp6")
     
 if __name__ == '__main__':
         main()
