@@ -14,8 +14,8 @@ class TestMiliReader(unittest.TestCase):
     def setUp(self):
         sys.stdout = open(os.devnull, 'w') # suppress print statements
         
-    	# file_name = 'd3samp6'
-        file_name = 'states/d3samp6'
+    	file_name = 'd3samp6.plt'
+        #file_name = 'states/d3samp6.plt'
     
         self.mili = read.Mili()
         self.mili.read(file_name)

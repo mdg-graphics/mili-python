@@ -846,22 +846,16 @@ class Mili:
         
         state_files = []
         for f in os.listdir(dir_name):
-            if file_name + ".plt" in f:
-                f_end = f.rfind('.plt') + 4
-                if str.isdigit(f[f_end:]):
-                    state_files.append(f)
+            if file_name in f and f[-1] != "A":
+                num = f[len(file_name):]
+                state_files.append(file_name + num)
         state_files.sort()
         
-        if end_dir != -1:
-            for i in range(len(state_files)):
-                state_files[i] = dir_name + os.sep + state_files[i]
-            file_name = dir_name + os.sep + file_name
-        file_name += ".pltA"
-        self.__filename = file_name
+        self.__filename = file_name + "A"
         self.__state_map_filename = state_files
         
     # Open file with 'b' to specify binary mode
-        with open(file_name, 'rb') as f:
+        with open(self.__filename, 'rb') as f:
             ### Read Header ###
             header = f.read(16)
             mili_taur = struct.unpack('4s', header[:4])[0].decode('ascii')
@@ -1383,8 +1377,8 @@ This function is an example of how a user could use the Mili reader
 def main():    
     
     mili = Mili()
-    mili.read("d3samp6")
-    #mili.read("states/d3samp6")
+    #mili.read("d3samp6.plt")
+    mili.read("states/d3samp6.plt")
     
 if __name__ == '__main__':
         main()
