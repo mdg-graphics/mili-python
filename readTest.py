@@ -1,5 +1,5 @@
 import unittest
-import read
+import mili_reader_lib as read
 import os, sys
 import psutil
 '''
@@ -254,14 +254,8 @@ class TestMiliReaderParallel(unittest.TestCase):
     def setUp(self):
         file_name = 'parallel/d3samp6.plt'
         self.mili = read.Mili()
-	self.mili.read(file_name)
-	self.mili.setErrorFile()
-    '''
-    Shut down the processes
-    '''
-    def tearDown(self):
-        self.mili.end_querying()
-    
+	self.mili.read(file_name, parallel_read=True)
+	self.mili.setErrorFile()   
     
     '''
     Testing invalid inputs

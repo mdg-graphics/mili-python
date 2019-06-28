@@ -380,49 +380,65 @@ class Mili:
         self.__filename = None
         self.__state_map_filename = None
 	self.__error_file = None
+	self.__parallel_mode = False
 
 	if read_file: self.read(read_file)
-
+    
+    '''
+    Close down all connections
+    '''
+    def __del__(self):
+        for conn in self.__parent_conns:
+	    conn, i = conn
+	    conn.send("End")
+	    conn.close()
+    
     '''
     Getter for params
     '''
     def getParams(self):
-        if len(self.__milis) > 1: return self.__getHelper("get params")
+        if self.__parallel_mode: return self.__getHelper("get params")
+	if len(self.__milis) > 1: return [m.getParams() for m in self.__milis]
         return self.__params
 
     '''
     Getter for state maps
     '''
     def getStateMaps(self):
-        if len(self.__milis) > 1: return self.__getHelper("get state maps")
+        if self.__parallel_mode: return self.__getHelper("get state maps")
+	if len(self.__milis) > 1: return [m.getStateMpas() for m in self.__milis]
         return self.__state_maps
 
     '''
     Getter for directories
     '''
     def getDirectories(self):
-        if len(self.__milis) > 1: return self.__getHelper("get directories")
+        if self.__parallel_mode: return self.__getHelper("get directories")
+	if len(self.__milis) > 1: return [m.getDirectories() for m in self.__milis]
         return self.__directories
 
     '''
     Getter for state variables
     '''
     def getStateVariables(self):
-        if len(self.__milis) > 1: return self.__getHelper("get state variables")
+        if self.__parallel_mode: return self.__getHelper("get state variables")
+	if len(self.__milis) > 1: return [m.getStateVariables() for m in self.__milis]
         return self.__state_variables
 
     '''
     Getter for labels
     '''
     def getLabels(self):
-        if len(self.__milis) > 1: return self.__getHelper("get labels")
+        if self.__parallel_mode: return self.__getHelper("get labels")
+	if len(self.__milis) > 1: return [m.getLabels() for m in self.__milis]
         return self.__labels
 
     '''
     Getter for materials
     '''
     def getMaterials(self):
-        if len(self.__milis) > 1: return self.__getHelper("get materials")
+        if self.__parallel_mode: return self.__getHelper("get materials")
+	if len(self.__milis) > 1: return [m.getMaterials() for m in self.__milis]
         return self.__materials
     
     '''
@@ -867,7 +883,8 @@ class Mili:
     This function calls the other reader functions one at a time, spanning the entire
     Mili file.
     '''
-    def read(self, file_name, labeltomili=None, mili_num=None):
+    def read(self, file_name, labeltomili=None, mili_num=None, parallel_read=False):
+        self.__parallel_mode = parallel_read
         orig = file_name
         # Handle case of multiple state files
         end_dir = file_name.rfind(os.sep)
@@ -885,7 +902,7 @@ class Mili:
         i = 0
         if len(parallel) > 1:
 	    self.__filename = file_name
-	    self.split_reads(orig)
+	    self.__split_reads(orig, parallel_read)
 	    return
         else:
             state_files = []
@@ -1125,6 +1142,8 @@ class Mili:
     Add two default dictionaries together
     '''
     def __addDicts(self, a, b):
+        if not a:
+	    return b
     	for k in a:
 	    b[k] = b[k].union(a[k])
 	return b
@@ -1140,15 +1159,18 @@ class Mili:
 	with open(self.__error_file, 'w') as f:
             f.write('')
 	if len(self.__milis) > 1:
-	    for i in range(len(self.__parent_conns)):
-	        conn, k = self.__parent_conns[i]
-		conn.send(["Error file", self.__error_file])
+	    if self.__parallel_mode:
+	        for i in range(len(self.__parent_conns)):
+	            conn, k = self.__parent_conns[i]
+		    conn.send(["Error file", self.__error_file])
+	    else:
+	        for mili in self.__milis:
+		    mili.setErrorFile(file_name)
 
     '''
     Write error to error file if it exists. Otherwise write it to screen.
     '''
     def __error(self, msg):
-        # print "file: ", self.__error_file, self
     	if self.__error_file:
 	    with open(self.__error_file, 'a+') as f:
                 f.write(msg + '\n')
@@ -1181,21 +1203,12 @@ class Mili:
         else:
            labels = labels_mat
 	return labels
-    
-    
-    '''
-    Close connections and end querying
-    '''
-    def end_querying(self):
-        for conn in self.__parent_conns:
-	    conn, i = conn
-	    conn.send("End")
-	    conn.close()
+        
     
     '''
     Create processes and read the files
     '''
-    def split_reads(self, file_name):
+    def __split_reads(self, file_name, parallel_read):
 	# Handle case of multiple state files
         end_dir = file_name.rfind(os.sep)
         # dir_name = os.getcwd()
@@ -1209,7 +1222,6 @@ class Mili:
                 parallel.append(f[:-1])
 	
 	cpus = psutil.cpu_count(logical=False)
-	print "CPUs: ", cpus
 	self.__parent_conns = []
         i = 0
         if len(parallel) > 1:
@@ -1217,42 +1229,49 @@ class Mili:
             for p in parallel:
                 mili = Mili()
                 self.__milis.append(mili)
-		
-		parent_conn, child_conn = mp.Pipe()
-		print i, parent_conn, child_conn
-		pr = mp.Process(target=self.child_read, args=(mili, child_conn, dir_name + os.sep + p, i,))
-	        self.__parent_conns.append([parent_conn, i])
-	        pr.start()
-		i+= 1
-	
-	#Receive reads from children
-	activeChildren = len(self.__parent_conns)
-	while activeChildren > 0:
-	    for conn in self.__parent_conns:
-	        conn, i = conn
-	        if (conn.poll()):
-		    child_number, mesh_objects, labels = conn.recv()
-                    for mesh_obj in mesh_objects:
+		if parallel_read:
+		    parent_conn, child_conn = mp.Pipe()
+		    pr = mp.Process(target=self.__child_read, args=(mili, child_conn, dir_name + os.sep + p, i,))
+	            self.__parent_conns.append([parent_conn, i])
+	            pr.start()
+		else:
+		    labeltomili, mesh_objects = mili.read(dir_name + os.sep + p, mili.__labeltomili, i)
+		    for mesh_obj in mesh_objects:
                         if mesh_obj not in self.__mesh_object_class_datas:
                             self.__mesh_object_class_datas[mesh_obj] = mesh_objects[mesh_obj]
 
-                    for class_name in labels:
-                        labmap = labels[class_name]
+                    for class_name in mili.__labels:
+                        labmap = mili.__labels[class_name]
                         for label_key in labmap:
                             self.__labeltomili[class_name][label_key].append(i)
+		i+= 1
+	
+	if parallel_read:
+	    #Receive reads from children
+	    activeChildren = len(self.__parent_conns)
+	    while activeChildren > 0:
+	        for conn in self.__parent_conns:
+	            conn, i = conn
+	            if (conn.poll()):
+		        child_number, mesh_objects, labels = conn.recv()
+                        for mesh_obj in mesh_objects:
+                            if mesh_obj not in self.__mesh_object_class_datas:
+                                self.__mesh_object_class_datas[mesh_obj] = mesh_objects[mesh_obj]
+
+                        for class_name in labels:
+                            labmap = labels[class_name]
+                            for label_key in labmap:
+                                self.__labeltomili[class_name][label_key].append(i)
 		    
-		    activeChildren -= 1
+		        activeChildren -= 1
 		            
 	
     '''
     Child read and wait process
     '''
-    def child_read(self, mili, conn, file_name, i):
+    def __child_read(self, mili, conn, file_name, i):
         # Read the file
         mili.__labeltomili, mesh_objects = mili.read(file_name, mili.__labeltomili, i)
-	
-	#while True:
-	 #   cat = 4
 	
 	# Send back mesh information and labels
 	conn.send([i, mesh_objects, mili.__labels])
@@ -1274,7 +1293,7 @@ class Mili:
 		    material = query[1]
 		    conn.send(mili.nodes_of_material(material))
 		elif query[0] == "nodes of elem":
-		    label, class_name = query[1], query[2]
+		    label, class_name = query[1]
 		    conn.send(mili.nodes_of_elem(label, class_name))
 		elif query[0] == "modify":
 		    state_variable, class_name, value, labels, state_numbers, int_points = query[1:]
@@ -1303,7 +1322,6 @@ class Mili:
 		    answer = mili.query(sv, class_name, material, label, state_numbers, modify, int_points, raw, answ)
 		    		    
 		    if not answer:
-		        # print "SENDING FAIL", mili, mili.__error_file
 		        conn.send("Fail")
                     else:
 		        state_number_zero = state_numbers if not isinstance(state_numbers, list) else state_numbers[0]
@@ -1341,6 +1359,7 @@ class Mili:
     6. modify: whether or not this is part of a modification call
     7. int_points: if this is a vector array, which integration points
     8. raw_data: whether the user wants raw data or Answer object
+    9. res: the result passed around when doing parallel querying, not for the user
 
 
     The following is the structure of the result that is passed to create answer
@@ -1412,22 +1431,26 @@ class Mili:
 		        mili_to_labels[m].append(label)
 		        milis.add(m)
 		milis = list(milis)
-		mili_conns = []
-                for mili_index in milis:
-		    mili_conn, i = self.__parent_conns[mili_index]
-		    mili_conn.send([sv, class_name, material, mili_to_labels[mili_index], state_numbers, modify, int_points, True, answ])
-		    mili_conns.append(mili_conn)
 		
-		while failcount < len(milis):
-		    for mili_conn in mili_conns:
-		        if mili_conn.poll():
-		            query_response = mili_conn.recv()
-		            if query_response == "Fail": failcount += 1
-		            else: 
-		                answ = self.__addres(query_response, answ)
-		                failcount += 1
-		        #if failcount >= len(milis):
-		         #   break
+		if self.__parallel_mode:
+		    mili_conns = []
+                    for mili_index in milis:
+		        mili_conn, i = self.__parent_conns[mili_index]
+		        mili_conn.send([sv, class_name, material, mili_to_labels[mili_index], state_numbers, modify, int_points, True, answ])
+		        mili_conns.append(mili_conn)
+		
+		    while failcount < len(milis):
+		        for mili_conn in mili_conns:
+		            if mili_conn.poll():
+		                query_response = mili_conn.recv()
+		                if query_response == "Fail": failcount += 1
+		                else: 
+		                    answ = self.__addres(query_response, answ)
+		                    failcount += 1
+		else:
+		    for mili_index in milis:
+		        resp = self.__milis[mili_index].query(sv, class_name, material, mili_to_labels[mili_index], state_numbers, modify, int_points, True, answ)
+		        if resp: answ = resp 
 			
             return self.__create_answer(answ, names, material, labels, class_name, state_numbers, modify, raw_data)
 
@@ -1504,10 +1527,8 @@ class Mili:
     Given a specific material. Find all mo_ids with that material and return
     their values.
     '''
-    def __elements_of_material(self, material, raw_data=True):
+    def __elements_of_material(self, material):
         mo_ids = defaultdict(list)
-        mo_id_list = []
-        class_names = []
 
         if material not in self.__matname and material not in self.__materials:
             return self.__error('There is no material ' + str(material))
@@ -1519,39 +1540,24 @@ class Mili:
                 mo_id_class = self.__materials[matnumber]
                 for class_name in mo_id_class:
                     mo_ids[class_name] += mo_id_class[class_name]
-                    mo_id_list += [item for item in mo_id_class[class_name]]
-                    class_names += [class_name for item in mo_id_class[class_name]]
         else:
             mo_id_class = self.__materials[material]
             for class_name in mo_id_class:
                 mo_ids[class_name] += mo_id_class[class_name]
-                mo_id_list += [item for item in mo_id_class[class_name]]
-                class_names += [class_name for item in mo_id_class[class_name]]
 
-        if raw_data:
-            return mo_ids
+        return mo_ids
 
-        answer = Answer()
-        answer.set(None, None, mo_id_list, None, class_names, None)
-
-        return answer
-
-    '''
-    Find the labels associated with a material
-    '''
-    def labels_of_material(self, material, raw_data=True):
-        labels = defaultdict(list)
-	labels_list = []
-	class_names = []
 	
-
-        if len(self.__milis) > 1:
-	    labels = defaultdict(set)
+    '''
+    Accumulate information from children
+    '''
+    def __get_children_info(self, accumulater, function, message, data_send, serial_function=None):
+        if self.__parallel_mode:
 	    failcount = 0
 	    mili_conns = []
 	    for mili_index in range(len(self.__parent_conns)):
 	        mili_conn, i = self.__parent_conns[mili_index]
-	        mili_conn.send(["labels of material", material])
+	        mili_conn.send([message, data_send])
 	        mili_conns.append(mili_conn)
 			
 	    while failcount < len(mili_conns):
@@ -1561,11 +1567,41 @@ class Mili:
 	                if query_response == None: 
 			    failcount += 1
 	                else:
-			    labels = self.__addDicts(query_response, labels)
+			    if function == self.__addDicts:
+			        accumulater = function(query_response, accumulater)
+			    if function == set.union:
+			        accumulater = function(set(query_response), accumulater)
+			    if function == None:
+			        accumulater = query_response
 	                    failcount += 1
 		    
 		if failcount >= len(mili_conns):
 		    break
+	else:
+	    for m in self.__milis:
+	        if message == "nodes of material":
+		    serial = serial_function(m, data_send)
+		    if serial: accumulater = function(set(serial), accumulater)
+		elif message == "nodes of elem":
+		    label, class_name = data_send
+		    val = serial_function(m, label, class_name)
+		    if val: accumulater = val
+		else: 
+		    accumulater = function(serial_function(m, data_send), accumulater)
+            
+	
+        return accumulater
+
+    '''
+    Find the labels associated with a material
+    '''
+    def labels_of_material(self, material, raw_data=True):
+        labels = defaultdict(list)
+	labels_list = []
+	class_names = []
+
+        if len(self.__milis) > 1:
+	    labels = self.__get_children_info(defaultdict(set), self.__addDicts, "labels of material", material, Mili.labels_of_material)
 		    
 	    for class_name in labels:
 	        l = list(labels[class_name])
@@ -1598,24 +1634,7 @@ class Mili:
         nodes = set()
 
         if len(self.__milis) > 1:
-	    failcount = 0
-	    mili_conns = []
-	    for mili_index in range(len(self.__parent_conns)):
-	        mili_conn, i = self.__parent_conns[mili_index]
-	        mili_conn.send(["nodes of material", material])
-	        mili_conns.append(mili_conn)
-			
-	    while failcount < len(mili_conns):
-	        for mili_conn in mili_conns:
-	            if mili_conn.poll():
-	                query_response = mili_conn.recv()
-	                if query_response == None: 
-			    failcount += 1
-	                else:
-			    nodes = nodes.union(set(query_response))
-	                    failcount += 1
-		if failcount >= len(mili_conns):
-		    break
+	    nodes = self.__get_children_info(set(), set.union, "nodes of material", material, Mili.nodes_of_material)
         else:
             elements = self.__elements_of_material(material)
             if not elements:
@@ -1640,24 +1659,8 @@ class Mili:
     def nodes_of_elem(self, label, class_name, raw_data=True):
         labels = None
 	if len(self.__milis) > 1:
-	    failcount = 0
-	    mili_conns = []
-	    for mili_index in range(len(self.__parent_conns)):
-	        mili_conn, i = self.__parent_conns[mili_index]
-	        mili_conn.send(["nodes of elem", label, class_name])
-	        mili_conns.append(mili_conn)
-			
-	    while failcount < len(mili_conns):
-	        for mili_conn in mili_conns:
-	            if mili_conn.poll():
-	                query_response = mili_conn.recv()
-	                if query_response == None: 
-			    failcount += 1
-	                else:
-			    labels = query_response
-	                    failcount = len(mili_conns)
-		if failcount >= len(mili_conns):
-		    break
+	    labels = self.__get_children_info(None, None, "nodes of elem", [label, class_name], Mili.nodes_of_elem)
+	    
         else:
             if class_name not in self.__mesh_object_class_datas:
                 return self.__error('Class name ' + class_name + ' not found')
@@ -1702,10 +1705,15 @@ class Mili:
     '''
     def modify_state_variable(self, state_variable, class_name, value, labels, state_numbers, int_points=False):
         if len(self.__milis) > 1:
-	    for mili_index in range(len(self.__parent_conns)):
-	        mili_conn, i = self.__parent_conns[mili_index]
-	        mili_conn.send(["modify", state_variable, class_name, value, labels, state_numbers, int_points])
+	    if self.__parallel_mode:
+	        for mili_index in range(len(self.__parent_conns)):
+	            mili_conn, i = self.__parent_conns[mili_index]
+	            mili_conn.send(["modify", state_variable, class_name, value, labels, state_numbers, int_points])
+	    else:
+	        for mili_index in range(len(self.__milis)):
+		    self.__milis[mili_index].modify_state_variable(state_variable, class_name, value, labels, state_numbers, int_points)
 	    return
+  
 
 	query = self.query(state_variable, class_name, None, labels, state_numbers, True, int_points)
         if type(query) is not list:
@@ -1815,15 +1823,15 @@ This function is an example of how a user could use the Mili reader
 def main():
     #f = 'd3samp6.plt'
     f = 'parallel/d3samp6.plt'
-    f = "taurus/taurus.plt"
+    #f = "taurus/taurus.plt"
+    # f = '/usr/workspace/wsrzc/legler5/BigMili/dblplt'
     mili = Mili()
-    mili.read(f)
+    mili.read(f, parallel_read=True)
+    #mili.read(f, parallel_read=False)
     mili.setErrorFile()
     
-    # print mili.getMaterials()
-        
-    mili.end_querying()
-
+    #print mili.getMaterials()
+    print mili.query(['nodpos[ux]', 'uy'], 'node', None, 4, 3)
 
 if __name__ == '__main__':
         main()
