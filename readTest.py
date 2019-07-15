@@ -59,7 +59,7 @@ class TestMiliReader(unittest.TestCase):
     '''
     def test_nodes_material(self):
         answer = self.mili.nodes_of_material('es_1', False)
-        assert(len(answer.items) == 48)
+        assert(len(answer.items) == 46)
         for i in range(len(answer.items)):
            assert(answer.items[i].label == i + 1)
     
@@ -77,9 +77,9 @@ class TestMiliReader(unittest.TestCase):
     Testing accessing a variable at a given state
     '''
     def test_state_variable(self):
-        answer = self.mili.query(['matke'], 'mat', None, [1,2], [3, 4], raw_data=False)
-        assert(len(answer.state_answers) == 2)
-        arr = [0.0, 1662.0]
+        answer = self.mili.query(['matcgx'], 'mat', None, [1,2], [3], raw_data=False)
+        assert(len(answer.state_answers) == 1)
+        arr = [0.6021666526794434, 0.6706029176712036]
         for i in range(len(answer.state_answers)):
             for j in range(len(answer.state_answers[i].items)):
                 assert(answer.state_answers[i].items[j].value == arr[j])
@@ -90,11 +90,11 @@ class TestMiliReader(unittest.TestCase):
     *Note* this is another case of state variable
     '''
     def test_node_attributes(self):
-        answer = self.mili.query(['nodpos[ux]'], 'node', None, [4], [3], None, None, False)
-        assert(answer.state_answers[0].items[0].value == 0.9659258127212524)
+        answer = self.mili.query(['nodpos[ux]'], 'node', None, [70], [3], None, None, False)
+        assert(answer.state_answers[0].items[0].value == 0.4330127537250519)
         
-        answer = self.mili.query(['ux'], 'node', None, [4], [3], None, None, False)
-        assert(answer.state_answers[0].items[0].value == 0.9659258127212524)
+        answer = self.mili.query(['ux'], 'node', None, [70], [3], None, None, False)
+        assert(answer.state_answers[0].items[0].value == 0.4330127537250519)
     
     '''
     Test querying by material name and number:
@@ -110,88 +110,88 @@ class TestMiliReader(unittest.TestCase):
     Testing the accessing of a vector, in this case node position
     '''
     def test_state_variable_vector(self):
-        answer = self.mili.query(['nodpos'], 'node', None, [4], [3], None, None, False)
-        arr = [0.9659258127212524, 0.4330127537250519, 1.000000238418579]
+        answer = self.mili.query(['nodpos'], 'node', None, [70], [3], None, None, False)
+        arr = [0.4330127537250519, 0.2500000596046448, 2.436666965484619]
         assert(answer.state_answers[0].items[0].value == arr)
     
     '''
     Testing the modification of a scalar state variable
     '''
     def test_modify_state_variable(self):
-        val = {3 : {'matke' : {1 : 5.5}}}
-        val2 = {3 : {'matke' : {1 : 0.0}}}
+        val = {3 : {'matcgx' : {1 : 5.5}}}
+        val2 = {3 : {'matcgx' : {1 : 0.6021666526794434}}}
     
         # Before change
-        answer = self.mili.query('matke', 'mat', None, [1], [3], None, None, False)
-        assert(answer.state_answers[0].items[0].value == 0.0)
+        answer = self.mili.query('matcgx', 'mat', None, [1], [3], None, None, False)
+        assert(answer.state_answers[0].items[0].value == 0.6021666526794434)
         
         # After change
-        self.mili.modify_state_variable('matke', 'mat', val, 1, [3])
-        answer = self.mili.query('matke', 'mat', None, [1], [3], None, None, False)
+        self.mili.modify_state_variable('matcgx', 'mat', val, 1, [3])
+        answer = self.mili.query('matcgx', 'mat', None, [1], [3], None, None, False)
         assert(answer.state_answers[0].items[0].value == 5.5)
         
         # Back to original
-        self.mili.modify_state_variable('matke', 'mat', val2, 1, [3])
-        answer = self.mili.query('matke', 'mat', None, [1], [3], None, None, False)
-        assert(answer.state_answers[0].items[0].value == 0.0)
+        self.mili.modify_state_variable('matcgx', 'mat', val2, 1, [3])
+        answer = self.mili.query('matcgx', 'mat', None, [1], [3], None, None, False)
+        assert(answer.state_answers[0].items[0].value == 0.6021666526794434)
     
     '''
     Testing the modification of a vector state variable
     '''
     def test_modify_vector(self):
-        val = {3 : {'nodpos' : {4 : [5.0, 6.0, 9.0], 5: [5.0, 6.0, 9.0]}}}
-        val2 = {3 : {'nodpos' : {4 : [0.9659258127212524, 0.4330127537250519, 1.000000238418579], 5 : [0.258819043636322, 0.25000011920928955, 9.362678099478217e-08]}}}
+        val = {3 : {'nodpos' : {70 : [5.0, 6.0, 9.0], 71: [5.0, 6.0, 9.0]}}}
+        val2 = {3 : {'nodpos' : {70 : [0.4330127537250519, 0.2500000596046448, 2.436666965484619], 71: [0.4330127239227295, 0.2499999850988388, 2.7033333778381348]}}}
         
         # Before change
-        answer = self.mili.query('nodpos', 'node', None, [4, 5], [3], None, None, False)
-        assert(answer.state_answers[0].items[0].value == [0.9659258127212524, 0.4330127537250519, 1.000000238418579])
-        assert(answer.state_answers[0].items[1].value == [0.258819043636322, 0.25000011920928955, 9.362678099478217e-08])
+        answer = self.mili.query('nodpos', 'node', None, [70, 71], [3], None, None, False)
+        assert(answer.state_answers[0].items[0].value == [0.4330127537250519, 0.2500000596046448, 2.436666965484619])
+        assert(answer.state_answers[0].items[1].value == [0.4330127239227295, 0.2499999850988388, 2.7033333778381348])
         
         
         # After change
-        self.mili.modify_state_variable('nodpos', 'node', val, [4, 5], [3])
-        answer = self.mili.query('nodpos', 'node', None, [4, 5], [3], None, None, False)
+        self.mili.modify_state_variable('nodpos', 'node', val, [70, 71], [3])
+        answer = self.mili.query('nodpos', 'node', None, [70, 71], [3], None, None, False)
         assert(answer.state_answers[0].items[0].value ==[5.0, 6.0, 9.0])
         assert(answer.state_answers[0].items[1].value ==[5.0, 6.0, 9.0])
         
         # Back to original
-        self.mili.modify_state_variable('nodpos', 'node', val2, [4, 5], [3])
-        answer = self.mili.query('nodpos', 'node', None, [4, 5], [3], None, None, False)
-        assert(answer.state_answers[0].items[0].value ==[0.9659258127212524, 0.4330127537250519, 1.000000238418579])
-        assert(answer.state_answers[0].items[1].value ==[0.258819043636322, 0.25000011920928955, 9.362678099478217e-08])
+        self.mili.modify_state_variable('nodpos', 'node', val2, [70, 71], [3])
+        answer = self.mili.query('nodpos', 'node', None, [70, 71], [3], None, None, False)
+        assert(answer.state_answers[0].items[0].value ==[0.4330127537250519, 0.2500000596046448, 2.436666965484619])
+        assert(answer.state_answers[0].items[1].value ==[0.4330127239227295, 0.2499999850988388, 2.7033333778381348])
     
     '''
     Testing the modification of a vector component
     '''
     def test_modify_vector_component(self):
-        val = {3 : {'nodpos[uz]' : {4 : 9.0, 5: 9.0}}}
-        val2 = {3 : {'nodpos[uz]' : {4 : 1.000000238418579, 5 : 9.362678099478217e-08}}}
+        val = {3 : {'nodpos[uz]' : {70 : 9.0, 71: 9.0}}}
+        val2 = {3 : {'nodpos[uz]' : {70 : 2.436666965484619, 71 : 2.7033333778381348}}}
         
         # Before change
-        answer = self.mili.query('nodpos[uz]', 'node', None, [4, 5], [3], None, None, False)
-        assert(answer.state_answers[0].items[0].value == 1.000000238418579)
-        assert(answer.state_answers[0].items[1].value == 9.362678099478217e-08)
+        answer = self.mili.query('nodpos[uz]', 'node', None, [70, 71], [3], None, None, False)
+        assert(answer.state_answers[0].items[0].value == 2.436666965484619)
+        assert(answer.state_answers[0].items[1].value == 2.7033333778381348)
     
         
         # After change
-        self.mili.modify_state_variable('nodpos[uz]', 'node', val, [4, 5], [3])
-        answer = self.mili.query('nodpos[uz]', 'node', None, [4, 5], [3], None, None, False)
+        self.mili.modify_state_variable('nodpos[uz]', 'node', val, [70, 71], [3])
+        answer = self.mili.query('nodpos[uz]', 'node', None, [70, 71], [3], None, None, False)
         assert(answer.state_answers[0].items[0].value == 9.0)
         assert(answer.state_answers[0].items[1].value == 9.0)
     
         
         # Back to original
-        self.mili.modify_state_variable('nodpos[uz]', 'node', val2, [4, 5], [3])
-        answer = self.mili.query('nodpos[uz]', 'node', None, [4, 5], [3], None, None, False)
-        assert(answer.state_answers[0].items[0].value == 1.000000238418579)
-        assert(answer.state_answers[0].items[1].value == 9.362678099478217e-08)
+        self.mili.modify_state_variable('nodpos[uz]', 'node', val2, [70, 71], [3])
+        answer = self.mili.query('nodpos[uz]', 'node', None, [70, 71], [3], None, None, False)
+        assert(answer.state_answers[0].items[0].value == 2.436666965484619)
+        assert(answer.state_answers[0].items[1].value == 2.7033333778381348)
         
     '''
     Test accessing a vector array
     '''
     def test_state_variable_vector_array(self):
         answer = self.mili.query('stress', 'beam', None, [5], [70], False, [2], False)
-        d = {'sz': {2: -5145.794921875}, 'sy': {2: -5545.70751953125}, 'sx': {2: 6544.61962890625}, 'szx': {2: -748.0955810546875}, 'sxy': {2: 6944.18017578125}, 'syz': {2: 1537.8297119140625}}
+        d = {'sz': {2: -3.736035978363361e-07}, 'sy': {2: -0.40591922402381897}, 'sx': {2: 6544.61962890625}, 'szx': {2: 6944.44775390625}, 'sxy': {2: 0.0}, 'syz': {2: 5146.49267578125}}
         assert(answer.state_answers[0].items[0].value == d)
     
     '''
@@ -199,15 +199,15 @@ class TestMiliReader(unittest.TestCase):
     '''
     def test_state_variable_vector_array_component(self):
         answer = self.mili.query('stress[sy]', 'beam', None, [5], [70], False, [2], False)
-        assert(answer.state_answers[0].items[0].value == {'sy' : {2: -5545.70751953125}})
+        assert(answer.state_answers[0].items[0].value == {'sy' : {2: -0.40591922402381897}})
         
     '''
     Test modifying a vector array 
     '''
     def test_modify_vector_array(self):
          # Before change
-        d = {70 : {'stress' : {5 : {'sz': {2: -5145.794921875}, 'sy': {2: -5545.70751953125}, 'sx': {2: 6544.61962890625}, 'szx': {2: -748.0955810546875}, 'sxy': {2: 6944.18017578125}, 'syz': {2: 1537.8297119140625}}}}}
-        dd = {'sz': {2: -5145.794921875}, 'sy': {2: -5545.70751953125}, 'sx': {2: 6544.61962890625}, 'szx': {2: -748.0955810546875}, 'sxy': {2: 6944.18017578125}, 'syz': {2: 1537.8297119140625}}
+        d = {70 : {'stress' : {5 : {'sz': {2: -3.736035978363361e-07}, 'sy': {2: -0.40591922402381897}, 'sx': {2: 6544.61962890625}, 'szx': {2: 6944.44775390625}, 'sxy': {2: 0.0}, 'syz': {2: 5146.49267578125}}}}}
+        dd = {'sz': {2: -3.736035978363361e-07}, 'sy': {2: -0.40591922402381897}, 'sx': {2: 6544.61962890625}, 'szx': {2: 6944.44775390625}, 'sxy': {2: 0.0}, 'syz': {2: 5146.49267578125}}
         answer = self.mili.query('stress', 'beam', None, [5], [70], False, [2], False)
         assert(answer.state_answers[0].items[0].value == dd)
         
@@ -225,8 +225,8 @@ class TestMiliReader(unittest.TestCase):
     Test modifying a vector array component
     '''
     def test_modify_vector_array_component(self):
-        d = {70 : {'stress' : {5 : {'sy': {2: -5545.70751953125}}}}}
-        dd = -5545.70751953125
+        d = {70 : {'stress' : {5 : {'sy': {2: -0.40591922402381897}}}}}
+        dd = -0.40591922402381897
         
         # Before change
         answer = self.mili.query('stress[sy]', 'beam', None, [5], [70], False, [2], False)
@@ -296,7 +296,7 @@ class TestMiliReaderParallel(unittest.TestCase):
     '''
     def test_nodes_material(self):
         answer = self.mili.nodes_of_material('es_1', False)
-        assert(len(answer.items) == 48)
+        assert(len(answer.items) == 46)
         for i in range(len(answer.items)):
            assert(answer.items[i].label == i + 1)
     
@@ -314,9 +314,9 @@ class TestMiliReaderParallel(unittest.TestCase):
     Testing accessing a variable at a given state
     '''
     def test_state_variable(self):
-        answer = self.mili.query(['matke'], 'mat', None, [1,2], [3, 4], raw_data=False)
-        assert(len(answer.state_answers) == 2)
-        arr = [0.0, 1662.0]
+        answer = self.mili.query(['matcgx'], 'mat', None, [1,2], [3], raw_data=False)
+        assert(len(answer.state_answers) == 1)
+        arr = [0.6021666526794434, 0.6706029176712036]
         for i in range(len(answer.state_answers)):
             for j in range(len(answer.state_answers[i].items)):
                 assert(answer.state_answers[i].items[j].value == arr[j])
@@ -327,18 +327,18 @@ class TestMiliReaderParallel(unittest.TestCase):
     *Note* this is another case of state variable
     '''
     def test_node_attributes(self):
-        answer = self.mili.query(['nodpos[ux]'], 'node', None, [4], [3], None, None, False)
-        assert(answer.state_answers[0].items[0].value == -3.2783542991410286e-08)
+        answer = self.mili.query(['nodpos[ux]'], 'node', None, [70], [3], None, None, False)
+        assert(answer.state_answers[0].items[0].value == 0.4330127537250519)
         
-        answer = self.mili.query(['ux'], 'node', None, [4], [3], None, None, False)
-        assert(-3.2783542991410286e-08 == answer.state_answers[0].items[0].value)
+        answer = self.mili.query(['ux'], 'node', None, [70], [3], None, None, False)
+        assert(0.4330127537250519 == answer.state_answers[0].items[0].value)
     
     '''
     Testing the accessing of a vector, in this case node position
     '''
     def test_state_variable_vector(self):
-        answer = self.mili.query(['nodpos'], 'node', None, [4], [3], raw_data=False)
-        arr = [-3.2783542991410286e-08, 2.9700000286102295, 0.0]
+        answer = self.mili.query(['nodpos'], 'node', None, [70], [3], raw_data=False)
+        arr = [0.4330127537250519, 0.2500000596046448, 2.436666965484619]
         assert(answer.state_answers[0].items[0].value == arr)
     
     '''
@@ -356,81 +356,95 @@ class TestMiliReaderParallel(unittest.TestCase):
     Testing the modification of a scalar state variable
     '''
     def test_modify_state_variable(self):
-        val = {3 : {'matke' : {1 : 5.5}}}
-        val2 = {3 : {'matke' : {1 : 0.0}}}
+        val = {3 : {'matcgx' : {1 : 5.5}}}
+        val2 = {3 : {'matcgx' : {1 : 0.6021666526794434}}}
     
         # Before change
-        answer = self.mili.query('matke', 'mat', None, [1], [3], None, None, False)
-        assert(answer.state_answers[0].items[0].value == 0.0)
+        answer = self.mili.query('matcgx', 'mat', None, [1], [3], None, None, False)
+        assert(answer.state_answers[0].items[0].value == 0.6021666526794434)
         
         # After change
-        self.mili.modify_state_variable('matke', 'mat', val, 1, [3])
-        answer = self.mili.query('matke', 'mat', None, [1], [3], None, None, False)
+        self.mili.modify_state_variable('matcgx', 'mat', val, 1, [3])
+        answer = self.mili.query('matcgx', 'mat', None, [1], [3], None, None, False)
         assert(answer.state_answers[0].items[0].value == 5.5)
         
         # Back to original
-        self.mili.modify_state_variable('matke', 'mat', val2, 1, [3])
-        answer = self.mili.query('matke', 'mat', None, [1], [3], None, None, False)
-        assert(answer.state_answers[0].items[0].value == 0.0)
+        self.mili.modify_state_variable('matcgx', 'mat', val2, 1, [3])
+        answer = self.mili.query('matcgx', 'mat', None, [1], [3], None, None, False)
+        assert(answer.state_answers[0].items[0].value == 0.6021666526794434)
     
     '''
     Testing the modification of a vector state variable
     '''
     def test_modify_vector(self):
-        val = {3 : {'nodpos' : {4 : [5.0, 6.0, 9.0], 5: [5.0, 6.0, 9.0]}}}
-        val2 = {3 : {'nodpos' : {4 : [-3.2783542991410286e-08, 2.9700000286102295, 0.0], 5 : [0.75, 0.0, -1000.0]}}}
+        val = {3 : {'nodpos' : {70 : [5.0, 6.0, 9.0], 71: [5.0, 6.0, 9.0]}}}
+        val2 = {3 : {'nodpos' : {70 : [0.4330127537250519, 0.2500000596046448, 2.436666965484619], 71: [0.4330127239227295, 0.2499999850988388, 2.7033333778381348]}}}
         
         # Before change
-        answer = self.mili.query('nodpos', 'node', None, [4, 5], [3], None, None, False)
-        assert(answer.state_answers[0].items[0].value == [-3.2783542991410286e-08, 2.9700000286102295, 0.0])
-        assert(answer.state_answers[0].items[1].value == [0.75, 0.0, -1000.0])
+        answer = self.mili.query('nodpos', 'node', None, [70, 71], [3], None, None, False)
+        assert(answer.state_answers[0].items[0].value == [0.4330127537250519, 0.2500000596046448, 2.436666965484619])
+        assert(answer.state_answers[0].items[1].value == [0.4330127239227295, 0.2499999850988388, 2.7033333778381348])
         
         
         # After change
-        self.mili.modify_state_variable('nodpos', 'node', val, [4, 5], [3])
-        answer = self.mili.query('nodpos', 'node', None, [4, 5], [3], None, None, False)
+        self.mili.modify_state_variable('nodpos', 'node', val, [70, 71], [3])
+        answer = self.mili.query('nodpos', 'node', None, [70, 71], [3], None, None, False)
         assert(answer.state_answers[0].items[0].value ==[5.0, 6.0, 9.0])
         assert(answer.state_answers[0].items[1].value ==[5.0, 6.0, 9.0])
         
         # Back to original
-        self.mili.modify_state_variable('nodpos', 'node', val2, [4, 5], [3])
-        answer = self.mili.query('nodpos', 'node', None, [4, 5], [3], None, None, False)
-        assert(answer.state_answers[0].items[0].value ==[-3.2783542991410286e-08, 2.9700000286102295, 0.0])
-        assert(answer.state_answers[0].items[1].value ==[0.75, 0.0, -1000.0])
+        self.mili.modify_state_variable('nodpos', 'node', val2, [70, 71], [3])
+        answer = self.mili.query('nodpos', 'node', None, [70, 71], [3], None, None, False)
+        assert(answer.state_answers[0].items[0].value ==[0.4330127537250519, 0.2500000596046448, 2.436666965484619])
+        assert(answer.state_answers[0].items[1].value ==[0.4330127239227295, 0.2499999850988388, 2.7033333778381348])
     
     '''
     Testing the modification of a vector component
     '''
     def test_modify_vector_component(self):
-        val = {3 : {'nodpos[uz]' : {4 : 9.0, 5: 9.0}}}
-        val2 = {3 : {'nodpos[uz]' : {4 : 0.0, 5 : -1000.0}}}
+        val = {3 : {'nodpos[uz]' : {70 : 9.0, 71: 9.0}}}
+        val2 = {3 : {'nodpos[uz]' : {70 : 2.436666965484619, 71 : 2.7033333778381348}}}
         
         # Before change
-        answer = self.mili.query('nodpos[uz]', 'node', None, [4, 5], [3], None, None, False)
-        assert(answer.state_answers[0].items[0].value == 0.0)
-        assert(answer.state_answers[0].items[1].value == -1000.0)
+        answer = self.mili.query('nodpos[uz]', 'node', None, [70, 71], [3], None, None, False)
+        assert(answer.state_answers[0].items[0].value == 2.436666965484619)
+        assert(answer.state_answers[0].items[1].value == 2.7033333778381348)
     
         
         # After change
-        self.mili.modify_state_variable('nodpos[uz]', 'node', val, [4, 5], [3])
-        answer = self.mili.query('nodpos[uz]', 'node', None, [4, 5], [3], None, None, False)
+        self.mili.modify_state_variable('nodpos[uz]', 'node', val, [70, 71], [3])
+        answer = self.mili.query('nodpos[uz]', 'node', None, [70, 71], [3], None, None, False)
         assert(answer.state_answers[0].items[0].value == 9.0)
         assert(answer.state_answers[0].items[1].value == 9.0)
     
         
         # Back to original
-        self.mili.modify_state_variable('nodpos[uz]', 'node', val2, [4, 5], [3])
-        answer = self.mili.query('nodpos[uz]', 'node', None, [4, 5], [3], None, None, False)
-        assert(answer.state_answers[0].items[0].value == 0.0)
-        assert(answer.state_answers[0].items[1].value == -1000.0)
-			
+        self.mili.modify_state_variable('nodpos[uz]', 'node', val2, [70, 71], [3])
+        answer = self.mili.query('nodpos[uz]', 'node', None, [70, 71], [3], None, None, False)
+        assert(answer.state_answers[0].items[0].value == 2.436666965484619)
+        assert(answer.state_answers[0].items[1].value == 2.7033333778381348)
+
+    '''
+    Test accessing a vector array
+    '''
+    def test_state_variable_vector_array(self):
+        answer = self.mili.query('stress', 'beam', None, [5], [70], False, [2], False)
+        d = {'sz': {2: -2.4870882953109685e-07}, 'sy': {2: -0.2791216969490051}, 'sx': {2: 6544.6015625}, 'szx': {2: 6944.56103515625}, 'sxy': {2: 0.0}, 'syz': {2: 5146.34326171875}}
+        assert(answer.state_answers[0].items[0].value == d)
+   
+    '''
+    Test accessing a vector array component
+    '''
+    def test_state_variable_vector_array_component(self):
+        answer = self.mili.query('stress[sy]', 'beam', None, [5], [70], False, [2], False)
+        assert(answer.state_answers[0].items[0].value == {'sy' : {2: -0.2791216969490051}})		
+    
     '''
     Test modifying a vector array 
     '''
     def test_modify_vector_array(self):
-
-        d = {70 : {'stress' : {5 : {'sz': {2: -5145.64404296875}, 'sy': {2: -5545.68701171875}, 'sx': {2: 6544.6015625}, 'szx': {2: -748.0105590820312}, 'sxy': {2: 6944.29248046875}, 'syz': {2: 1537.8612060546875}}}}}
-        dd = {'sz': {2: -5145.64404296875}, 'sy': {2: -5545.68701171875}, 'sx': {2: 6544.6015625}, 'szx': {2: -748.0105590820312}, 'sxy': {2: 6944.29248046875}, 'syz': {2: 1537.8612060546875}}
+        d = {70 : {'stress' : {5 : {'sz': {2: -2.4870882953109685e-07}, 'sy': {2: -0.2791216969490051}, 'sx': {2: 6544.6015625}, 'szx': {2: 6944.56103515625}, 'sxy': {2: 0.0}, 'syz': {2: 5146.34326171875}}}}}
+        dd = {'sz': {2: -2.4870882953109685e-07}, 'sy': {2: -0.2791216969490051}, 'sx': {2: 6544.6015625}, 'szx': {2: 6944.56103515625}, 'sxy': {2: 0.0}, 'syz': {2: 5146.34326171875}}
         answer = self.mili.query('stress', 'beam', None, [5], [70], False, [2], False)
         assert(answer.state_answers[0].items[0].value == dd)
         
@@ -449,8 +463,8 @@ class TestMiliReaderParallel(unittest.TestCase):
     Test modifying a vector array component
     '''
     def test_modify_vector_array_component(self):
-        d = {70 : {'stress' : {5 : {'sy': {2: -5545.68701171875}}}}}
-        dd = -5545.68701171875
+        d = {70 : {'stress' : {5 : {'sy': {2: -0.2791216969490051}}}}}
+        dd = -0.2791216969490051
         
         # Before change
         answer = self.mili.query('stress[sy]', 'beam', None, [5], [70], False, [2], False)

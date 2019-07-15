@@ -344,7 +344,7 @@ and subrecords. It also has a number of querying functions that a user can call
 to access this data. Takes in the path of the file to read
 '''
 class Mili:
-    def __init__(self, read_file=None):
+    def __init__(self, read_file=None, parallel_read=False):
         self.__milis = [] # list of parallel mili files
 	self.__parent_conns = [] # list of parent connection, index number
 	self.__mili_num = None # Number of mili file (processor number)
@@ -380,9 +380,9 @@ class Mili:
         self.__filename = None
         self.__state_map_filename = None
 	self.__error_file = None
-	self.__parallel_mode = False
+	self.__parallel_mode = parallel_read
 
-	if read_file: self.read(read_file)
+	if read_file: self.read(read_file, parallel_read=self.__parallel_mode)
     
     '''
     Close down all connections
@@ -530,8 +530,8 @@ class Mili:
 
                     self.__labels[('M_NODE', 'node')] = {}
                     for j in range (first-1, last):
-                        self.__labels[('M_NODE', 'node')][j+1] = node_labels[j]
-			self.__labeltomili[('M_NODE', 'node')][j+1].append(self.__mili_num)
+                        self.__labels[('M_NODE', 'node')][node_labels[j]] = j+1
+			self.__labeltomili[('M_NODE', 'node')][node_labels[j]].append(self.__mili_num)
 
 
                 if 'Element Label' in name:
@@ -905,6 +905,10 @@ class Mili:
 	    self.__split_reads(orig, parallel_read)
 	    return
         else:
+	    if parallel_read:
+	        self.__error('Reading in serial mode, since there are less than 2 mili files')
+		parallel_read = False
+		self.__parallel_mode = False
             state_files = []
             for f in os.listdir(dir_name):
                 if file_name in f and f[-1] != 'A':
@@ -1034,7 +1038,8 @@ class Mili:
         # These are the mo_ids we are interested in for this subrecord
         for label in labels:
             if label not in self.__labels[(sup_class, clas)]:
-                return self.__error('label ' + str(label) + ' was not found in ' + clas)
+                # return self.__error('label ' + str(label) + ' was not found in ' + clas)
+		nothing = 0
             else:
                 mo_search_arr.append([label, self.__labels[(sup_class, clas)][label]])
 
@@ -1053,24 +1058,38 @@ class Mili:
         indices[sub] = defaultdict(list)
 
         # Deal with aggregate types and create list of state variable names
+	
         if name in self.__state_variables and AggregateType(self.__state_variables[name][0].agg_type).name == 'VECTOR':
             variables = self.__state_variables[name][0].svars
-
+        
         sv_names = []
+	sv_group_start = {}
+	sv_group_start[0] = 0
+	sv_group_len = {}
+	group_idx = 0
         for sv in subrecord.svar_names:
             sv_var = self.__state_variables[sv][0]
+	    sv_group_len[group_idx] = max(1, len(sv_var.svars))
+	    if group_idx: sv_group_start[group_idx] = sv_group_start[group_idx-1] + sv_group_len[group_idx]
             if len(sv_var.svars) > 0:
                 for sv_name in sv_var.svars:
                     sv_names.append(sv_name)
             else:
                 sv_names.append(sv)
-
+	    group_idx += 1
+		
         var_indexes = []
         for child in variables:
             if child not in sv_names:
                 return self.__error(child + ' not a valid variable name')
-            var_indexes.append(sv_names.index(child))
-
+            # var_indexes.append(sv_names.index(child))
+	    for sv_group in subrecord.svar_names:
+	        if sv_group == child: 
+		    var_indexes.append([subrecord.svar_names.index(sv_group), 0])
+	        sv = self.__state_variables[sv_group][0].svars
+	        if child in sv:
+	            var_indexes.append([subrecord.svar_names.index(sv_group), sv.index(child)])
+		    	    
         # Add correct values given organizational structure and correct indexing
         if int_points:
             int_points, num_int_points = int_points[:-1], int_points[-1:][0]
@@ -1080,17 +1099,19 @@ class Mili:
             else: indexes = []
             label, mo_index = mo_index
             for var_index in var_indexes:
-                if int_points: indexes[var_index] = {}
+	        var_index, var_in_group = var_index
+		if int_points: var_index = var_in_group
+                if int_points and var_index not in indexes: indexes[var_index] = {}
                 if int_points:
                     offset = mo_index * len(sv_names) * num_int_points
                     for int_point in int_points:
-                        index = offset + var_index * len(sv_names) + int_point - 1
+                        index = offset + var_index * num_int_points + int_point - 1
                         indexes[var_index][int_point] = index
                 else:
                     if subrecord.organization == DataOrganization.OBJECT.value:
-                        indexes.append(mo_index * len(sv_names) + var_index)
+                        indexes.append(mo_index * len(sv_names) + sv_group_start[var_index] + var_in_group)
                     else:
-                        indexes.append(var_index * subrecord.mo_qty + mo_index)
+                        indexes.append(sv_group_start[var_index] * subrecord.mo_qty + sv_group_len[var_index] * mo_index + var_in_group)
 
             # 3 different aggregate types here - contructing the res
             if int_points:
@@ -1106,7 +1127,7 @@ class Mili:
                         indices[sub][label][sv_names[index]][int_point] = indexes[index][int_point]
                     v_index += 1
             elif name in self.__state_variables and AggregateType(self.__state_variables[name][0].agg_type).name == 'VECTOR':
-                res[state][name][label] = []
+		res[state][name][label] = []
                 for index in indexes:
                     res[state][name][label].append(vars[index])
                     indices[sub][label].append(index)
@@ -1365,8 +1386,8 @@ class Mili:
     The following is the structure of the result that is passed to create answer
     res[state][name][label] = value
     '''
-    def query(self, names, class_name, material=None, labels=None, state_numbers=None, modify=False, int_points=False, raw_data=True, res=defaultdict(dict)):
-        # Parse Arguments
+    def query(self, names, class_name, material=None, labels=None, state_numbers=None, modify=False, int_points=False, raw_data=True, res=defaultdict(dict)):	
+	# Parse Arguments
         if not state_numbers:
             state_numbers = [i-1 for i in range(1, self.__number_of_state_maps + 1)]
         elif type(state_numbers) is int:
@@ -1389,10 +1410,10 @@ class Mili:
         if labels:
             if type(labels) is not list or type(labels[0]) is not int:
                 return self.__error('labels must of a list of ints or an int')
-        if not labels:
+        if not labels and not self.__parallel_mode:
             sup_class = self.__mesh_object_class_datas[class_name].superclass
             sup_class = Superclass(sup_class).name
-            labels = self.__labels[(sup_class, class_name)]
+            labels = self.__labels[(sup_class, class_name)].keys()
 
         if type(names) is str:
             names = [names]
@@ -1425,12 +1446,14 @@ class Mili:
 		failcount = 0
 		milis = set()
 	        mili_to_labels = defaultdict(list)
-		for label in labels:
-                    mili = self.__labeltomili[(sup_class, class_name)][label]
-		    for m in mili:
-		        mili_to_labels[m].append(label)
-		        milis.add(m)
-		milis = list(milis)
+		if labels != None:
+		    for label in labels:
+                        mili = self.__labeltomili[(sup_class, class_name)][label]
+		        for m in mili:
+		            mili_to_labels[m].append(label)
+		            milis.add(m)
+		    milis = list(milis)
+		if not labels: milis = set([i for i in range(len(self.__milis))])
 		
 		if self.__parallel_mode:
 		    mili_conns = []
@@ -1450,7 +1473,8 @@ class Mili:
 		else:
 		    for mili_index in milis:
 		        resp = self.__milis[mili_index].query(sv, class_name, material, mili_to_labels[mili_index], state_numbers, modify, int_points, True, answ)
-		        if resp: answ = resp 
+			if resp: 
+			    answ = resp 
 			
             return self.__create_answer(answ, names, material, labels, class_name, state_numbers, modify, raw_data)
 
@@ -1495,7 +1519,7 @@ class Mili:
                                 int_points[i] = ip
                         int_points.append(len(self.__is_vec_array(vector, class_name)))
 
-                    elif vector:
+                    elif vector: 
                         if vector not in self.__state_variables:
                             return self.__error('There is no variable ' + vector)
                         sv, subrecords = self.__state_variables[vector]
@@ -1503,7 +1527,7 @@ class Mili:
                         if name not in self.__state_variables:
                             return self.__error('There is no variable ' + name)
                         sv, subrecords = self.__state_variables[name]
-
+                     
                     for sub in subrecords:
                         subrecord = self.__srec_container.subrecs[sub]
                         f.seek(subrecord.offset, 1)
@@ -1636,14 +1660,13 @@ class Mili:
         if len(self.__milis) > 1:
 	    nodes = self.__get_children_info(set(), set.union, "nodes of material", material, Mili.nodes_of_material)
         else:
-            elements = self.__elements_of_material(material)
-            if not elements:
-                return self.__error('There are no elements with material ' + str(material))
-            for class_name in elements:
-                mo_ids = elements[class_name]
-                for mo_id in mo_ids:
-                    for node in self.__connectivity[class_name][mo_id]:
-                        nodes.add(self.__labels[('M_NODE', 'node')][node])
+            labels = self.labels_of_material(material)
+            if not labels:
+                return self.__error('There are no labels with material ' + str(material))
+            for class_name in labels:
+                labs = labels[class_name]
+                for lab in labs:
+		    nodes.add(lab)
 
         if raw_data:
             return list(nodes)
@@ -1718,7 +1741,7 @@ class Mili:
 	query = self.query(state_variable, class_name, None, labels, state_numbers, True, int_points)
         if type(query) is not list:
 	    return None
-
+        
         res, indices = query
         type_to_str = {'s' : 'M_STRING', 'f' : 'M_FLOAT', 'd' : 'M_FLOAT8', 'i' : 'M_INT', 'q' : 'M_INT8'}
 
@@ -1821,17 +1844,16 @@ class Mili:
 This function is an example of how a user could use the Mili reader
 '''
 def main():
-    #f = 'd3samp6.plt'
-    f = 'parallel/d3samp6.plt'
-    #f = "taurus/taurus.plt"
-    # f = '/usr/workspace/wsrzc/legler5/BigMili/dblplt'
-    mili = Mili()
-    mili.read(f, parallel_read=True)
-    #mili.read(f, parallel_read=False)
-    mili.setErrorFile()
+    # You can run code here as well if you copy the library!
     
-    #print mili.getMaterials()
-    print mili.query(['nodpos[ux]', 'uy'], 'node', None, 4, 3)
-
+    #f = 'd3samp6.plt'
+    #f = 'parallel/d3samp6.plt'
+    #f = "taurus/taurus.plt"
+    #f = '/usr/workspace/wsrzc/legler5/BigMili/dblplt'
+    #mili = Mili()
+    #mili.read(f, parallel_read=True)
+    #mili.read(f, parallel_read=False)
+    #mili.setErrorFile()
+    
 if __name__ == '__main__':
         main()
