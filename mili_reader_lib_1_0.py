@@ -1846,7 +1846,7 @@ This function is an example of how a user could use the Mili reader
 def main():
     # You can run code here as well if you copy the library!
     
-    #f = 'd3samp6.plt'
+    f = 'd3samp6.plt'
     #f = 'parallel/d3samp6.plt'
     #f = "taurus/taurus.plt"
     #f = '/usr/workspace/wsrzc/legler5/BigMili/dblplt'
