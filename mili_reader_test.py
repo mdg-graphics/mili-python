@@ -12,11 +12,11 @@ class TestMiliReader(unittest.TestCase):
     Set up the mili file object
     '''
     def setUp(self):        
-    	file_name = 'd3samp6.plt'
+        file_name = 'd3samp6.plt'
         #file_name = 'states/d3samp6.plt'    
         self.mili = read.Mili(file_name)
         self.mili.setErrorFile()
-	
+        
     '''
     Testing invalid inputs
     '''
@@ -101,10 +101,10 @@ class TestMiliReader(unittest.TestCase):
     '''
     def test_query_material(self):
         answer = self.mili.query('sx', 'brick', 2, None, [37], raw_data=False)
-	assert(len(answer.state_answers[0].items) == 36)
-	
-	answer = self.mili.query('sx', 'brick', 'es_12', None, [37], raw_data=False)
-	assert(len(answer.state_answers[0].items) == 36)
+        assert(len(answer.state_answers[0].items) == 36)
+        
+        answer = self.mili.query('sx', 'brick', 'es_12', None, [37], raw_data=False)
+        assert(len(answer.state_answers[0].items) == 36)
     
     '''
     Testing the accessing of a vector, in this case node position
@@ -254,8 +254,8 @@ class TestMiliReaderParallel(unittest.TestCase):
     def setUp(self):
         file_name = 'parallel/d3samp6.plt'
         self.mili = read.Mili()
-	self.mili.read(file_name, parallel_read=True)
-	self.mili.setErrorFile()   
+        self.mili.read(file_name, parallel_read=True)
+        self.mili.setErrorFile()   
     
     '''
     Testing invalid inputs
@@ -346,10 +346,10 @@ class TestMiliReaderParallel(unittest.TestCase):
     '''
     def test_query_material(self):
         answer = self.mili.query('sx', 'brick', 2, None, [37], raw_data=False)
-	assert(len(answer.state_answers[0].items) == 36)
-	
-	answer = self.mili.query('sx', 'brick', 'es_12', None, [37], raw_data=False)
-	assert(len(answer.state_answers[0].items) == 36)
+        assert(len(answer.state_answers[0].items) == 36)
+        
+        answer = self.mili.query('sx', 'brick', 'es_12', None, [37], raw_data=False)
+        assert(len(answer.state_answers[0].items) == 36)
     
     
     '''
