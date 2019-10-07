@@ -1,5 +1,5 @@
 import unittest
-import mili_reader_lib as read
+import mili_reader_lib as reader
 import os, sys
 import psutil
 '''
@@ -14,7 +14,7 @@ class TestMiliReader(unittest.TestCase):
     def setUp(self):        
         file_name = 'd3samp6.plt'
         #file_name = 'states/d3samp6.plt'    
-        self.mili = read.Mili(file_name)
+        self.mili = reader.Mili(file_name)
         self.mili.setErrorFile()
         
     '''
@@ -253,8 +253,8 @@ class TestMiliReaderParallel(unittest.TestCase):
     '''
     def setUp(self):
         file_name = 'parallel/d3samp6.plt'
-        self.mili = read.Mili()
-        self.mili.read(file_name, parallel_read=True)
+        self.mili = reader.Mili()
+        self.mili.read(file_name, parallel_read=False)
         self.mili.setErrorFile()   
     
     '''
@@ -481,6 +481,8 @@ class TestMiliReaderParallel(unittest.TestCase):
         self.mili.modify_state_variable('stress[sy]', 'beam', d, 5, [70], [2])
         answer = self.mili.query('stress[sy]', 'beam', None, [5], [70], False, [2], False)
         assert(answer.state_answers[0].items[0].value['sy'][2] == dd)
+    
+    
     
 if __name__ == '__main__':
     unittest.main()

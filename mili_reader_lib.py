@@ -785,12 +785,15 @@ class Mili:
                 else:
                     cdata = struct.unpack(str(srec_c_data) + 's', f.read(srec_c_data))[0].split(b'\x00')
                 
+		
                 int_pos = 0
                 c_pos = 0
                 self.__srec_container = SubrecordContainer()
 
                 for k in range(srec_qty_subrecs):
                     org, qty_svars, qty_id_blks = idata[int_pos], idata[int_pos+1], idata[int_pos+2]
+		    
+		    
                     # for j in range(qty_id_blks):
 
                     int_pos += 3
@@ -901,6 +904,10 @@ class Mili:
     Mili file.
     '''
     def read(self, file_name, labeltomili=None, mili_num=None, parallel_read=False):
+        if self.__filename:
+	    self.__error('This mili object is already instantiated. You must create another.')
+	    return
+	    
         self.__parallel_mode = parallel_read
         orig = file_name
         # Handle case of multiple state files
@@ -980,8 +987,9 @@ class Mili:
 
                 ### SUBRECORD DATA ###
                 self.__readSubrecords(f)
-            
-        return [self.__labeltomili, self.__mesh_object_class_datas]
+        
+	if self.__mili_num is not None:
+            return [self.__labeltomili, self.__mesh_object_class_datas]
 
     '''
     Take name and turn it into vector and component names
@@ -1863,16 +1871,14 @@ This function is an example of how a user could use the Mili reader
 def main():
     # You can run code here as well if you copy the library!
     
-    f = '/g/g20/legler5/mili-python/d3samp6.plt'
-    #f = '/g/g20/legler5/mili-python/parallel/d3samp6.plt'
+    #f = '/g/g20/legler5/Xmilics/XMILICS-toss_3_x86_64-RZTRONA/bin_debug/HexModel1.plt_c'
+    f = '/g/g20/legler5/Mili/MILI-toss_3_x86_64_ib-RZGENIE/d3samp6.plt'
     #f = "taurus/taurus.plt"
     #f = '/usr/workspace/wsrzc/legler5/BigMili/dblplt'
     mili = Mili()
     #mili.read(f, parallel_read=True)
-    mili.read(f, parallel_read=False)
+    #mili.read(f, parallel_read=False)
     #mili.setErrorFile()
-    
-    print(len(mili.getStateMaps()))
-    
+        
 if __name__ == '__main__':
         main()
