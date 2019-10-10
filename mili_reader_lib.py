@@ -515,7 +515,7 @@ class Mili:
 
                 type_rep = type_to_str[DataType(type).name]
                 type_value = ExtSize[DataType(type).name].value
-
+		
                 if type_to_str[DataType(type).name] == 's':
                     if (sys.version_info > (3, 0)):
                         self.__params[name] = [str(struct.unpack(self.__tag + str(int(directory.length_idx/type_value)) + type_rep, byte_array)[0])[2:].split('\\x00'), directory]
@@ -523,7 +523,7 @@ class Mili:
                         self.__params[name] = [struct.unpack(self.__tag + str(int(directory.length_idx/type_value)) + type_rep, byte_array)[0].split(b'\x00')[0], directory]                
                 else:
                     self.__params[name] = [struct.unpack(self.__tag + str(int(directory.length_idx/type_value)) + type_rep, byte_array), directory]
-
+                		
                 if name == 'mesh dimensions':
                     f.seek(directory.offset_idx)
                     byte_array = f.read(directory.length_idx)
@@ -1076,7 +1076,7 @@ class Mili:
             start, end = range
             for mo_search in mo_search_arr:
                 label, mo_search = mo_search
-                if mo_search >= start or mo_search <= end:
+                if mo_search >= start and mo_search <= end:
                     mo_idx_found.append([label, mo_index + mo_search - start])
             mo_index += end - start
 
@@ -1872,12 +1872,20 @@ def main():
     # You can run code here as well if you copy the library!
     
     #f = '/g/g20/legler5/Xmilics/XMILICS-toss_3_x86_64-RZTRONA/bin_debug/HexModel1.plt_c'
-    f = '/g/g20/legler5/Mili/MILI-toss_3_x86_64_ib-RZGENIE/d3samp6.plt'
+    #f = '/g/g20/legler5/Mili/MILI-toss_3_x86_64_ib-RZGENIE/d3samp6.plt'
     #f = "taurus/taurus.plt"
     #f = '/usr/workspace/wsrzc/legler5/BigMili/dblplt'
+    f = 'dblplt'
     mili = Mili()
-    #mili.read(f, parallel_read=True)
-    #mili.read(f, parallel_read=False)
+    # mili.read(f, parallel_read=True)
+    mili.read(f, parallel_read=False)
+    
+    d = mili.getParams()
+    
+    print d['Set_RGB_1']
+    
+    for sv in mili.getParams():
+        print sv
     #mili.setErrorFile()
         
 if __name__ == '__main__':
