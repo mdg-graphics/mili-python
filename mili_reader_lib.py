@@ -815,6 +815,9 @@ class Mili:
                             sub.mo_blocks.append([start, stop])
                             sub.mo_qty += stop - start + 1
                     else:
+		        for j in range(qty_id_blks):
+                            start, stop = idata[int_pos], idata[int_pos + 1]
+                            int_pos += 2
                         sub.mo_qty = 1
 
 
