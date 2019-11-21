@@ -815,7 +815,7 @@ class Mili:
                             sub.mo_blocks.append([start, stop])
                             sub.mo_qty += stop - start + 1
                     else:
-		        for j in range(qty_id_blks):
+                        for j in range(qty_id_blks):
                             start, stop = idata[int_pos], idata[int_pos + 1]
                             int_pos += 2
                         sub.mo_qty = 1
@@ -908,8 +908,8 @@ class Mili:
     '''
     def read(self, file_name, labeltomili=None, mili_num=None, parallel_read=False):
         if self.__filename:
-	    self.__error('This mili object is already instantiated. You must create another.')
-	    return
+            self.__error('This mili object is already instantiated. You must create another.')
+            return
 	    
         self.__parallel_mode = parallel_read
         orig = file_name
@@ -991,7 +991,7 @@ class Mili:
                 ### SUBRECORD DATA ###
                 self.__readSubrecords(f)
         
-	if self.__mili_num is not None:
+        if self.__mili_num is not None:
             return [self.__labeltomili, self.__mesh_object_class_datas]
 
     '''
@@ -1294,7 +1294,7 @@ class Mili:
                         for label_key in labmap:
                             self.__labeltomili[class_name][label_key].append(i)
                 i+= 1
-        
+	            
         if parallel_read:
             #Receive reads from children
             activeChildren = len(self.__parent_conns)
@@ -1438,10 +1438,17 @@ class Mili:
         if labels:
             if type(labels) is not list or type(labels[0]) is not int:
                 return self.__error('labels must of a list of ints or an int')
-        if not labels and not self.__parallel_mode:
+        
+        if not labels and class_name not in self.__mesh_object_class_datas:
+            return self.__create_answer({}, names, material, labels, class_name, state_numbers, modify, raw_data)
+        if not labels and not self.__parallel_mode and not len(self.__milis):
             sup_class = self.__mesh_object_class_datas[class_name].superclass
             sup_class = Superclass(sup_class).name
             labels = self.__labels[(sup_class, class_name)].keys()
+        if not labels and not self.__parallel_mode and len(self.__milis):
+            sup_class = self.__mesh_object_class_datas[class_name].superclass
+            sup_class = Superclass(sup_class).name
+            labels = self.__labeltomili[(sup_class, class_name)].keys()
 
         if type(names) is str:
             names = [names]
@@ -1878,17 +1885,13 @@ def main():
     #f = '/g/g20/legler5/Mili/MILI-toss_3_x86_64_ib-RZGENIE/d3samp6.plt'
     #f = "taurus/taurus.plt"
     #f = '/usr/workspace/wsrzc/legler5/BigMili/dblplt'
-    f = 'dblplt'
-    mili = Mili()
-    # mili.read(f, parallel_read=True)
-    mili.read(f, parallel_read=False)
-    
-    d = mili.getParams()
-    
-    print d['Set_RGB_1']
-    
-    for sv in mili.getParams():
-        print sv
+    #f = 'parallel/d3samp6.plt'
+    #f = 'd3samp6.plt_c'
+    #mili = Mili()
+    #mili.read(f, parallel_read=True)
+    #mili.read(f, parallel_read=False)
+    f = ''
+
     #mili.setErrorFile()
         
 if __name__ == '__main__':
