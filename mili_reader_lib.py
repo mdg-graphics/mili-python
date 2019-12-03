@@ -1886,11 +1886,15 @@ def main():
     #f = "taurus/taurus.plt"
     #f = '/usr/workspace/wsrzc/legler5/BigMili/dblplt'
     #f = 'parallel/d3samp6.plt'
-    #f = 'd3samp6.plt_c'
-    #mili = Mili()
+    f = 'd3samp6.plt'
+    mili = Mili()
     #mili.read(f, parallel_read=True)
-    #mili.read(f, parallel_read=False)
-    f = ''
+    mili.read(f, parallel_read=False)
+    
+    d = mili.getParams()
+    
+    print(mili.query('sz', 'brick', None, None, 10))
+    
 
     #mili.setErrorFile()
         
