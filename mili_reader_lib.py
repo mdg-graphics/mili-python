@@ -25,18 +25,22 @@ Copyright (c) 2016, Lawrence Livermore National Security, LLC.
 
 
 """
-import struct
-import os
-from enum import Enum
-import time
-from collections import defaultdict
-import multiprocessing as mp
-import psutil
-import sys
-
 '''
 This is the 'meta' information for a statemap, but not the statemap itself.
 '''
+
+from collections import defaultdict
+import os
+import struct
+import sys
+import time
+
+from enum import Enum
+import psutil
+
+import multiprocessing as mp
+
+
 class StateMap:
     def __init__(self, file_number, file_offset, time, state_map_id):
         self.file_number = file_number
@@ -73,7 +77,7 @@ class StateVariable:
         self.list_size = 0
         self.order = 0
         self.dims = []
-        self.svars = [] # list of string names included in this if it is vector
+        self.svars = []  # list of string names included in this if it is vector
 
     '''
     Returns the quantity of atoms based on the aggregate type.
@@ -112,7 +116,7 @@ class Subrecord:
         self.mo_blocks = []
         self.mo_qty = None
         self.offset = 0
-        self.size = 0 # set this mo_qty * size of variables
+        self.size = 0  # set this mo_qty * size of variables
 
 '''
 Each Mili object has a subrecord container holding all the subrecords.
@@ -153,7 +157,7 @@ class BlockList:
     def __init__(self, obj_qty, block_qty, blocks):
         self.obj_qty = obj_qty
         self.block_qty = block_qty
-        self.blocks = blocks # array of tuples with start, stop
+        self.blocks = blocks  # array of tuples with start, stop
 
 '''
 An attribute has a name and a value
@@ -179,13 +183,13 @@ Any number of its attributes may be None if they aren't filled
 class Item:
     def __init__(self, name=None, material=None, mo_id=None, label=None, class_name=None, modify=None, value=None):
         self.name = name
-        self.material= material
-        self.mo_id= mo_id
-        self.label= label
-        self.class_name= class_name
-        self.modify= modify
-        self.value= value
-        self.always_print = False # always print the value
+        self.material = material
+        self.mo_id = mo_id
+        self.label = label
+        self.class_name = class_name
+        self.modify = modify
+        self.value = value
+        self.always_print = False  # always print the value
 
     def set(self, value):
         self.value = value
@@ -213,7 +217,7 @@ Each contains a list of items and a state number
 class StateAnswer:
     def __init__(self):
         self.items = []
-        self.state_number=None
+        self.state_number = None
 
     def __str__(self):
         ret = '\nstate number: ' + str(self.state_number) + '\n'
@@ -232,7 +236,7 @@ the answer contains a list of state answers.
 class Answer:
 
     def __init__(self):
-        self.state_answers=[]
+        self.state_answers = []
         self.items = []
 
     def __str__(self):
@@ -293,7 +297,7 @@ class Superclass(Enum):
     M_QUAD = 5
     M_TET = 6
     M_PYRAMID = 7
-    M_WEDGE= 8
+    M_WEDGE = 8
     M_HEX = 9
     M_MAT = 10
     M_MESH = 11
@@ -317,7 +321,7 @@ class ConnWords(Enum):
     M_QUAD = 6
     M_TET = 6
     M_PYRAMID = 7
-    M_WEDGE= 8
+    M_WEDGE = 8
     M_HEX = 10
     M_MAT = 0
     M_MESH = 0
@@ -373,26 +377,26 @@ to access this data. Takes in the path of the file to read
 '''
 class Mili:
     def __init__(self, read_file=None, parallel_read=False):
-        self.__milis = [] # list of parallel mili files
-        self.__parent_conns = [] # list of parent connection, index number
-        self.__mili_num = None # Number of mili file (processor number)
-        self.__labeltomili = defaultdict(lambda: defaultdict(list)) # map from (superclass, label) to dict of label:file
+        self.__milis = []  # list of parallel mili files
+        self.__parent_conns = []  # list of parent connection, index number
+        self.__mili_num = None  # Number of mili file (processor number)
+        self.__labeltomili = defaultdict(lambda: defaultdict(list))  # map from (superclass, label) to dict of label:file
         self.__state_maps = []
         self.__directories = []
         self.__names = []
-        self.__params = {} # maps param name: [value]
-        self.__state_variables = {} # map to state variable, list of subrecords it is in
-        self.__mesh_object_class_datas = {} #shortname to object
-        self.__labels = {} # maps from label : elem_id
+        self.__params = {}  # maps param name: [value]
+        self.__state_variables = {}  # map to state variable, list of subrecords it is in
+        self.__mesh_object_class_datas = {}  # shortname to object
+        self.__labels = {}  # maps from label : elem_id
         self.__label_keys = []
         self.__int_points = {}
         self.__nodes = []
-        self.__materials = defaultdict(dict) # map from material number to dict of class to elems
-        self.__matname = {} # from material name to number
+        self.__materials = defaultdict(dict)  # map from material number to dict of class to elems
+        self.__matname = {}  # from material name to number
         for i in range(1000):
-            self.__matname[str(i)] = [i] # this is the default in case they don't have an entry for material names
-        self.__connectivity = {} # shortname : {mo_id : node}
-        self.__dim = None # dimensions from mesh dimensions
+            self.__matname[str(i)] = [i]  # this is the default in case they don't have an entry for material names
+        self.__connectivity = {}  # shortname : {mo_id : node}
+        self.__dim = None  # dimensions from mesh dimensions
         self.__srec_container = None
         self.__header_version = None
         self.__directory_version = None
@@ -519,7 +523,7 @@ class Mili:
         byte_array = struct.unpack(self.__tag + fmt, f.read(self.__null_termed_names_bytes))[0]
         
         if (sys.version_info > (3, 0)):
-            strings = str(byte_array)[2:].split('\\x00') # only works for Python3
+            strings = str(byte_array)[2:].split('\\x00')  # only works for Python3
         else:
             strings = byte_array.split(b'\x00')
         nnames = 0
@@ -542,36 +546,36 @@ class Mili:
 
                 type_rep = type_to_str[DataType(type).name]
                 type_value = ExtSize[DataType(type).name].value
-		
+        
                 if type_to_str[DataType(type).name] == 's':
                     if (sys.version_info > (3, 0)):
-                        self.__params[name] = [str(struct.unpack(self.__tag + str(int(directory.length_idx/type_value)) + type_rep, byte_array)[0])[2:].split('\\x00'), directory]
+                        self.__params[name] = [str(struct.unpack(self.__tag + str(int(directory.length_idx / type_value)) + type_rep, byte_array)[0])[2:].split('\\x00'), directory]
                     else:
-                        self.__params[name] = [struct.unpack(self.__tag + str(int(directory.length_idx/type_value)) + type_rep, byte_array)[0].split(b'\x00')[0], directory]                
+                        self.__params[name] = [struct.unpack(self.__tag + str(int(directory.length_idx / type_value)) + type_rep, byte_array)[0].split(b'\x00')[0], directory]                
                 else:
-                    self.__params[name] = [struct.unpack(self.__tag + str(int(directory.length_idx/type_value)) + type_rep, byte_array), directory]
-                		
+                    self.__params[name] = [struct.unpack(self.__tag + str(int(directory.length_idx / type_value)) + type_rep, byte_array), directory]
+                        
                 if name == 'mesh dimensions':
                     f.seek(directory.offset_idx)
                     byte_array = f.read(directory.length_idx)
-                    self.__dim = struct.unpack(self.__tag + str(int(directory.length_idx/4)) + 'i', byte_array)[0]
+                    self.__dim = struct.unpack(self.__tag + str(int(directory.length_idx / 4)) + 'i', byte_array)[0]
                 
                 if 'Node Labels' in name:
                     f.seek(directory.offset_idx)
                     byte_array = f.read(directory.length_idx)
-                    ints = struct.unpack(self.__tag + str(int(directory.length_idx/4)) + 'i', byte_array)
+                    ints = struct.unpack(self.__tag + str(int(directory.length_idx / 4)) + 'i', byte_array)
                     first, last, node_labels = ints[0], ints[1], ints[2:]
 
                     self.__labels[('M_NODE', 'node')] = {}
-                    for j in range (first-1, last):
-                        self.__labels[('M_NODE', 'node')][node_labels[j]] = j+1
+                    for j in range (first - 1, last):
+                        self.__labels[('M_NODE', 'node')][node_labels[j]] = j + 1
                         self.__labeltomili[('M_NODE', 'node')][node_labels[j]].append(self.__mili_num)
 
 
                 if 'Element Label' in name:
                     f.seek(directory.offset_idx)
                     byte_array = f.read(directory.length_idx)
-                    ints = struct.unpack(self.__tag + str(int(directory.length_idx/4)) + 'i', byte_array)
+                    ints = struct.unpack(self.__tag + str(int(directory.length_idx / 4)) + 'i', byte_array)
                     first, total, ints = ints[0], ints[1], ints[2:]
 
                     sup_class_idx = name.index('Scls-') + len('Scls-')
@@ -598,7 +602,7 @@ class Mili:
                     byte_array = f.read(directory.length_idx)
                     
                     if (sys.version_info > (3, 0)):
-                        matname = str(struct.unpack(str(directory.length_idx) + 's', byte_array)[0])[2:].split('\\x00')[0] # only works for Python3
+                        matname = str(struct.unpack(str(directory.length_idx) + 's', byte_array)[0])[2:].split('\\x00')[0]  # only works for Python3
                     else:
                         matname = struct.unpack(str(directory.length_idx) + 's', byte_array)[0].split(b'\x00')[0]
                     
@@ -611,8 +615,8 @@ class Mili:
                 if 'es_' in name:
                     f.seek(directory.offset_idx)
                     byte_array = f.read(directory.length_idx)
-                    i_points = struct.unpack(self.__tag + str(int(directory.length_idx/4)) + 'i', byte_array)
-                    first, total, i_points, num_i_ponts = i_points[0], i_points[1], i_points[2:len(i_points)- 1], i_points[len(i_points) - 1]
+                    i_points = struct.unpack(self.__tag + str(int(directory.length_idx / 4)) + 'i', byte_array)
+                    first, total, i_points, num_i_ponts = i_points[0], i_points[1], i_points[2:len(i_points) - 1], i_points[len(i_points) - 1]
                     index = name.find('es_')
                     self.__int_points[name[index:]] = [i_points, num_i_ponts]
                     # determine stress or strain
@@ -622,9 +626,9 @@ class Mili:
                 f.seek(directory.offset_idx)
                 svar_words, svar_bytes = struct.unpack('2i', f.read(8))
                 num_ints = (svar_words - 2)
-                ints = struct.unpack(str(num_ints) + 'i', f.read(num_ints * 4)) # what is this
+                ints = struct.unpack(str(num_ints) + 'i', f.read(num_ints * 4))  # what is this
                 if (sys.version_info > (3, 0)):
-                    s = str(struct.unpack(str(svar_bytes) + 's', f.read(svar_bytes))[0])[2:].split('\\x00') # only works for Python3
+                    s = str(struct.unpack(str(svar_bytes) + 's', f.read(svar_bytes))[0])[2:].split('\\x00')  # only works for Python3
                 else:
                     s = struct.unpack(str(svar_bytes) + 's', f.read(svar_bytes))[0].split(b'\x00')
                 
@@ -708,7 +712,7 @@ class Mili:
         if self.__directory_version > 2:
             directory_length = 8 * 6
             int_long = 'q'
-        offset -=  state_map_length * self.__number_of_state_maps + directory_length * self.__number_of_directories # make this not a hard coded 6 eventually
+        offset -= state_map_length * self.__number_of_state_maps + directory_length * self.__number_of_directories  # make this not a hard coded 6 eventually
         f.seek(offset, os.SEEK_END)
         for i in range(1, 1 + self.__number_of_directories):
             byte_array = f.read(directory_length)
@@ -732,7 +736,7 @@ class Mili:
                 short_name = self.__names[name_cnt]
                 long_name = self.__names[name_cnt + 1]
                 mocd = MeshObjectClassData(short_name, long_name, superclass)
-                self.__mesh_object_class_datas[short_name]= mocd
+                self.__mesh_object_class_datas[short_name] = mocd
 
             if directory.type_idx == DirectoryType.CLASS_IDENTS.value:
                 f.seek(directory.offset_idx)
@@ -757,7 +761,7 @@ class Mili:
                 sup_class = Superclass(sup_class).name
 
                 for n in range(0, len(floats), self.__dim):
-                    self.__nodes.append([floats[n:n+self.__dim]])
+                    self.__nodes.append([floats[n:n + self.__dim]])
 
                 self.__mesh_object_class_datas[short_name].add_block(start, stop)
 
@@ -767,8 +771,8 @@ class Mili:
                 self.__connectivity[short_name] = {}
                 superclass, qty_blocks = struct.unpack('2i', f.read(8))
                 elem_blocks = struct.unpack(str(2 * qty_blocks) + 'i', f.read(8 * qty_blocks))
-                for j in range(0,len(elem_blocks),2):
-                    self.__mesh_object_class_datas[short_name].add_block(elem_blocks[j], elem_blocks[j+1])
+                for j in range(0, len(elem_blocks), 2):
+                    self.__mesh_object_class_datas[short_name].add_block(elem_blocks[j], elem_blocks[j + 1])
 
                 elem_qty = directory.modifier_idx2
                 word_qty = ConnWords[Superclass(superclass).name].value
@@ -778,7 +782,7 @@ class Mili:
                 index = 0
 
                 for j in range(qty_blocks):
-                    off = elem_blocks[j * 2] -1
+                    off = elem_blocks[j * 2] - 1
                     elem_qty = elem_blocks[j * 2 + 1] - elem_blocks[j * 2] + 1
 
                     mo_id = 1
@@ -808,25 +812,25 @@ class Mili:
                 srec_id, srec_parent_mesh_id, srec_size_bytes, srec_qty_subrecs = struct.unpack('4i', f.read(16))
                 idata = struct.unpack(str(srec_int_data) + 'i', f.read(srec_int_data * 4))
                 if (sys.version_info > (3, 0)):
-                    cdata = str(struct.unpack(str(srec_c_data) + 's', f.read(srec_c_data))[0])[2:].split('\\x00') # only works for Python3
+                    cdata = str(struct.unpack(str(srec_c_data) + 's', f.read(srec_c_data))[0])[2:].split('\\x00')  # only works for Python3
                 else:
                     cdata = struct.unpack(str(srec_c_data) + 's', f.read(srec_c_data))[0].split(b'\x00')
                 
-		
+        
                 int_pos = 0
                 c_pos = 0
                 self.__srec_container = SubrecordContainer()
 
                 for k in range(srec_qty_subrecs):
-                    org, qty_svars, qty_id_blks = idata[int_pos], idata[int_pos+1], idata[int_pos+2]
-		    
-		    
+                    org, qty_svars, qty_id_blks = idata[int_pos], idata[int_pos + 1], idata[int_pos + 2]
+            
+            
                     # for j in range(qty_id_blks):
 
                     int_pos += 3
-                    name, class_name = cdata[c_pos:c_pos+2]
+                    name, class_name = cdata[c_pos:c_pos + 2]
                     c_pos += 2
-                    svars = cdata[c_pos:c_pos+qty_svars]
+                    svars = cdata[c_pos:c_pos + qty_svars]
                     c_pos += qty_svars
 
                     superclass = self.__mesh_object_class_datas[class_name].superclass
@@ -867,9 +871,9 @@ class Mili:
                             self.__state_variables[sv][1].append(k)
 
                             atom_size = ExtSize[DataType(state_var.data_type).name].value
-                            atoms = state_var.atom_qty(self.__state_variables) # define this
+                            atoms = state_var.atom_qty(self.__state_variables)  # define this
 
-                            ### stuff about surface here
+                            # ## stuff about surface here
 
                             total_atoms = atoms
                             count += total_atoms
@@ -888,7 +892,7 @@ class Mili:
                             self.__state_variables[sv][1].append(k)
 
                             atoms = state_var.atom_qty(self.__state_variables)
-                            ### stuff about surface here
+                            # ## stuff about surface here
                             total_atoms = atoms
 
                             lump_atoms.append(sub.mo_qty * total_atoms)
@@ -896,7 +900,7 @@ class Mili:
 
                         lump_offsets.append(0)
                         for j in range(1, sub.qty_svars):
-                            lump_offsets.append(lump_offsets[j-1] + lump_sizes[j-1])
+                            lump_offsets.append(lump_offsets[j - 1] + lump_sizes[j - 1])
 
                         j = sub.qty_svars - 1
                         sub.size = lump_offsets[j] + lump_sizes[j]
@@ -937,7 +941,7 @@ class Mili:
         if self.__filename:
             self.__error('This mili object is already instantiated. You must create another.')
             return
-	    
+        
         self.__parallel_mode = parallel_read
         orig = file_name
         # Handle case of multiple state files
@@ -945,7 +949,7 @@ class Mili:
         # dir_name = os.getcwd()
         dir_name = os.getcwd()
         if end_dir != -1:
-            dir_name =  file_name[:end_dir]
+            dir_name = file_name[:end_dir]
             file_name = file_name[end_dir + 1:]
 
         parallel = []
@@ -976,7 +980,7 @@ class Mili:
             self.__state_map_filename = state_files
 
     # Open file with 'b' to specify binary mode
-        with open(self.__filename, 'rb') as f:	   
+        with open(self.__filename, 'rb') as f:       
             ### Handle parallel information ###
             if type(mili_num) is int: 
                 if labeltomili: self.__labeltomili = labeltomili
@@ -996,7 +1000,7 @@ class Mili:
             ### Read Indexing ###
             offset = -16
             f.seek(offset, os.SEEK_END)
-            self.__null_termed_names_bytes, self.__number_of_commits,  self.__number_of_directories, self.__number_of_state_maps = \
+            self.__null_termed_names_bytes, self.__number_of_commits, self.__number_of_directories, self.__number_of_state_maps = \
                 struct.unpack('4i', f.read(16))
 
             ### Read State Maps ####
@@ -1007,7 +1011,7 @@ class Mili:
 
 
             if self.__null_termed_names_bytes > 0:
-                 ### DIRECTORY AND SV DATA #
+                 # ## DIRECTORY AND SV DATA #
                 self.__readStateVariablesAndParams(f, offset)
 
 
@@ -1029,7 +1033,7 @@ class Mili:
         if '[' in name:
             pos = name.find('[')
             vector = name[:pos]
-            component = name[pos+1:len(name)-1]
+            component = name[pos + 1:len(name) - 1]
         return [vector, component]
 
     '''
@@ -1084,7 +1088,7 @@ class Mili:
     def __variable_at_state(self, subrecord, labels, name, vars, sup_class, clas, sub, res, state, modify=False, int_points=False):
         mo_search_arr = []
         indices = {}
-        values = {} # from label to value
+        values = {}  # from label to value
 
         # Deal with names like vector[component]
         vector, variables = self.__parse_name(name)
@@ -1125,7 +1129,7 @@ class Mili:
         for sv in subrecord.svar_names:
             sv_var = self.__state_variables[sv][0]
             sv_group_len[group_idx] = max(1, len(sv_var.svars))
-            if group_idx: sv_group_start[group_idx] = sv_group_start[group_idx-1] + sv_group_len[group_idx]
+            if group_idx: sv_group_start[group_idx] = sv_group_start[group_idx - 1] + sv_group_len[group_idx]
             if len(sv_var.svars) > 0:
                 for sv_name in sv_var.svars:
                     sv_names.append(sv_name)
@@ -1290,7 +1294,7 @@ class Mili:
         # dir_name = os.getcwd()
         dir_name = os.getcwd()
         if end_dir != -1:
-            dir_name =  file_name[:end_dir]
+            dir_name = file_name[:end_dir]
             file_name = file_name[end_dir + 1:]
         parallel = []
         for f in os.listdir(dir_name):
@@ -1320,10 +1324,10 @@ class Mili:
                         labmap = mili.__labels[class_name]
                         for label_key in labmap:
                             self.__labeltomili[class_name][label_key].append(i)
-                i+= 1
-	            
+                i += 1
+                
         if parallel_read:
-            #Receive reads from children
+            # Receive reads from children
             activeChildren = len(self.__parent_conns)
             while activeChildren > 0:
                 for conn in self.__parent_conns:
@@ -1353,7 +1357,7 @@ class Mili:
         conn.send([i, mesh_objects, mili.__labels])
         
         answ = defaultdict(dict)
-        ### Wait for querys
+        # ## Wait for querys
         while True:    
             if conn.poll():
                 query = conn.recv()
@@ -1444,7 +1448,7 @@ class Mili:
     def query(self, names, class_name, material=None, labels=None, state_numbers=None, modify=False, int_points=False, raw_data=True, res=defaultdict(dict)):
         # Parse Arguments
         if not state_numbers:
-            state_numbers = [i-1 for i in range(1, self.__number_of_state_maps + 1)]
+            state_numbers = [i - 1 for i in range(1, self.__number_of_state_maps + 1)]
         elif type(state_numbers) is int:
             state_numbers = [state_numbers]
 
@@ -1576,7 +1580,7 @@ class Mili:
                             for i in range(len(int_points)):
                                 ip = int_points[i]
                                 if ip not in possible_int_points:
-                                    idx_ip, ip = min(enumerate(possible_int_points), key=lambda x: abs(x[1]-ip))
+                                    idx_ip, ip = min(enumerate(possible_int_points), key=lambda x: abs(x[1] - ip))
                                     self.__error(str(ip) + ' is not an integration point, but the closest is ' + str(ip))
                                 int_points[i] = ip
                         int_points.append(len(self.__is_vec_array(vector, class_name)))
@@ -1734,7 +1738,7 @@ class Mili:
             return list(nodes)
 
         answer = Answer()
-        answer.set(None, None,None, list(nodes), 'node', None)
+        answer.set(None, None, None, list(nodes), 'node', None)
 
         return answer
 
@@ -1808,13 +1812,13 @@ class Mili:
         type_to_str = {'s' : 'M_STRING', 'f' : 'M_FLOAT', 'd' : 'M_FLOAT8', 'i' : 'M_INT', 'q' : 'M_INT8'}
 
         if not state_numbers:
-            state_numbers = [i-1 for i in range(1, self.__number_of_state_maps + 1)]
+            state_numbers = [i - 1 for i in range(1, self.__number_of_state_maps + 1)]
         elif type(state_numbers) is int:
             state_numbers = [state_numbers]
         if type(labels) is int:
             labels = [labels]
         if int_points:
-            int_points = int_points[:len(int_points)-1]
+            int_points = int_points[:len(int_points) - 1]
         if type(state_variable) is not str:
             return self.__error('state variable must be a string')
 
@@ -1908,14 +1912,14 @@ This function is an example of how a user could use the Mili reader
 def main():
     # You can run code here as well if you copy the library!
     
-    #f = '/g/g20/legler5/Xmilics/XMILICS-toss_3_x86_64-RZTRONA/bin_debug/HexModel1.plt_c'
-    #f = '/g/g20/legler5/Mili/MILI-toss_3_x86_64_ib-RZGENIE/d3samp6.plt'
-    #f = "taurus/taurus.plt"
-    #f = '/usr/workspace/wsrzc/legler5/BigMili/dblplt'
-    #f = 'parallel/d3samp6.plt'
+    # f = '/g/g20/legler5/Xmilics/XMILICS-toss_3_x86_64-RZTRONA/bin_debug/HexModel1.plt_c'
+    # f = '/g/g20/legler5/Mili/MILI-toss_3_x86_64_ib-RZGENIE/d3samp6.plt'
+    # f = "taurus/taurus.plt"
+    # f = '/usr/workspace/wsrzc/legler5/BigMili/dblplt'
+    # f = 'parallel/d3samp6.plt'
     f = 'd3samp6.plt'
     mili = Mili()
-    #mili.read(f, parallel_read=True)
+    # mili.read(f, parallel_read=True)
     mili.read(f, parallel_read=False)
     
     d = mili.getParams()
@@ -1923,7 +1927,7 @@ def main():
     print(mili.query('sz', 'brick', None, None, 10))
     
 
-    #mili.setErrorFile()
+    # mili.setErrorFile()
         
 if __name__ == '__main__':
         main()
