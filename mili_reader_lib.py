@@ -34,6 +34,7 @@ import os
 import struct
 import sys
 import time
+import re
 
 from enum import Enum
 import psutil
@@ -952,12 +953,11 @@ class Mili:
             dir_name = file_name[:end_dir]
             file_name = file_name[end_dir + 1:]
 
-        parallel = []
-        for f in os.listdir(dir_name):
-            if file_name in f and f[-1] == 'A':
-                parallel.append(f[:-1])
+        attfile_re = re.compile(re.escape(file_name) + "[0-9]*A$")
+        sfile_re = re.compile(re.escape(file_name) + "[0-9]*[^A]$")
 
-        i = 0
+        parallel = list(filter(attfile_re.match,os.listdir(dir_name)))
+
         if len(parallel) > 1:
             self.__filename = file_name
             self.__split_reads(orig, parallel_read)
@@ -967,11 +967,8 @@ class Mili:
                 self.__error('Reading in serial mode, since there are less than 2 mili files')
                 parallel_read = False
                 self.__parallel_mode = False
-            state_files = []
-            for f in os.listdir(dir_name):
-                if file_name in f and f[-1] != 'A':
-                    num = f[len(file_name):]
-                    state_files.append(dir_name + os.sep + file_name + num)
+            state_files = list(filter(sfile_re.match,os.listdir(dir_name)))
+            # num = [ sfile[len(file_name):] for sfile in state_files ]
             state_files.sort()
 
             file_name = dir_name + os.sep + file_name
@@ -1910,13 +1907,8 @@ class Mili:
 This function is an example of how a user could use the Mili reader
 '''
 def main():
-    # You can run code here as well if you copy the library!
-    
-    # f = '/g/g20/legler5/Xmilics/XMILICS-toss_3_x86_64-RZTRONA/bin_debug/HexModel1.plt_c'
-    # f = '/g/g20/legler5/Mili/MILI-toss_3_x86_64_ib-RZGENIE/d3samp6.plt'
-    # f = "taurus/taurus.plt"
-    # f = '/usr/workspace/wsrzc/legler5/BigMili/dblplt'
-    # f = 'parallel/d3samp6.plt'
+    # You can run code here as well if you copy the library !
+
     f = 'd3samp6.plt'
     mili = Mili()
     # mili.read(f, parallel_read=True)
