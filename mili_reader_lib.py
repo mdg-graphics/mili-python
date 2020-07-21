@@ -942,7 +942,7 @@ class Mili:
         if self.__filename:
             self.__error('This mili object is already instantiated. You must create another.')
             return
-        
+
         self.__parallel_mode = parallel_read
         orig = file_name
         # Handle case of multiple state files
@@ -954,11 +954,11 @@ class Mili:
             file_name = file_name[end_dir + 1:]
 
         attfile_re = re.compile(re.escape(file_name) + "[0-9]*A$")
-        sfile_re = re.compile(re.escape(file_name) + "[0-9]*[^A]$")
-
         parallel = list(filter(attfile_re.match,os.listdir(dir_name)))
+        # remove the 'A' at the end of the filename for recursive parallel read
+        parallel = [ rootfile[:-1] for rootfile in parallel ]
 
-        if len(parallel) > 1:
+        if len( parallel ) > 1:
             self.__filename = file_name
             self.__split_reads(orig, parallel_read)
             return
@@ -967,8 +967,11 @@ class Mili:
                 self.__error('Reading in serial mode, since there are less than 2 mili files')
                 parallel_read = False
                 self.__parallel_mode = False
+
+            sfile_re = re.compile(re.escape(file_name) + "[0-9]*[^A]$")
+
             state_files = list(filter(sfile_re.match,os.listdir(dir_name)))
-            # num = [ sfile[len(file_name):] for sfile in state_files ]
+            state_files = [ dir_name + os.sep + fname for fname in state_files ]
             state_files.sort()
 
             file_name = dir_name + os.sep + file_name
@@ -1293,10 +1296,11 @@ class Mili:
         if end_dir != -1:
             dir_name = file_name[:end_dir]
             file_name = file_name[end_dir + 1:]
-        parallel = []
-        for f in os.listdir(dir_name):
-            if file_name in f and f[-1] == 'A':
-                parallel.append(f[:-1])
+        
+        attfile_re = re.compile(re.escape(file_name) + "[0-9]*A$")
+        parallel = list(filter(attfile_re.match,os.listdir(dir_name)))
+        # strip the A off the end
+        parallel = [ f[:-1] for f in parallel ] 
         
         cpus = psutil.cpu_count(logical=False)
         self.__parent_conns = []
@@ -1498,8 +1502,10 @@ class Mili:
             answ = defaultdict(dict)
             for sv in names:
                 vector, variables = self.__parse_name(sv)
-                if not vector: sv_key = variables
-                else: sv_key = vector
+                if not vector:
+                    sv_key = variables
+                else:
+                    sv_key = vector
 
                 # turn sv and class into elem
                 if class_name not in self.__mesh_object_class_datas: return self.__error('invalid class name')
