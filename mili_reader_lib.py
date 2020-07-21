@@ -989,7 +989,7 @@ class Mili:
             ### Read Header ###
             header = f.read(16)
             mili_taur = struct.unpack('4s', header[:4])[0].decode('ascii')
-            assert(mili_taur == 'mili')
+            assert(mili_taur == 'mili' or mili_taur == 'taur')
             self.__header_version, self.__directory_version, self.__endian_flag, self.__precision_flag, self.__state_file_suffix_length, self.__partition_flag = \
                struct.unpack('6b', header[4:10])
 
