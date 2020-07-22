@@ -1041,7 +1041,7 @@ class Mili:
     This is what is returned by query
     '''
     def __create_answer(self, res, names, materials, labels, class_name, state_numbers, modify, raw_data):
-        if raw_data:
+        if raw_data or not res:
             return res
         answer = Answer()
 
@@ -1085,22 +1085,22 @@ class Mili:
     '''
     Given a single state variable name, a number of states, and a number of label(s) return the requested value(s)
     '''
-    def __variable_at_state(self, subrecord, labels, name, vars, sup_class, clas, sub, res, state, modify=False, int_points=False):
+    def __variable_at_state(self, subrecord, labels, name, variables, sup_class, clas, sub, res, state, modify=False, int_points=False):
         mo_search_arr = []
         indices = {}
-        values = {}  # from label to value
+        temp_res = { state : { name : {} } }
+        #values = {}  # from label to value
 
         # Deal with names like vector[component]
-        vector, variables = self.__parse_name(name)
-        variables = [variables]
+        _, child_variables = self.__parse_name(name)
+        child_variables = [child_variables]
 
         # These are the mo_ids we are interested in for this subrecord
-        for label in labels:
-            if label not in self.__labels[(sup_class, clas)]:
-                # return self.__error('label ' + str(label) + ' was not found in ' + clas)
-                nothing = 0
-            else:
-                mo_search_arr.append([label, self.__labels[(sup_class, clas)][label]])
+        labels_we_have = list( set(labels) & set(self.__labels[(sup_class,clas)]) )
+        if len(labels_we_have) == 0:
+            return None
+        for label in labels_we_have:
+            mo_search_arr.append([label, self.__labels[(sup_class, clas)][label]])
 
         mo_index = 0
         mo_idx_found = []
@@ -1119,7 +1119,7 @@ class Mili:
         # Deal with aggregate types and create list of state variable names
                 
         if name in self.__state_variables and AggregateType(self.__state_variables[name][0].agg_type).name == 'VECTOR':
-            variables = self.__state_variables[name][0].svars
+            child_variables = self.__state_variables[name][0].svars
         
         sv_names = []
         sv_group_start = {}
@@ -1138,7 +1138,7 @@ class Mili:
             group_idx += 1
             
         var_indexes = []
-        for child in variables:
+        for child in child_variables:
             if child not in sv_names:
                 return self.__error(child + ' not a valid variable name')
             # var_indexes.append(sv_names.index(child))
@@ -1175,24 +1175,27 @@ class Mili:
             # 3 different aggregate types here - contructing the res
             if int_points:
                 indices[sub][label] = {}
-                if label not in res[state][name]: res[state][name][label] = {}
+                if label not in temp_res[state][name]: temp_res[state][name][label] = {}
                 v_index = 0
                 for index in indexes.keys():
                     indices[sub][label][sv_names[index]] = {}
                     sv_name = sv_names[index]
-                    res[state][name][label][sv_name] = {}
+                    temp_res[state][name][label][sv_name] = {}
                     for int_point in int_points:
-                        res[state][name][label][sv_name][int_point] = vars[indexes[index][int_point]]
+                        temp_res[state][name][label][sv_name][int_point] = variables[indexes[index][int_point]]
                         indices[sub][label][sv_names[index]][int_point] = indexes[index][int_point]
                     v_index += 1
             elif name in self.__state_variables and AggregateType(self.__state_variables[name][0].agg_type).name == 'VECTOR':
-                res[state][name][label] = []
+                temp_res[state][name][label] = []
                 for index in indexes:
-                    res[state][name][label].append(vars[index])
+                    temp_res[state][name][label].append(variables[index])
                     indices[sub][label].append(index)
             else:
-                res[state][name][label] = vars[indexes[0]]
+                temp_res[state][name][label] = variables[indexes[0]]
                 indices[sub][label].append(indexes[0])
+
+        # the nested form of the dicts needs to be identical iirc
+        self.__recurMergeDicts(res,temp_res)
 
         if modify:
             return [res, indices]
@@ -1227,6 +1230,16 @@ class Mili:
         for k in a:
             b[k] = b[k].union(a[k])
         return b
+
+    '''
+    Merge two dictionaries with nested dictionaries together
+    '''
+    def __recurMergeDicts(self, dct, merge_dct):
+        for k, v in merge_dct.items():
+            if (k in dct and isinstance(dct[k], dict) and isinstance(merge_dct[k], dict)):
+                self.__recurMergeDicts(dct[k], merge_dct[k])
+            else:
+                dct[k] = merge_dct[k]
 
     '''
     Set the output file for error messages (screen output)
@@ -1445,7 +1458,9 @@ class Mili:
     The following is the structure of the result that is passed to create answer
     res[state][name][label] = value
     '''
-    def query(self, names, class_name, material=None, labels=None, state_numbers=None, modify=False, int_points=False, raw_data=True, res=defaultdict(dict)):
+    def query(self, names, class_name, material=None, labels=None, state_numbers=None, modify=False, int_points=False, raw_data=True, res=None):
+        # default args are instantiated at function definition, not when called, this makes mutable types cache modifications between calls
+        res = res if res is not None else defaultdict(dict)
         # Parse Arguments
         if not state_numbers:
             state_numbers = [i - 1 for i in range(1, self.__number_of_state_maps + 1)]
@@ -1458,28 +1473,27 @@ class Mili:
         if material:
             if len(self.__milis):
                 labels = self.labels_of_material(material)
-                if class_name not in labels:
-                    self.__error('There are no elements from class ' + str(class_name) + ' of material ' + str(material))
+                if not labels or class_name not in labels:
+                    return self.__error('There are no elements from class ' + str(class_name) + ' of material ' + str(material))
                 labels = list(labels[class_name])
             else:
                 labels = self.__material_to_labels(material, class_name, labels)
 
             if not labels or not len(labels):
                 return self.__error('There are no elements from class ' + str(class_name) + ' of material ' + str(material))
-        if labels:
-            if type(labels) is not list or type(labels[0]) is not int:
-                return self.__error('labels must of a list of ints or an int')
-        
-        if not labels and class_name not in self.__mesh_object_class_datas:
-            return self.__create_answer({}, names, material, labels, class_name, state_numbers, modify, raw_data)
+        if labels and type(labels) is not list:
+            return self.__error('labels must of a list of ints or an int')
+
+        if class_name not in self.__mesh_object_class_datas:
+            return self.__error('invalid class name')
         if not labels and not self.__parallel_mode and not len(self.__milis):
             sup_class = self.__mesh_object_class_datas[class_name].superclass
             sup_class = Superclass(sup_class).name
-            labels = self.__labels[(sup_class, class_name)].keys()
+            labels = list(self.__labels[(sup_class, class_name)].keys())
         if not labels and not self.__parallel_mode and len(self.__milis):
             sup_class = self.__mesh_object_class_datas[class_name].superclass
             sup_class = Superclass(sup_class).name
-            labels = self.__labeltomili[(sup_class, class_name)].keys()
+            labels = list(self.__labeltomili[(sup_class, class_name)].keys())
 
         if type(names) is str:
             names = [names]
@@ -1505,7 +1519,6 @@ class Mili:
                 else: sv_key = vector
 
                 # turn sv and class into elem
-                if class_name not in self.__mesh_object_class_datas: return self.__error('invalid class name')
                 sup_class = self.__mesh_object_class_datas[class_name].superclass
                 sup_class = Superclass(sup_class).name
                 
@@ -1539,16 +1552,18 @@ class Mili:
                 else:
                     for mili_index in milis:
                         resp = self.__milis[mili_index].query(sv, class_name, material, mili_to_labels[mili_index], state_numbers, modify, int_points, True, answ)
-                        if resp: 
-                            answ = resp 
-                        
+                        # answ is modified in-place, shouldn't need to check/append if something isn't found, should avoid in-place modifications if something isn't found (which is currently happening)
+                        #if resp:
+                        #    answ = resp
+                
+                if answ is not None and len(answ) == 0:
+                    answ = None
+
             return self.__create_answer(answ, names, material, labels, class_name, state_numbers, modify, raw_data)
 
         # Run Correct Function
 
         for state in state_numbers:
-            if state not in res: res[state] = defaultdict(dict)
-
             if state < 0 or state >= len(self.__state_maps):
                 return self.__error('There is no state ' + str(state))
             state_map = self.__state_maps[state]
@@ -1556,7 +1571,7 @@ class Mili:
             with open(self.__state_map_filename[state_map.file_number], 'rb') as f:
                 f.seek(state_map.file_offset)
                 byte_array = f.read(8)
-                time, state_map_id = struct.unpack(self.__tag + 'fi', byte_array)
+                _, _ = struct.unpack(self.__tag + 'fi', byte_array)
 
                 for name in names:
                     # Handle case of vector[component]
@@ -1572,7 +1587,6 @@ class Mili:
                             temp_subrecord = self.__srec_container.subrecs[temp_subrecords[0]]
                             if temp_subrecord.class_name == class_name:
                                 sv, subrecords = temp_sv, temp_subrecords
-                                set_name_chosen = set_name
                         if not int_points:
                             int_points = list(self.__is_vec_array(vector, class_name))
                         else:
@@ -1580,7 +1594,7 @@ class Mili:
                             for i in range(len(int_points)):
                                 ip = int_points[i]
                                 if ip not in possible_int_points:
-                                    idx_ip, ip = min(enumerate(possible_int_points), key=lambda x: abs(x[1] - ip))
+                                    _, ip = min(enumerate(possible_int_points), key=lambda x: abs(x[1] - ip))
                                     self.__error(str(ip) + ' is not an integration point, but the closest is ' + str(ip))
                                 int_points[i] = ip
                         int_points.append(len(self.__is_vec_array(vector, class_name)))
@@ -1600,16 +1614,16 @@ class Mili:
                         byte_array = f.read(subrecord.size)
                         s = self.__set_string(subrecord)
 
-                        vars = struct.unpack(self.__tag + s, byte_array)
+                        var_data = struct.unpack(self.__tag + s, byte_array)
 
                         if class_name == subrecord.class_name:
                             sup_class = self.__mesh_object_class_datas[subrecord.class_name].superclass
                             sup_class = Superclass(sup_class).name
 
                             if modify:
-                                return self.__variable_at_state(subrecord, labels, name, vars, sup_class, subrecord.class_name, sub, res, state, modify, int_points)
+                                return self.__variable_at_state(subrecord, labels, name, var_data, sup_class, subrecord.class_name, sub, res, state, modify, int_points)
                             else:
-                                res = self.__variable_at_state(subrecord, labels, name, vars, sup_class, subrecord.class_name, sub, res, state, modify, int_points)
+                                res = self.__variable_at_state(subrecord, labels, name, var_data, sup_class, subrecord.class_name, sub, res, state, modify, int_points)
 
         return self.__create_answer(res, names, material, labels, class_name, state_numbers, modify, raw_data)
 
@@ -1692,7 +1706,10 @@ class Mili:
 
         if len(self.__milis) > 1:
             labels = self.__get_children_info(defaultdict(set), self.__addDicts, "labels of material", material, Mili.labels_of_material)
-                
+
+            if len(labels) == 0:
+                return self.__error("No labes of material '" + str(material) + "' found in database files" )
+
             for class_name in labels:
                 l = list(labels[class_name])
                 labels_list += l
@@ -1725,6 +1742,8 @@ class Mili:
 
         if len(self.__milis) > 1:
             nodes = self.__get_children_info(set(), set.union, "nodes of material", material, Mili.nodes_of_material)
+            if len(nodes) == 0: 
+                return self.__error("No labels with material '" + str(material) + "' found in database files.")
         else:
             labels = self.labels_of_material(material)
             if not labels:
@@ -1749,7 +1768,8 @@ class Mili:
         labels = None
         if len(self.__milis) > 1:
             labels = self.__get_children_info(None, None, "nodes of elem", [label, class_name], Mili.nodes_of_elem)
-        
+            if not labels: 
+                return self.__error("Class name '" + str(class_name) + "' or label '" + str(label) + "' not found in datamaste files.")
         else:
             if class_name not in self.__mesh_object_class_datas:
                 return self.__error('Class name ' + class_name + ' not found')
@@ -1895,7 +1915,9 @@ class Mili:
                                 f.seek(offset, 1)
                                 if type(value[state][name][label]) is not list:
                                     value[state][name][label] = [value[state][name][label]]
-                                byte_array = struct.pack(self.__tag + s[indices[sub][label][idx]], value[state][name][label][idx])
+                                to_write = value[state][name][label][idx]
+                                byte_array = struct.pack(self.__tag + s[indices[sub][label][idx]], to_write)
+                                
                                 f.write(byte_array)
                                 f.seek(-offset - len(byte_array), 1)
 
