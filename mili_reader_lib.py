@@ -52,13 +52,18 @@ class StateMap:
 Directories dictate where information can be found in the .pltA file.
 '''
 class Directory:
-    def __init__(self, type_idx, modifier_idx1, modifier_idx2, string_qty_idx, offset_idx, length_idx):
+    def __init__(self, type_idx, modifier_idx1, modifier_idx2, string_qty_idx, offset_idx, length_idx, string_offset_idx):
         self.type_idx = type_idx
         self.modifier_idx1 = modifier_idx1
         self.modifier_idx2 = modifier_idx2
         self.string_qty_idx = string_qty_idx
         self.offset_idx = offset_idx
         self.length_idx = length_idx
+        self.string_offset_idx = string_offset_idx
+        self.strings = []
+    def addStrings( self, strings ):
+        assert( len(strings) == self.string_qty_idx )
+        self.strings = strings
 
 '''
 A state variable is the information being stored in subrecords throughout time
@@ -382,7 +387,7 @@ class Mili:
         self.__mili_num = None  # Number of mili file (processor number)
         self.__labeltomili = defaultdict(lambda: defaultdict(list))  # map from (superclass, label) to dict of label:file
         self.__state_maps = []
-        self.__directories = []
+        self.__directories = {}
         self.__names = []
         self.__params = {}  # maps param name: [value]
         self.__state_variables = {}  # map to state variable, list of subrecords it is in
@@ -511,12 +516,7 @@ class Mili:
             f.seek(-1 * state_map_length, 1)
         return offset
 
-    '''
-    Reads the state variables and parameters from the Mili file.
-    '''
-    def __readStateVariablesAndParams(self, f, offset):
-        type_to_str = {'M_STRING' : 's', 'M_FLOAT' : 'f', 'M_FLOAT4' : 'f', 'M_FLOAT8' : 'd', 'M_INT' : 'i', 'M_INT4' : 'i', 'M_INT8' : 'q'}
-
+    def __readNames(self,f,offset):
         offset -= self.__null_termed_names_bytes
         f.seek(offset, os.SEEK_END)
         fmt = str(self.__null_termed_names_bytes) + 's'
@@ -526,28 +526,40 @@ class Mili:
             strings = str(byte_array)[2:].split('\\x00')  # only works for Python3
         else:
             strings = byte_array.split(b'\x00')
-        nnames = 0
+
+        for type_id in DirectoryType:
+            if type_id.value in self.__directories.keys():
+                for directory in self.__directories[type_id.value]:
+                    string_offset = directory.string_offset_idx
+                    string_count = directory.string_qty_idx
+                    directory_strings = [ strings[sidx] for sidx in range( string_offset, string_offset + string_count) ]
+                    self.__names.extend( directory_strings  )
+                    directory.addStrings( directory_strings )
+
+    '''
+    Reads the state variables and parameters from the Mili file.
+    '''
+    def __readParams(self, f, offset):
+        type_to_str = {'M_STRING' : 's', 'M_FLOAT' : 'f', 'M_FLOAT4' : 'f', 'M_FLOAT8' : 'd', 'M_INT' : 'i', 'M_INT4' : 'i', 'M_INT8' : 'q'}
+
         file_number = 0
 
-        for i in range(len(self.__directories)):
-            directory = self.__directories[i]
-            for j in range(directory.string_qty_idx):
-                name = strings[nnames]
-                self.__names.append(name)
-                nnames += 1
+        can_proc = [ DirectoryType.MILI_PARAM.value, DirectoryType.APPLICATION_PARAM.value, DirectoryType.TI_PARAM.value ]
+        for type_id in can_proc:
+            for directory in self.__directories[type_id]:
 
-            if directory.type_idx == DirectoryType.MILI_PARAM.value or directory.type_idx == DirectoryType.APPLICATION_PARAM.value or \
-                self.__directory_version >= 2 and directory.type_idx == DirectoryType.TI_PARAM.value:
+                name = directory.strings[0]
+
                 self.__params[name] = file_number, directory
                 f.seek(directory.offset_idx)
                 byte_array = f.read(directory.length_idx)
-                type = directory.modifier_idx1
-                num_entries = directory.modifier_idx2
+                param_type = directory.modifier_idx1
+                # num_entries = directory.modifier_idx2
 
-                type_rep = type_to_str[DataType(type).name]
-                type_value = ExtSize[DataType(type).name].value
+                type_rep = type_to_str[DataType(param_type).name]
+                type_value = ExtSize[DataType(param_type).name].value
         
-                if type_to_str[DataType(type).name] == 's':
+                if type_to_str[DataType(param_type).name] == 's':
                     if (sys.version_info > (3, 0)):
                         self.__params[name] = [str(struct.unpack(self.__tag + str(int(directory.length_idx / type_value)) + type_rep, byte_array)[0])[2:].split('\\x00'), directory]
                     else:
@@ -576,7 +588,7 @@ class Mili:
                     f.seek(directory.offset_idx)
                     byte_array = f.read(directory.length_idx)
                     ints = struct.unpack(self.__tag + str(int(directory.length_idx / 4)) + 'i', byte_array)
-                    first, total, ints = ints[0], ints[1], ints[2:]
+                    first, _, ints = ints[0], ints[1], ints[2:]
 
                     sup_class_idx = name.index('Scls-') + len('Scls-')
                     sup_class_end_idx = name.index('/', sup_class_idx, len(name))
@@ -616,34 +628,45 @@ class Mili:
                     f.seek(directory.offset_idx)
                     byte_array = f.read(directory.length_idx)
                     i_points = struct.unpack(self.__tag + str(int(directory.length_idx / 4)) + 'i', byte_array)
-                    first, total, i_points, num_i_ponts = i_points[0], i_points[1], i_points[2:len(i_points) - 1], i_points[len(i_points) - 1]
+                    first, _, i_points, num_i_ponts = i_points[0], i_points[1], i_points[2:len(i_points) - 1], i_points[len(i_points) - 1]
                     index = name.find('es_')
                     self.__int_points[name[index:]] = [i_points, num_i_ponts]
                     # determine stress or strain
 
+    def __readStateVariables(self,f,offset_idx):
 
-            if directory.type_idx == DirectoryType.STATE_VAR_DICT.value:
-                f.seek(directory.offset_idx)
-                svar_words, svar_bytes = struct.unpack('2i', f.read(8))
-                num_ints = (svar_words - 2)
-                ints = struct.unpack(str(num_ints) + 'i', f.read(num_ints * 4))  # what is this
-                if (sys.version_info > (3, 0)):
-                    s = str(struct.unpack(str(svar_bytes) + 's', f.read(svar_bytes))[0])[2:].split('\\x00')  # only works for Python3
-                else:
-                    s = struct.unpack(str(svar_bytes) + 's', f.read(svar_bytes))[0].split(b'\x00')
-                
-                int_pos = 0
-                c_pos = 0
-                while int_pos < len(ints):
-                    sv_name, title = s[c_pos], s[c_pos + 1]
+        for directory in self.__directories[DirectoryType.STATE_VAR_DICT.value]:
+            f.seek(directory.offset_idx)
+            svar_words, svar_bytes = struct.unpack('2i', f.read(8))
+            num_ints = (svar_words - 2)
+            ints = struct.unpack(str(num_ints) + 'i', f.read(num_ints * 4))  # what is this
+            if (sys.version_info > (3, 0)):
+                s = str(struct.unpack(str(svar_bytes) + 's', f.read(svar_bytes))[0])[2:].split('\\x00')  # only works for Python3
+            else:
+                s = struct.unpack(str(svar_bytes) + 's', f.read(svar_bytes))[0].split(b'\x00')
+            
+            int_pos = 0
+            c_pos = 0
+            while int_pos < len(ints):
+                sv_name, title = s[c_pos], s[c_pos + 1]
 
-                    agg_type, data_type = ints[int_pos], ints[int_pos + 1]
-                    state_variable = StateVariable(sv_name, title, agg_type, data_type)
+                agg_type, data_type = ints[int_pos], ints[int_pos + 1]
+                state_variable = StateVariable(sv_name, title, agg_type, data_type)
 
-                    int_pos += 2
-                    c_pos += 2
+                int_pos += 2
+                c_pos += 2
 
-                    if agg_type == AggregateType.ARRAY.value:
+                if agg_type == AggregateType.ARRAY.value:
+                    order, dims = ints[int_pos], []
+                    int_pos += 1
+                    for k in range(order):
+                        dims.append(ints[int_pos])
+                        int_pos += 1
+                    state_variable.order = order
+                    state_variable.dims = dims
+
+                if agg_type == AggregateType.VECTOR.value or agg_type == AggregateType.VEC_ARRAY.value:
+                    if agg_type == AggregateType.VEC_ARRAY.value:
                         order, dims = ints[int_pos], []
                         int_pos += 1
                         for k in range(order):
@@ -652,54 +675,44 @@ class Mili:
                         state_variable.order = order
                         state_variable.dims = dims
 
-                    if agg_type == AggregateType.VECTOR.value or agg_type == AggregateType.VEC_ARRAY.value:
-                        if agg_type == AggregateType.VEC_ARRAY.value:
-                            order, dims = ints[int_pos], []
-                            int_pos += 1
-                            for k in range(order):
-                                dims.append(ints[int_pos])
-                                int_pos += 1
-                            state_variable.order = order
-                            state_variable.dims = dims
+                    state_variable.list_size = ints[int_pos]
+                    int_pos += 1
+                    sv_names = []
+                    for j in range(state_variable.list_size):
+                        sv_names.append(s[c_pos])
+                        c_pos += 1
+                    for sv_name_inner in sv_names:
+                        if sv_name_inner in self.__state_variables:
+                            sv = self.__state_variables[sv_name_inner]
+                        else:
+                            sv_name_inner, title = s[c_pos], s[c_pos + 1]
+                            agg_type, data_type = ints[int_pos], ints[int_pos + 1]
+                            int_pos += 2
+                            c_pos += 2
+                            sv = StateVariable(sv_name_inner, title, agg_type, data_type)
+                            self.__state_variables[sv_name_inner] = [sv, []]
+                    state_variable.svars = sv_names
 
-                        state_variable.list_size = ints[int_pos]
-                        int_pos += 1
-                        sv_names = []
-                        for j in range(state_variable.list_size):
-                            sv_names.append(s[c_pos])
-                            c_pos += 1
-                        for sv_name_inner in sv_names:
-                            if sv_name_inner in self.__state_variables:
-                                sv = self.__state_variables[sv_name_inner]
-                            else:
-                                sv_name_inner, title = s[c_pos], s[c_pos + 1]
-                                agg_type, data_type = ints[int_pos], ints[int_pos + 1]
-                                int_pos += 2
-                                c_pos += 2
-                                sv = StateVariable(sv_name_inner, title, agg_type, data_type)
-                                self.__state_variables[sv_name_inner] = [sv, []]
-                        state_variable.svars = sv_names
+                self.__state_variables[sv_name] = [state_variable, []]
 
-                    self.__state_variables[sv_name] = [state_variable, []]
+                if (sv_name == 'es_1a' or sv_name == 'es_3a' or sv_name == 'es_3c') and sv_name[:-1] in self.__int_points:
+                    stresscount = straincount = 0
+                    stress = strain = []
 
-                    if (sv_name == 'es_1a' or sv_name == 'es_3a' or sv_name == 'es_3c') and sv_name[:-1] in self.__int_points:
-                        stresscount = straincount = 0
-                        stress = strain = []
+                    if 'stress' in self.__state_variables: stress = self.__state_variables['stress'][0].svars
+                    if 'strain' in self.__state_variables: strain = self.__state_variables['strain'][0].svars
 
-                        if 'stress' in self.__state_variables: stress = self.__state_variables['stress'][0].svars
-                        if 'strain' in self.__state_variables: strain = self.__state_variables['strain'][0].svars
+                    for p in sv_names:
+                        if p in stress: stresscount += 1
+                        if p in strain: straincount += 1
 
-                        for p in sv_names:
-                            if p in stress: stresscount += 1
-                            if p in strain: straincount += 1
+                    if stresscount == 6:
+                        if not 'stress' in self.__int_points: self.__int_points['stress'] = {}
+                        self.__int_points['stress'][sv_name] = self.__int_points[sv_name[:-1]]
 
-                        if stresscount == 6:
-                            if not 'stress' in self.__int_points: self.__int_points['stress'] = {}
-                            self.__int_points['stress'][sv_name] = self.__int_points[sv_name[:-1]]
-
-                        if straincount == 6:
-                            if not 'strain' in self.__int_points: self.__int_points['strain'] = {}
-                            self.__int_points['strain'][sv_name] = self.__int_points[sv_name[:-1]]
+                    if straincount == 6:
+                        if not 'strain' in self.__int_points: self.__int_points['strain'] = {}
+                        self.__int_points['strain'][sv_name] = self.__int_points[sv_name[:-1]]
 
     '''
     Reads in directory information from the Mili file
@@ -718,7 +731,9 @@ class Mili:
             byte_array = f.read(directory_length)
             type_idx, modifier_idx1, modifier_idx2, string_qty_idx, offset_idx, length_idx = \
                 struct.unpack(self.__tag + '6' + int_long, byte_array)
-            self.__directories.append(Directory(type_idx, modifier_idx1, modifier_idx2, string_qty_idx, offset_idx, length_idx))
+            if not type_idx in self.__directories.keys( ):
+                self.__directories[type_idx] = []
+            self.__directories[type_idx].append(Directory(type_idx, modifier_idx1, modifier_idx2, string_qty_idx, offset_idx, length_idx, number_of_strings))
             number_of_strings += string_qty_idx
         return offset
 
@@ -726,189 +741,189 @@ class Mili:
     Reads in information such as nodes and element connections from the Mili fiel
     '''
     def __readMesh(self, f):
-        name_cnt = 0
-        for i in range(len(self.__directories)):
-            directory = self.__directories[i]
+        can_proc = [ DirectoryType.CLASS_DEF.value , 
+                     DirectoryType.CLASS_IDENTS.value, 
+                     DirectoryType.NODES.value, 
+                     DirectoryType.ELEM_CONNS.value ]
 
+        for type_id in can_proc:
+            for directory in self.__directories[type_id]:
 
-            if directory.type_idx == DirectoryType.CLASS_DEF.value:
-                superclass = directory.modifier_idx2
-                short_name = self.__names[name_cnt]
-                long_name = self.__names[name_cnt + 1]
-                mocd = MeshObjectClassData(short_name, long_name, superclass)
-                self.__mesh_object_class_datas[short_name] = mocd
+                if directory.type_idx == DirectoryType.CLASS_DEF.value:
+                    superclass = directory.modifier_idx2
+                    short_name = directory.strings[0]
+                    long_name = directory.strings[1]
+                    mocd = MeshObjectClassData(short_name, long_name, superclass)
+                    self.__mesh_object_class_datas[short_name] = mocd
 
-            if directory.type_idx == DirectoryType.CLASS_IDENTS.value:
-                f.seek(directory.offset_idx)
-                short_name = self.__names[name_cnt]
-                superclass, start, stop = struct.unpack('3i', f.read(12))
-                self.__mesh_object_class_datas[short_name].add_block(start, stop)
-                superclass = Superclass(superclass).name
-                if (superclass, short_name) not in self.__labels:
-                    self.__labels[(superclass, short_name)] = {}
-                for label in range(start, stop + 1):
-                    self.__labels[(superclass, short_name)][label] = label
-                    self.__labeltomili[(superclass, short_name)][label].append(self.__mili_num)
+                if directory.type_idx == DirectoryType.CLASS_IDENTS.value:
+                    f.seek(directory.offset_idx)
+                    short_name = directory.strings[0]
+                    superclass, start, stop = struct.unpack('3i', f.read(12))
+                    self.__mesh_object_class_datas[short_name].add_block(start, stop)
+                    superclass = Superclass(superclass).name
+                    if (superclass, short_name) not in self.__labels:
+                        self.__labels[(superclass, short_name)] = {}
+                    for label in range(start, stop + 1):
+                        self.__labels[(superclass, short_name)][label] = label
+                        self.__labeltomili[(superclass, short_name)][label].append(self.__mili_num)
 
-            if directory.type_idx == DirectoryType.NODES.value:
-                f.seek(directory.offset_idx)
-                short_name = self.__names[name_cnt]
-                start, stop = struct.unpack('2i', f.read(8))
-                num_coordinates = self.__dim * (stop - start + 1)
-                floats = struct.unpack(str(num_coordinates) + 'f', f.read(4 * num_coordinates))
-                class_name = self.__names[name_cnt]
-                sup_class = self.__mesh_object_class_datas[class_name].superclass
-                sup_class = Superclass(sup_class).name
+                if directory.type_idx == DirectoryType.NODES.value:
+                    f.seek(directory.offset_idx)
+                    short_name = directory.strings[0]
+                    start, stop = struct.unpack('2i', f.read(8))
+                    num_coordinates = self.__dim * (stop - start + 1)
+                    floats = struct.unpack(str(num_coordinates) + 'f', f.read(4 * num_coordinates))
+                    class_name = short_name
+                    sup_class = self.__mesh_object_class_datas[class_name].superclass
+                    sup_class = Superclass(sup_class).name
 
-                for n in range(0, len(floats), self.__dim):
-                    self.__nodes.append([floats[n:n + self.__dim]])
+                    for n in range(0, len(floats), self.__dim):
+                        self.__nodes.append([floats[n:n + self.__dim]])
 
-                self.__mesh_object_class_datas[short_name].add_block(start, stop)
+                    self.__mesh_object_class_datas[short_name].add_block(start, stop)
 
-            if directory.type_idx == DirectoryType.ELEM_CONNS.value:
-                f.seek(directory.offset_idx)
-                short_name = self.__names[name_cnt]
-                self.__connectivity[short_name] = {}
-                superclass, qty_blocks = struct.unpack('2i', f.read(8))
-                elem_blocks = struct.unpack(str(2 * qty_blocks) + 'i', f.read(8 * qty_blocks))
-                for j in range(0, len(elem_blocks), 2):
-                    self.__mesh_object_class_datas[short_name].add_block(elem_blocks[j], elem_blocks[j + 1])
+                if directory.type_idx == DirectoryType.ELEM_CONNS.value:
+                    f.seek(directory.offset_idx)
+                    short_name = directory.strings[0]
+                    self.__connectivity[short_name] = {}
+                    superclass, qty_blocks = struct.unpack('2i', f.read(8))
+                    elem_blocks = struct.unpack(str(2 * qty_blocks) + 'i', f.read(8 * qty_blocks))
+                    for j in range(0, len(elem_blocks), 2):
+                        self.__mesh_object_class_datas[short_name].add_block(elem_blocks[j], elem_blocks[j + 1])
 
-                elem_qty = directory.modifier_idx2
-                word_qty = ConnWords[Superclass(superclass).name].value
-                conn_qty = word_qty - 2
-                mat_offset = word_qty - 1
-                ebuf = struct.unpack(str(elem_qty * word_qty) + 'i', f.read(elem_qty * word_qty * 4))
-                index = 0
+                    elem_qty = directory.modifier_idx2
+                    word_qty = ConnWords[Superclass(superclass).name].value
+                    conn_qty = word_qty - 2
+                    mat_offset = word_qty - 1
+                    ebuf = struct.unpack(str(elem_qty * word_qty) + 'i', f.read(elem_qty * word_qty * 4))
+                    index = 0
 
-                for j in range(qty_blocks):
-                    off = elem_blocks[j * 2] - 1
-                    elem_qty = elem_blocks[j * 2 + 1] - elem_blocks[j * 2] + 1
+                    for j in range(qty_blocks):
+                        off = elem_blocks[j * 2] - 1
+                        elem_qty = elem_blocks[j * 2 + 1] - elem_blocks[j * 2] + 1
 
-                    mo_id = 1
-                    for k in range(index, len(ebuf), word_qty):
-                        self.__connectivity[short_name][mo_id] = []
-                        mat = ebuf[k + conn_qty]
-                        for m in range(0, conn_qty):
-                            node = ebuf[k + m]
-                            self.__connectivity[short_name][mo_id].append(node)
-                        part = ebuf[k + mat_offset]
-                        if short_name not in self.__materials[mat]: self.__materials[mat][short_name] = []
-                        self.__materials[mat][short_name].append(mo_id)
-                        mo_id += 1
-                    index = word_qty * elem_qty
-            name_cnt += directory.string_qty_idx
+                        mo_id = 1
+                        for k in range(index, len(ebuf), word_qty):
+                            self.__connectivity[short_name][mo_id] = []
+                            mat = ebuf[k + conn_qty]
+                            for m in range(0, conn_qty):
+                                node = ebuf[k + m]
+                                self.__connectivity[short_name][mo_id].append(node)
+                            part = ebuf[k + mat_offset]
+                            if short_name not in self.__materials[mat]: self.__materials[mat][short_name] = []
+                            self.__materials[mat][short_name].append(mo_id)
+                            mo_id += 1
+                        index = word_qty * elem_qty
 
     '''
     Reads in all the subrecords for a Mili file
     '''
     def __readSubrecords(self, f):
-        for i in range(len(self.__directories)):
-            directory = self.__directories[i]
-            if directory.type_idx == DirectoryType.STATE_REC_DATA.value:
-                srec_int_data = directory.modifier_idx1 - 4
-                srec_c_data = directory.modifier_idx2
-                f.seek(directory.offset_idx)
-                srec_id, srec_parent_mesh_id, srec_size_bytes, srec_qty_subrecs = struct.unpack('4i', f.read(16))
-                idata = struct.unpack(str(srec_int_data) + 'i', f.read(srec_int_data * 4))
-                if (sys.version_info > (3, 0)):
-                    cdata = str(struct.unpack(str(srec_c_data) + 's', f.read(srec_c_data))[0])[2:].split('\\x00')  # only works for Python3
-                else:
-                    cdata = struct.unpack(str(srec_c_data) + 's', f.read(srec_c_data))[0].split(b'\x00')
-                
+        for directory in self.__directories[DirectoryType.STATE_REC_DATA.value]:
+            srec_int_data = directory.modifier_idx1 - 4
+            srec_c_data = directory.modifier_idx2
+            f.seek(directory.offset_idx)
+            srec_id, srec_parent_mesh_id, srec_size_bytes, srec_qty_subrecs = struct.unpack('4i', f.read(16))
+            idata = struct.unpack(str(srec_int_data) + 'i', f.read(srec_int_data * 4))
+            if (sys.version_info > (3, 0)):
+                cdata = str(struct.unpack(str(srec_c_data) + 's', f.read(srec_c_data))[0])[2:].split('\\x00')  # only works for Python3
+            else:
+                cdata = struct.unpack(str(srec_c_data) + 's', f.read(srec_c_data))[0].split(b'\x00')
+            
+    
+            int_pos = 0
+            c_pos = 0
+            self.__srec_container = SubrecordContainer()
+
+            for k in range(srec_qty_subrecs):
+                org, qty_svars, qty_id_blks = idata[int_pos], idata[int_pos + 1], idata[int_pos + 2]
         
-                int_pos = 0
-                c_pos = 0
-                self.__srec_container = SubrecordContainer()
+        
+                # for j in range(qty_id_blks):
 
-                for k in range(srec_qty_subrecs):
-                    org, qty_svars, qty_id_blks = idata[int_pos], idata[int_pos + 1], idata[int_pos + 2]
-            
-            
-                    # for j in range(qty_id_blks):
+                int_pos += 3
+                name, class_name = cdata[c_pos:c_pos + 2]
+                c_pos += 2
+                svars = cdata[c_pos:c_pos + qty_svars]
+                c_pos += qty_svars
 
-                    int_pos += 3
-                    name, class_name = cdata[c_pos:c_pos + 2]
-                    c_pos += 2
-                    svars = cdata[c_pos:c_pos + qty_svars]
-                    c_pos += qty_svars
+                superclass = self.__mesh_object_class_datas[class_name].superclass
 
-                    superclass = self.__mesh_object_class_datas[class_name].superclass
+                sub = Subrecord(name, class_name, org, qty_svars, svars)
 
-                    sub = Subrecord(name, class_name, org, qty_svars, svars)
-
-                    if superclass != Superclass.M_MESH.value:
-                        sub.mo_qty = 0
-                        sub.qty_blocks = qty_id_blks
-                        for j in range(qty_id_blks):
-                            start, stop = idata[int_pos], idata[int_pos + 1]
-                            int_pos += 2
-                            sub.mo_blocks.append([start, stop])
-                            sub.mo_qty += stop - start + 1
-                    else:
-                        for j in range(qty_id_blks):
-                            start, stop = idata[int_pos], idata[int_pos + 1]
-                            int_pos += 2
-                        sub.mo_qty = 1
+                if superclass != Superclass.M_MESH.value:
+                    sub.mo_qty = 0
+                    sub.qty_blocks = qty_id_blks
+                    for j in range(qty_id_blks):
+                        start, stop = idata[int_pos], idata[int_pos + 1]
+                        int_pos += 2
+                        sub.mo_blocks.append([start, stop])
+                        sub.mo_qty += stop - start + 1
+                else:
+                    for j in range(qty_id_blks):
+                        start, stop = idata[int_pos], idata[int_pos + 1]
+                        int_pos += 2
+                    sub.mo_qty = 1
 
 
-                    lump_atoms = []
-                    lump_sizes = []
-                    lump_offsets = []
-                    count = 0
-                    sz = 0
-                    
-                    # Handle Aggregate Types
+                lump_atoms = []
+                lump_sizes = []
+                lump_offsets = []
+                count = 0
+                sz = 0
+                
+                # Handle Aggregate Types
+                for sv in svars:
+                    sv_name = sv
+                    sv = self.__state_variables[sv][0]
+                    for sv_sv in sv.svars:
+                        self.__state_variables[sv_sv][1].append(k)
+
+                if org == DataOrganization.OBJECT.value:
                     for sv in svars:
-                        sv_name = sv
-                        sv = self.__state_variables[sv][0]
-                        for sv_sv in sv.svars:
-                            self.__state_variables[sv_sv][1].append(k)
+                        state_var = self.__state_variables[sv][0]
+                        self.__state_variables[sv][1].append(k)
 
-                    if org == DataOrganization.OBJECT.value:
-                        for sv in svars:
-                            state_var = self.__state_variables[sv][0]
-                            self.__state_variables[sv][1].append(k)
+                        atom_size = ExtSize[DataType(state_var.data_type).name].value
+                        atoms = state_var.atom_qty(self.__state_variables)  # define this
 
-                            atom_size = ExtSize[DataType(state_var.data_type).name].value
-                            atoms = state_var.atom_qty(self.__state_variables)  # define this
+                        # ## stuff about surface here
 
-                            # ## stuff about surface here
+                        total_atoms = atoms
+                        count += total_atoms
+                        sz += total_atoms * atom_size
+                    lump_atoms.append(count)
+                    lump_sizes.append(sz)
 
-                            total_atoms = atoms
-                            count += total_atoms
-                            sz += total_atoms * atom_size
-                        lump_atoms.append(count)
-                        lump_sizes.append(sz)
+                    if superclass != Superclass.M_SURFACE.value:
+                        sub.size = sz * sub.mo_qty
+                    else:
+                        sub.size = sz
 
-                        if superclass != Superclass.M_SURFACE.value:
-                            sub.size = sz * sub.mo_qty
-                        else:
-                            sub.size = sz
+                elif org == DataOrganization.RESULT.value:
+                    for sv in svars:
+                        state_var = self.__state_variables[sv][0]
+                        self.__state_variables[sv][1].append(k)
 
-                    elif org == DataOrganization.RESULT.value:
-                        for sv in svars:
-                            state_var = self.__state_variables[sv][0]
-                            self.__state_variables[sv][1].append(k)
+                        atoms = state_var.atom_qty(self.__state_variables)
+                        # ## stuff about surface here
+                        total_atoms = atoms
 
-                            atoms = state_var.atom_qty(self.__state_variables)
-                            # ## stuff about surface here
-                            total_atoms = atoms
+                        lump_atoms.append(sub.mo_qty * total_atoms)
+                        lump_sizes.append(sub.mo_qty * total_atoms * ExtSize[DataType(state_var.data_type).name].value)
 
-                            lump_atoms.append(sub.mo_qty * total_atoms)
-                            lump_sizes.append(sub.mo_qty * total_atoms * ExtSize[DataType(state_var.data_type).name].value)
+                    lump_offsets.append(0)
+                    for j in range(1, sub.qty_svars):
+                        lump_offsets.append(lump_offsets[j - 1] + lump_sizes[j - 1])
 
-                        lump_offsets.append(0)
-                        for j in range(1, sub.qty_svars):
-                            lump_offsets.append(lump_offsets[j - 1] + lump_sizes[j - 1])
-
-                        j = sub.qty_svars - 1
-                        sub.size = lump_offsets[j] + lump_sizes[j]
+                    j = sub.qty_svars - 1
+                    sub.size = lump_offsets[j] + lump_sizes[j]
 
 
-                    sub.offset = self.__srec_container.size
-                    self.__srec_container.size += sub.size
-                    self.__srec_container.subrecs.append(sub)
+                sub.offset = self.__srec_container.size
+                self.__srec_container.size += sub.size
+                self.__srec_container.subrecs.append(sub)
 
     '''
     This function returns the string representation of a subrecord, to be used
@@ -1012,12 +1027,12 @@ class Mili:
 
             if self.__null_termed_names_bytes > 0:
                  # ## DIRECTORY AND SV DATA #
-                self.__readStateVariablesAndParams(f, offset)
-
+                self.__readNames(f, offset)
+                self.__readParams(f, offset)
+                self.__readStateVariables(f, offset)
 
                 ### MESH DATA ###
                 self.__readMesh(f)
-
 
                 ### SUBRECORD DATA ###
                 self.__readSubrecords(f)
