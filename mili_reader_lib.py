@@ -516,6 +516,10 @@ class Mili:
             f.seek(-1 * state_map_length, 1)
         return offset
 
+    '''
+    Reads all the string data for the mili file and associates the strings
+    with the appropriate directory structures.
+    '''
     def __readNames(self,f,offset):
         offset -= self.__null_termed_names_bytes
         f.seek(offset, os.SEEK_END)
@@ -527,14 +531,13 @@ class Mili:
         else:
             strings = byte_array.split(b'\x00')
 
-        for type_id in DirectoryType:
-            if type_id.value in self.__directories.keys():
-                for directory in self.__directories[type_id.value]:
-                    string_offset = directory.string_offset_idx
-                    string_count = directory.string_qty_idx
-                    directory_strings = [ strings[sidx] for sidx in range( string_offset, string_offset + string_count) ]
-                    self.__names.extend( directory_strings  )
-                    directory.addStrings( directory_strings )
+        for _, directories in self.__directories.items():
+            for directory in directories:
+                string_offset = directory.string_offset_idx
+                string_count = directory.string_qty_idx
+                directory_strings = [ strings[sidx] for sidx in range( string_offset, string_offset + string_count) ]
+                self.__names.extend( directory_strings  )
+                directory.addStrings( directory_strings )
 
     '''
     Reads the state variables and parameters from the Mili file.
@@ -546,7 +549,7 @@ class Mili:
 
         can_proc = [ DirectoryType.MILI_PARAM.value, DirectoryType.APPLICATION_PARAM.value, DirectoryType.TI_PARAM.value ]
         for type_id in can_proc:
-            for directory in self.__directories[type_id]:
+            for directory in self.__directories.get(type_id, []):
 
                 name = directory.strings[0]
 
@@ -635,7 +638,7 @@ class Mili:
 
     def __readStateVariables(self,f,offset_idx):
 
-        for directory in self.__directories[DirectoryType.STATE_VAR_DICT.value]:
+        for directory in self.__directories.get(DirectoryType.STATE_VAR_DICT.value, []):
             f.seek(directory.offset_idx)
             svar_words, svar_bytes = struct.unpack('2i', f.read(8))
             num_ints = (svar_words - 2)
@@ -747,7 +750,7 @@ class Mili:
                      DirectoryType.ELEM_CONNS.value ]
 
         for type_id in can_proc:
-            for directory in self.__directories[type_id]:
+            for directory in self.__directories.get(type_id, []):
 
                 if directory.type_idx == DirectoryType.CLASS_DEF.value:
                     superclass = directory.modifier_idx2
@@ -820,11 +823,11 @@ class Mili:
     Reads in all the subrecords for a Mili file
     '''
     def __readSubrecords(self, f):
-        for directory in self.__directories[DirectoryType.STATE_REC_DATA.value]:
+        for directory in self.__directories.get(DirectoryType.STATE_REC_DATA.value, []):
             srec_int_data = directory.modifier_idx1 - 4
             srec_c_data = directory.modifier_idx2
             f.seek(directory.offset_idx)
-            srec_id, srec_parent_mesh_id, srec_size_bytes, srec_qty_subrecs = struct.unpack('4i', f.read(16))
+            _, _, _, srec_qty_subrecs = struct.unpack('4i', f.read(16))
             idata = struct.unpack(str(srec_int_data) + 'i', f.read(srec_int_data * 4))
             if (sys.version_info > (3, 0)):
                 cdata = str(struct.unpack(str(srec_c_data) + 's', f.read(srec_c_data))[0])[2:].split('\\x00')  # only works for Python3
