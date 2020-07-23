@@ -1373,8 +1373,7 @@ class Mili:
         # ## Wait for querys
         while True:
             # sleep for 5 nanoseconds to reduce contention, this speeds us up by like 3x (just the read goes from 1.7 -> 0.6s on my system)
-            time.sleep(5/1000000)
-            if conn.poll():
+            if conn.poll(5/1000000):
                 query = conn.recv()
                 if query == "End":
                     conn.close()
