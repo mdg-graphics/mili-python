@@ -1447,11 +1447,10 @@ class Mili:
     '''
     def query(self, names, class_name, material=None, labels=None, state_numbers=None, modify=False, int_points=False, raw_data=True, res=defaultdict(dict)):
         # Parse Arguments
-        if not state_numbers:
+        if state_numbers is None:
             state_numbers = [i - 1 for i in range(1, self.__number_of_state_maps + 1)]
         elif type(state_numbers) is int:
             state_numbers = [state_numbers]
-
         if type(labels) is int:
             labels = [labels]
 
@@ -1545,10 +1544,8 @@ class Mili:
             return self.__create_answer(answ, names, material, labels, class_name, state_numbers, modify, raw_data)
 
         # Run Correct Function
-
         for state in state_numbers:
             if state not in res: res[state] = defaultdict(dict)
-
             if state < 0 or state >= len(self.__state_maps):
                 return self.__error('There is no state ' + str(state))
             state_map = self.__state_maps[state]
@@ -1595,11 +1592,14 @@ class Mili:
                         sv, subrecords = self.__state_variables[name]
                      
                     for sub in subrecords:
+                        
+                        f.seek(state_map.file_offset)
+                        
                         subrecord = self.__srec_container.subrecs[sub]
                         f.seek(subrecord.offset, 1)
                         byte_array = f.read(subrecord.size)
                         s = self.__set_string(subrecord)
-
+                        
                         vars = struct.unpack(self.__tag + s, byte_array)
 
                         if class_name == subrecord.class_name:
