@@ -1148,7 +1148,6 @@ class Mili:
                 sv = self.__state_variables[sv_group][0].svars
                 if child in sv:
                     var_indexes.append([subrecord.svar_names.index(sv_group), sv.index(child)])
-                    
         # Add correct values given organizational structure and correct indexing
         if int_points:
             int_points, num_int_points = int_points[:-1], int_points[-1:][0]
@@ -1172,7 +1171,7 @@ class Mili:
                     else:
                         indexes.append(sv_group_start[var_index] * subrecord.mo_qty + sv_group_len[var_index] * mo_index + var_in_group)
 
-            # 3 different aggregate types here - contructing the res
+            # 3 different aggregate types here - constructing the res
             if int_points:
                 indices[sub][label] = {}
                 if label not in res[state][name]: res[state][name][label] = {}
@@ -1592,8 +1591,7 @@ class Mili:
                         sv, subrecords = self.__state_variables[name]
                      
                     for sub in subrecords:
-                        
-                        f.seek(state_map.file_offset)
+                        f.seek(state_map.file_offset+8)
                         
                         subrecord = self.__srec_container.subrecs[sub]
                         f.seek(subrecord.offset, 1)
@@ -1610,6 +1608,7 @@ class Mili:
                                 return self.__variable_at_state(subrecord, labels, name, vars, sup_class, subrecord.class_name, sub, res, state, modify, int_points)
                             else:
                                 res = self.__variable_at_state(subrecord, labels, name, vars, sup_class, subrecord.class_name, sub, res, state, modify, int_points)
+                                
 
         return self.__create_answer(res, names, material, labels, class_name, state_numbers, modify, raw_data)
 
@@ -1924,7 +1923,7 @@ def main():
     
     d = mili.getParams()
     
-    print(mili.query('sz', 'brick', None, None, 10))
+    print(mili.query('stress[sz]', 'brick',None, [5],raw_data=True))
     
 
     # mili.setErrorFile()
