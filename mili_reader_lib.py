@@ -1167,7 +1167,6 @@ class Mili:
                 sv = self.__state_variables[sv_group][0].svars
                 if child in sv:
                     var_indexes.append([subrecord.svar_names.index(sv_group), sv.index(child)])
-                    
         # Add correct values given organizational structure and correct indexing
         if int_points:
             int_points, num_int_points = int_points[:-1], int_points[-1:][0]
@@ -1191,7 +1190,7 @@ class Mili:
                     else:
                         indexes.append(sv_group_start[var_index] * subrecord.mo_qty + sv_group_len[var_index] * mo_index + var_in_group)
 
-            # 3 different aggregate types here - contructing the res
+            # 3 different aggregate types here - constructing the res
             if int_points:
                 indices[sub][label] = {}
                 if label not in temp_res[state][name]: temp_res[state][name][label] = {}
@@ -1483,11 +1482,10 @@ class Mili:
         # default args are instantiated at function definition, not when called, this makes mutable types cache modifications between calls
         res = res if res is not None else defaultdict(dict)
         # Parse Arguments
-        if not state_numbers:
+        if state_numbers is None:
             state_numbers = [i - 1 for i in range(1, self.__number_of_state_maps + 1)]
         elif type(state_numbers) is int:
             state_numbers = [state_numbers]
-
         if type(labels) is int:
             labels = [labels]
 
@@ -1585,7 +1583,6 @@ class Mili:
             return self.__create_answer(answ, names, material, labels, class_name, state_numbers, modify, raw_data)
 
         # Run Correct Function
-
         for state in state_numbers:
             if state < 0 or state >= len(self.__state_maps):
                 return self.__error('There is no state ' + str(state))
@@ -1632,6 +1629,8 @@ class Mili:
                         sv, subrecords = self.__state_variables[name]
                      
                     for sub in subrecords:
+                        f.seek(state_map.file_offset+8)
+                        
                         subrecord = self.__srec_container.subrecs[sub]
                         f.seek(subrecord.offset, 1)
                         byte_array = f.read(subrecord.size)
@@ -1964,7 +1963,7 @@ def main():
     
     d = mili.getParams()
     
-    print(mili.query('sz', 'brick', None, None, 10))
+    print(mili.query('stress[sz]', 'brick',None, [5]))
     
 
     # mili.setErrorFile()

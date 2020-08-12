@@ -117,6 +117,7 @@ class TestMiliReader(unittest.TestCase):
     '''
     def test_node_attributes(self):
         answer = self.mili.query(['nodpos[ux]'], 'node', None, [70], [3], None, None, False)
+        print("nodpos",answer)
         assert(answer.state_answers[0].items[0].value == 0.4330127537250519)
         
         answer = self.mili.query(['ux'], 'node', None, [70], [3], None, None, False)
@@ -216,7 +217,7 @@ class TestMiliReader(unittest.TestCase):
     Test accessing a vector array
     '''
     def test_state_variable_vector_array(self):
-        answer = self.mili.query('stress', 'beam', None, [5], [70], False, [2], False)
+        answer = self.mili.query('stress', 'beam', None, [5], [1,2], False, [2], False)
         d = {'sz': {2: -3.736035978363361e-07}, 'sy': {2: -0.40591922402381897}, 'sx': {2: 6544.61962890625}, 'szx': {2: 6944.44775390625}, 'sxy': {2: 0.0}, 'syz': {2: 5146.49267578125}}
         assert(answer.state_answers[0].items[0].value == d)
     
@@ -453,8 +454,9 @@ class TestMiliReaderParallel(unittest.TestCase):
     Test accessing a vector array
     '''
     def test_state_variable_vector_array(self):
-        answer = self.mili.query('stress', 'beam', None, [5], [70], False, [2], False)
+        answer = self.mili.query('stress', 'beam', None, [5], [1,2], False, [1], False)
         d = {'sz': {2: -2.4870882953109685e-07}, 'sy': {2: -0.2791216969490051}, 'sx': {2: 6544.6015625}, 'szx': {2: 6944.56103515625}, 'sxy': {2: 0.0}, 'syz': {2: 5146.34326171875}}
+        print(answer)
         assert(answer.state_answers[0].items[0].value == d)
    
     '''
