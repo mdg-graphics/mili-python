@@ -628,7 +628,7 @@ class Mili:
                     else:
                         self.__matname[matname] = [int(num)]
 
-                if 'es_' in name:
+                if 'IntLabel_es_' in name:
                     f.seek(directory.offset_idx)
                     byte_array = f.read(directory.length_idx)
                     i_points = struct.unpack(self.__tag + str(int(directory.length_idx / 4)) + 'i', byte_array)
@@ -640,6 +640,7 @@ class Mili:
     def __readStateVariables(self,f,offset_idx):
 
         for directory in self.__directories.get(DirectoryType.STATE_VAR_DICT.value, []):
+            
             f.seek(directory.offset_idx)
             svar_words, svar_bytes = struct.unpack('2i', f.read(8))
             num_ints = (svar_words - 2)
@@ -699,7 +700,8 @@ class Mili:
 
                 self.__state_variables[sv_name] = [state_variable, []]
 
-                if (sv_name == 'es_1a' or sv_name == 'es_3a' or sv_name == 'es_3c') and sv_name[:-1] in self.__int_points:
+                if sv_name[:-1] in self.__int_points:
+                #if (sv_name == 'es_1a' or sv_name == 'es_3a' or sv_name == 'es_3c') and sv_name[:-1] in self.__int_points:
                     stresscount = straincount = 0
                     stress = strain = []
 
@@ -1063,7 +1065,6 @@ class Mili:
         if raw_data or not res:
             return res
         answer = Answer()
-
         for state_number in state_numbers:
             state = StateAnswer()
             answer.state_answers.append(state)
@@ -1072,8 +1073,8 @@ class Mili:
             for name in names:
                 for label in labels:
                     item = Item(name, None, None, label, class_name, modify)
-                    if name in res[state_number]:
-                        item.set(res[state_number][name][label])
+                    if name in res[state_number-1]:
+                        item.set(res[state_number-1][name][label])
                         state.items.append(item)
 
         return answer
@@ -1105,17 +1106,18 @@ class Mili:
     Given a single state variable name, a number of states, and a number of label(s) return the requested value(s)
     '''
     def __variable_at_state(self, subrecord, labels, name, variables, sup_class, clas, sub, res, state, modify=False, int_points=False):
+        
         mo_search_arr = []
         indices = {}
         temp_res = { state : { name : {} } }
         #values = {}  # from label to value
-
+        
         # Deal with names like vector[component]
         _, child_variables = self.__parse_name(name)
         child_variables = [child_variables]
-
         # These are the mo_ids we are interested in for this subrecord
         labels_we_have = list( set(labels) & set(self.__labels[(sup_class,clas)]) )
+        
         if len(labels_we_have) == 0:
             return None
         for label in labels_we_have:
@@ -1145,6 +1147,7 @@ class Mili:
         sv_group_start[0] = 0
         sv_group_len = {}
         group_idx = 0
+        
         for sv in subrecord.svar_names:
             sv_var = self.__state_variables[sv][0]
             sv_group_len[group_idx] = max(1, len(sv_var.svars))
@@ -1180,7 +1183,9 @@ class Mili:
                 if int_points: var_index = var_in_group
                 if int_points and var_index not in indexes: indexes[var_index] = {}
                 if int_points:
+                    
                     offset = mo_index * len(sv_names) * num_int_points
+                    
                     for int_point in int_points:
                         index = offset + var_index * num_int_points + int_point - 1
                         indexes[var_index][int_point] = index
@@ -1192,14 +1197,19 @@ class Mili:
 
             # 3 different aggregate types here - constructing the res
             if int_points:
+                
                 indices[sub][label] = {}
+                
                 if label not in temp_res[state][name]: temp_res[state][name][label] = {}
                 v_index = 0
+                
                 for index in indexes.keys():
+                    
                     indices[sub][label][sv_names[index]] = {}
                     sv_name = sv_names[index]
                     temp_res[state][name][label][sv_name] = {}
                     for int_point in int_points:
+                        
                         temp_res[state][name][label][sv_name][int_point] = variables[indexes[index][int_point]]
                         indices[sub][label][sv_names[index]][int_point] = indexes[index][int_point]
                     v_index += 1
@@ -1481,9 +1491,10 @@ class Mili:
     def query(self, names, class_name, material=None, labels=None, state_numbers=None, modify=False, int_points=False, raw_data=True, res=None):
         # default args are instantiated at function definition, not when called, this makes mutable types cache modifications between calls
         res = res if res is not None else defaultdict(dict)
+        processed_integration_point = False
         # Parse Arguments
         if state_numbers is None:
-            state_numbers = [i - 1 for i in range(1, self.__number_of_state_maps + 1)]
+            state_numbers = [i  for i in range(1, self.__number_of_state_maps +1)]
         elif type(state_numbers) is int:
             state_numbers = [state_numbers]
         if type(labels) is int:
@@ -1574,9 +1585,7 @@ class Mili:
                     for mili_index in milis:
                         resp = self.__milis[mili_index].query(sv, class_name, material, mili_to_labels[mili_index], state_numbers, modify, int_points, True, answ)
                         # answ is modified in-place, shouldn't need to check/append if something isn't found, should avoid in-place modifications if something isn't found (which is currently happening)
-                        #if resp:
-                        #    answ = resp
-                
+                        
                 if answ is not None and len(answ) == 0:
                     answ = None
 
@@ -1584,14 +1593,15 @@ class Mili:
 
         # Run Correct Function
         for state in state_numbers:
-            if state < 0 or state >= len(self.__state_maps):
+            if state < 1 or state > len(self.__state_maps):
                 return self.__error('There is no state ' + str(state))
-            state_map = self.__state_maps[state]
-
+            state_map = self.__state_maps[state-1]
+            
             with open(self.__state_map_filename[state_map.file_number], 'rb') as f:
-                f.seek(state_map.file_offset)
-                byte_array = f.read(8)
-                _, _ = struct.unpack(self.__tag + 'fi', byte_array)
+                state_subrecord_start_offset = state_map.file_offset+8
+                #f.seek(state_map.file_offset)
+                #byte_array = f.read(8)
+                #_, _ = struct.unpack(self.__tag + 'fi', byte_array)
 
                 for name in names:
                     # Handle case of vector[component]
@@ -1603,22 +1613,24 @@ class Mili:
                         elif 'strain' in name: elem_sets = self.__int_points['strain']
 
                         for set_name in elem_sets.keys():
+                            
                             temp_sv, temp_subrecords = self.__state_variables[set_name]
                             temp_subrecord = self.__srec_container.subrecs[temp_subrecords[0]]
                             if temp_subrecord.class_name == class_name:
                                 sv, subrecords = temp_sv, temp_subrecords
-                        if not int_points:
-                            int_points = list(self.__is_vec_array(vector, class_name))
-                        else:
-                            possible_int_points = self.__is_vec_array(vector, class_name)
-                            for i in range(len(int_points)):
-                                ip = int_points[i]
-                                if ip not in possible_int_points:
-                                    _, ip = min(enumerate(possible_int_points), key=lambda x: abs(x[1] - ip))
-                                    self.__error(str(ip) + ' is not an integration point, but the closest is ' + str(ip))
-                                int_points[i] = ip
-                        int_points.append(len(self.__is_vec_array(vector, class_name)))
-
+                        if(not processed_integration_point):
+                            if not int_points:
+                                int_points = list(self.__is_vec_array(vector, class_name))
+                            else:
+                                possible_int_points = self.__is_vec_array(vector, class_name)
+                                for i in range(len(int_points)):
+                                    ip = int_points[i]
+                                    if ip not in possible_int_points:
+                                        _, ip = min(enumerate(possible_int_points), key=lambda x: abs(x[1] - ip))
+                                        self.__error(str(ip) + ' is not an integration point, but the closest is ' + str(ip))
+                                        int_points[i] = ip
+                            int_points.append(len(self.__is_vec_array(vector, class_name)))
+                        processed_integration_point = True
                     elif vector: 
                         if vector not in self.__state_variables:
                             return self.__error('There is no variable ' + vector)
@@ -1629,13 +1641,13 @@ class Mili:
                         sv, subrecords = self.__state_variables[name]
                      
                     for sub in subrecords:
-                        f.seek(state_map.file_offset+8)
+                        f.seek(state_subrecord_start_offset)
                         
                         subrecord = self.__srec_container.subrecs[sub]
                         f.seek(subrecord.offset, 1)
                         byte_array = f.read(subrecord.size)
                         s = self.__set_string(subrecord)
-
+                        
                         var_data = struct.unpack(self.__tag + s, byte_array)
 
                         if class_name == subrecord.class_name:
@@ -1643,10 +1655,10 @@ class Mili:
                             sup_class = Superclass(sup_class).name
 
                             if modify:
-                                return self.__variable_at_state(subrecord, labels, name, var_data, sup_class, subrecord.class_name, sub, res, state, modify, int_points)
+                                return self.__variable_at_state(subrecord, labels, name, var_data, sup_class, subrecord.class_name, sub, res, state-1, modify, int_points)
                             else:
-                                res = self.__variable_at_state(subrecord, labels, name, var_data, sup_class, subrecord.class_name, sub, res, state, modify, int_points)
-
+                                res = self.__variable_at_state(subrecord, labels, name, var_data, sup_class, subrecord.class_name, sub, res, state-1, modify, int_points)
+        
         return self.__create_answer(res, names, material, labels, class_name, state_numbers, modify, raw_data)
 
     '''
@@ -1844,8 +1856,6 @@ class Mili:
                 for mili_index in range(len(self.__milis)):
                     self.__milis[mili_index].modify_state_variable(state_variable, class_name, value, labels, state_numbers, int_points)
             return
-  
-
         query = self.query(state_variable, class_name, None, labels, state_numbers, True, int_points)
         if type(query) is not list:
             return None
@@ -1854,7 +1864,7 @@ class Mili:
         type_to_str = {'s' : 'M_STRING', 'f' : 'M_FLOAT', 'd' : 'M_FLOAT8', 'i' : 'M_INT', 'q' : 'M_INT8'}
 
         if not state_numbers:
-            state_numbers = [i - 1 for i in range(1, self.__number_of_state_maps + 1)]
+            state_numbers = [i for i in range(1, self.__number_of_state_maps+1)]
         elif type(state_numbers) is int:
             state_numbers = [state_numbers]
         if type(labels) is int:
@@ -1863,18 +1873,15 @@ class Mili:
             int_points = int_points[:len(int_points) - 1]
         if type(state_variable) is not str:
             return self.__error('state variable must be a string')
-
         for state in state_numbers:
-            if state < 0 or state >= len(self.__state_maps):
+            if state < 1 or state > len(self.__state_maps):
                 return self.__error('There is no state ' + str(state))
 
-            state_map = self.__state_maps[state]
+            state_map = self.__state_maps[state-1]
 
             with open(self.__state_map_filename[state_map.file_number], 'rb+') as f:
-                f.seek(state_map.file_offset)
-                byte_array = f.read(8)
-                time, state_map_id = struct.unpack(self.__tag + 'fi', byte_array)
-
+                state_subrecord_start_offset = state_map.file_offset+8
+                
                 name = state_variable
 
                 vector, variables = self.__parse_name(name)
@@ -1903,7 +1910,7 @@ class Mili:
 
                 for sub in subrecords:
                     subrecord = self.__srec_container.subrecs[sub]
-                    f.seek(subrecord.offset, 1)
+                    f.seek(state_subrecord_start_offset+subrecord.offset)
                     s = self.__set_string(subrecord)
 
                     # Iterate through s, the string representation of the subrecord, adding
@@ -1955,15 +1962,29 @@ This function is an example of how a user could use the Mili reader
 '''
 def main():
     # You can run code here as well if you copy the library !
-
-    f = 'd3samp6.plt'
+    # This is the definition of the query function
+    """def query(self, variable_names, 
+                       class_name, 
+                       material=None, 
+                       labels=None, 
+                       state_numbers=None, 
+                       modify=False, 
+                       int_points=False, 
+                       raw_data=True, 
+                       res=None):
+    """
+    f = 'parallel/d3samp6.plt'
     mili = Mili()
     # mili.read(f, parallel_read=True)
     mili.read(f, parallel_read=False)
     
     d = mili.getParams()
-    
-    print(mili.query('stress[sz]', 'brick',None, [5]))
+    answer = mili.query('stress', 'beam', None, [5,6], [21,22], False, [2], False)
+    #answer = mili.query('stress[sy]', 'beam', None, [5], [70], False, [2], False)
+    #answer = mili.query('stress[sy]', 'beam', None, [5], [70], False, [2], False)
+    #answer = mili.query(['matcgx'], 'mat', None, [1,2], [4], raw_data=False)
+    print (answer)   
+    #print(mili.query('stress[eps]', 'beam',None, [5],None,raw_data=False))
     
 
     # mili.setErrorFile()
