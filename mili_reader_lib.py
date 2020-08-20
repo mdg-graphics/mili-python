@@ -1599,10 +1599,7 @@ class Mili:
             
             with open(self.__state_map_filename[state_map.file_number], 'rb') as f:
                 state_subrecord_start_offset = state_map.file_offset+8
-                #f.seek(state_map.file_offset)
-                #byte_array = f.read(8)
-                #_, _ = struct.unpack(self.__tag + 'fi', byte_array)
-
+                
                 for name in names:
                     # Handle case of vector[component]
                     vector, variables = self.__parse_name(name)
@@ -1973,12 +1970,13 @@ def main():
                        raw_data=True, 
                        res=None):
     """
-    f = 'parallel/d3samp6.plt'
+    f = 'd3samp6.plt'
     mili = Mili()
     # mili.read(f, parallel_read=True)
     mili.read(f, parallel_read=False)
     
     d = mili.getParams()
+    # Leaving these as they giz a variety of examples
     answer = mili.query('stress', 'beam', None, [5,6], [21,22], False, [2], False)
     #answer = mili.query('stress[sy]', 'beam', None, [5], [70], False, [2], False)
     #answer = mili.query('stress[sy]', 'beam', None, [5], [70], False, [2], False)
