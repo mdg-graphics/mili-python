@@ -376,6 +376,55 @@ class DataOrganization(Enum):
     RESULT = 0
     OBJECT = 1
 
+class Search:
+    def __init__(self):
+        self.__table = {}
+    
+    def find(self, mili_class_name, variable_name, item=None):
+        
+        all = False
+        
+        if (mili_class_name == None or len(mili_class_name) == 0 ) or (variable_name == None and len(variable_name)>0) :
+            print("Class name or Variable name not found")
+            return None
+        
+        if not variable_name in self.__table.keys() or not mili_class_name in self.__table[variable_name].keys():
+            return None
+        
+        if item == None:
+            all = True
+        
+        subrecords = self.__table[variable_name][mili_class_name]
+        
+        for subrecord in subrecords:
+            for block in subrecord.mo_blocks:
+                if(block[0] <= item and item <=block[1]):
+                    return subrecord
+        
+        return None    
+        
+    def __str__(self):
+        
+        for key in self.__table.keys():
+            print(key)
+            for class_key in self.__table[key].keys():
+                print("\t",class_key)
+                for subrecord in self.__table[key][class_key]:
+                    print("\t\t",subrecord.name)
+                    print("\t\t",subrecord.svar_names)
+                        #print("\t\t\tMo_ids: ",subrecord.mo_blocks[i][0],"-",subrecord.mo_blocks[i][1])
+        return "\n"
+    
+    def add(self, mili_class_name, variable_name, subrecord):  
+        if (mili_class_name == None or len(mili_class_name) == 0) or (variable_name == None and len(variable_name)>0) :
+            return False
+        
+        if variable_name not in self.__table.keys():
+            self.__table[variable_name] = {}
+        if mili_class_name not in self.__table[variable_name].keys():
+            self.__table[variable_name][mili_class_name] = []
+        self.__table[variable_name][mili_class_name].append(subrecord)
+                    
 '''
 A Mili object contains data structures to store objects such as directories
 and subrecords. It also has a number of querying functions that a user can call
@@ -402,6 +451,7 @@ class Mili:
         for i in range(1000):
             self.__matname[str(i)] = [i]  # this is the default in case they don't have an entry for material names
         self.__connectivity = {}  # shortname : {mo_id : node}
+        self.__mili_search = Search()  #added to help speed up the query routine
         self.__dim = None  # dimensions from mesh dimensions
         self.__srec_container = None
         self.__header_version = None
@@ -882,6 +932,7 @@ class Mili:
                 # Handle Aggregate Types
                 for sv in svars:
                     sv_name = sv
+                    self.__mili_search.add(class_name,sv,sub)
                     sv = self.__state_variables[sv][0]
                     for sv_sv in sv.svars:
                         self.__state_variables[sv_sv][1].append(k)
@@ -977,6 +1028,7 @@ class Mili:
         parallel = list(filter(attfile_re.match,os.listdir(dir_name)))
         # remove the 'A' at the end of the filename for recursive parallel read
         parallel = [ rootfile[:-1] for rootfile in parallel ]
+        
 
         if len( parallel ) > 1:
             self.__filename = file_name
@@ -995,7 +1047,7 @@ class Mili:
             state_files.sort()
 
             file_name = dir_name + os.sep + file_name
-
+            
             self.__filename = file_name + 'A'
             self.__state_map_filename = state_files
 
@@ -1240,6 +1292,7 @@ class Mili:
         sup_class = self.__mesh_object_class_datas[class_name].superclass
         sup_class = Superclass(sup_class).name
         labels = self.__labels[(sup_class, class_name)]
+        return ret
         for elem in elems:
             id, class_name_elem = elem
             for k in labels.keys():
@@ -1331,6 +1384,7 @@ class Mili:
     '''
     def __split_reads(self, file_name, parallel_read):
         # Handle case of multiple state files
+        is_first = True
         end_dir = file_name.rfind(os.sep)
         # dir_name = os.getcwd()
         dir_name = os.getcwd()
@@ -1358,6 +1412,9 @@ class Mili:
                     pr.start()
                 else:
                     labeltomili, mesh_objects = mili.read(dir_name + os.sep + p, mili.__labeltomili, i)
+                    if(is_first):
+                        is_first=False
+                        self.__number_of_state_maps = mili.__number_of_state_maps
                     for mesh_obj in mesh_objects:
                         if mesh_obj not in self.__mesh_object_class_datas:
                             self.__mesh_object_class_datas[mesh_obj] = mesh_objects[mesh_obj]
@@ -1954,6 +2011,13 @@ class Mili:
                     self.__params['post_modified'][0] = 1
                     f.write(one)
 
+    def print_search(self):
+        print(self.__mili_search)
+    
+    def search(self,mili_class_name,variable_name,item):
+        return self.__mili_search.find(mili_class_name, variable_name, item)
+        
+
 '''
 This function is an example of how a user could use the Mili reader
 '''
@@ -1970,21 +2034,31 @@ def main():
                        raw_data=True, 
                        res=None):
     """
-    f = 'd3samp6.plt'
+    #f = 'parallel/d3samp6.plt'
+    #f='/p/lustre1/depiero/2020_08_19_073746_4370645/'
+    f= '/usr/workspace/wsrzd/jdurren/mili-python/chandra/jethe_01_run.dyn.plt'
+    #f = "nickolai/ingrido_f.dyna.plt"
     mili = Mili()
-    # mili.read(f, parallel_read=True)
-    mili.read(f, parallel_read=False)
+    #mili.read(f, parallel_read=True)
+    #mili.read(f, parallel_read=True)
     
-    d = mili.getParams()
+    mili.read(f)
+    #mili.print_search()
+    #result = mili.search("node", "pen27s", 169)
+    #print (result.name)
+    #d = mili.getParams()
     # Leaving these as they giz a variety of examples
-    answer = mili.query('stress', 'beam', None, [5,6], [21,22], False, [2], False)
-    #answer = mili.query('stress[sy]', 'beam', None, [5], [70], False, [2], False)
+    #mat_id ='2'
+    #label = 5
+    
+    answer = mili.query(['nodpos'], class_name='node', material=None, labels=[1])
+    #answer = mili.query('stress[sy]', 'brick', None, [5], [70], False, [2], False)
     #answer = mili.query('stress[sy]', 'beam', None, [5], [70], False, [2], False)
     #answer = mili.query(['matcgx'], 'mat', None, [1,2], [4], raw_data=False)
-    print (answer)   
+    #print (answer)   
     #print(mili.query('stress[eps]', 'beam',None, [5],None,raw_data=False))
     
-
+    print(answer)
     # mili.setErrorFile()
         
 if __name__ == '__main__':
