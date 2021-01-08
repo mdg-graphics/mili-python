@@ -1,314 +1,4 @@
 
-    class MiliFamily:
-        # Set to None, [], {}, or should actually be init     
-
-        def __init__(self):
-            self.pid = None # getpid()
-            self.my_id = None # family id
-            self.root = None # family root string
-            self.root_len = None
-            self.path = None# path to directory where family is/will be
-            self.file_root = None
-            self.aFile = None # filename ?
-            self.access_mode = None
-            self.num_procs = None
-            #self.post_modified = post_modified
-            #self.visit_file_on = visit_file_on
-            self.db_type = None # Database_type
-            #self.lock_file_descriptor = lock_file_descriptor # lockf() ?
-            #self.st_suffix_width = st_suffix_width
-            self.non_state_ready = None # Bool_type
-            #self.hide_states = hide_states # Bool_type
-            self.char_header = None # DIR_VERSION_IDX, ENDIAN_IDX, HDR, ST_FILE
-            #self.swap_bytes = swap_bytes # swap_bytes()
-            #self.precision_limit = precision_limit # Precision_limit_type, set by read_header()
-            #self.partition_scheme = partition_scheme
-            #self.states_per_file = states_per_file # qty of states per family state_data file
-            #self.bytes_per_file_limit = bytes_per_file_limit # compare to bytes_per_file_limit
-            #self.active_family = active_family # Bool_type
-            #self.written_st_qty = written_st_qty
-            #self.commit_count = commit_count # p_fd
-            #self.cur_file = cur_file # FILE*
-            #self.cur_file_size = cur_file_size
-            #self.cur_index = cur_index # current family id index
-            #self.file_count = file_count # call prep_for_new_data() to update - is this the number of files it takes to hold all info?
-            self.next_free_byte = None # dependent on cur_file_size
-            self.cur_st_file = None # FILE*, seek_state_file()
-            self.cur_st_file_mode = None
-            self.cur_st_file_size = None # should not be larger than fam.bytes_per_file_limit, ABSOLUTE_MAX_FILE_SIZE
-            #self.cur_st_index = cur_st_index # ST_FILE_SUFFIX()
-            #self.st_file_count = st_file_count # file count in active db, includes partial files
-            #self.st_file_index_offset = st_file_index_offset
-            #self.cur_st_offset = cur_st_offset
-            #self.file_st_qty = file_st_qty # compare to fam.states_per_file
-            self.cur_srec_id = None
-            self.state_qty = None
-            self.state_closed = None
-            self.state_dirty = None
-            self.file_map = None # State_file_descriptor*, has state_qtys
-            self.state_map = None # State_descriptor*
-            # Directory data
-            self.directory = None # File_dir*
-            # Parameter data
-            self.param_table = None # Hash_table*
-            # Mesh data
-            self.mesh_type = None # Mesh_type*
-            self.dimensions = None
-            self.meshes = None # Mesh_descriptor**
-            self.qty_meshes = None
-            # State record descriptor data
-            self.srecs = None # Srec**
-            self.srec_meshes = None # Mesh_descriptor**
-            self.qty_srecs = None
-            self.commit_max = None
-            # State variable table and I/O stores
-            self.svar_table = None # Hash_table*
-            self.svar_c_ios = None # IO_mem_store*
-            self.svar_i_ios = None # IO_mem_store*
-            self.svar_hdr = None # int*
-            # Subrecord table
-            self.subrec_table = None # Hash_table*
-
-            # I/O routines
-            #def readFuncs():
-            #    return int
-            #def state_read_funcs():
-            #    return int
-            #def write_funcs():
-            #    return int
-            #def state_write_funcs():
-            #    return int
-
-
-
-
-
-    class StateFileDescriptor():
-        def __init__(self):
-            self.state_qty = None
-
-    class StateDescriptor():
-        def __init__(self):
-            self.file = None # int
-            self.offset = None # LONGLONG
-            self.time = None # float
-            self.srec_format = None # int
-
-    class IO_mem_buffer():
-        def __init__(self):
-            self.data = []
-            self.used = None # size_t
-            self.output = None # size_t
-            self.invalid = [] # Block_list
-
-    class IO_mem_store():
-        def __init__(self):
-            self.IO_mem_buffer = None
-            self.type = None # int
-            self.current_index = None # size_t
-            self.current_output_index = None # size_t
-            self.traverse_index = None # size_t
-            self.traverse_remain = None # size_t
-            self.traverse_next = None # string?
-
-    class File_dir():
-        def __init__(self):
-            self.commit_count = None # int
-            self.qty_entries = None # int
-            self.dir_entries = None # Dir_entry 
-            self.qty_names = None # int
-            self.names = [] # char**
-            self.name_data = None # IO_mem_store
-
-    class MeshType(Enum):
-        UNDEFINED = 0
-        #UNSTRUCTURED
-
-    class MeshDescriptor():
-        def __init__(self):
-            self.name = None # string?
-
-    class Srec():
-        def __init__(self):
-            self.qty_subrecs = None # int
-            self.subrecs = None # Sub_srec**
-            self.size = None # LONGLONG
-            self.status = None # Db_object_status
-
-    class BlockList():
-        def __init__(self):
-            self.object_qty = None # int
-            self.block_qty = None # int
-            self.blocks = [] # Int_range
-
-    class IntRange():
-        def __init__(self):
-            self.prev = None # IntRange
-            self.next = None # IntRange
-            self.start = None # int
-            self.stop = None # int
-
-    class DirEntry():
-        def __init__(self):
-            self.entry = None # 6 numbers so can be array of 6 ints?
-    
-    ############ Create the database / create_family() ##############
-
-    def CreateMiliFamily(fam):
-
-        fam.st_suffix_width = DEFAULT_SUFFIX_WIDTH
-        fam.partition_scheme = DEFAULT_PARTITION_SCHEME
-        fam.states_per_file  = 0
-        fam.bytes_per_file_limit = 0
-        fam.post_modified = 0
-
-        fam.st_file_count = 0
-        fam.file_count = 0
-        fam.cur_index = -1
-        fam.commit_max = -1
-
-        fam.ti_cur_index = -1
-        fam.ti_file_count = 0
-
-        # Create first file and its directory - non_state_file_open()
-        NonStateFileOpen()
-
-        # If fam.param_table is not None, init_header(fam) and mc_init_metadata(fam.my_id)
-        # Q: what are the hash tables created for?
-
-        fam.file_count += 1
-        InitHeader()
-
-        mcInitMetadata()
-
-        return OK
-
-
-    def NonStateFileOpen(fam, index, mode):
-        with open(fname, 'w+') as p_file:
-
-
-        fam.next_free_byte = fam.cur_file_size
-
-        # Set current file index and manage directory
-        fam.cur_index = index
-
-        fam.directory = RENEW_N # Q: figure out renew(file_dir, fam.dir, fcount, 1, "file dir head")
-
-
-
-    def InitHeader(fam):
-        # fam.char_header gets parts from attributes of fam, Q: is header a struct?    
-
-        # fam.char_header[HDR_VERSION_IDX], fam.char_header[DIR_VERSION_IDX]
-
-        # fam.swap_bytes, set fam.char_header[ENDIAN_IDX], fam.
-        return OK
-
-    def WriteHeader(fam):
-        # Write character header to A file    
-
-        # Open file w read/write access
-        NonStateFileOpen(fam, 0, 'a')
-
-        # Check for read/write access()
-
-        write()
-
-        NonStateFileClose(fam)    
-
-
-
-    def DefSvars(fam, qty, names, svar_ints, svar_s):
-        # see where names and qty come from
-        # should have complete list of names and titles
-
-        # Go though the names...what are titles?
-        for name in names:
-            # valid_svar_data() --> check to see if svar?
-
-            # add name to family names
-            fam
-
-            # add title?
-
-            # add agg_type
-
-            # add data_type
-            fam.svar_c_ios
-            fam.svar_i_ios
-
-        return OK    
-
-
-    ############## mc_flush() ################       
-
-    def CommitNonState(fam):
-        p_fname = []
-        fd = 0
-        rval = 0 # ReturnValue type
-        write_cnt = 0
-
-        rval = PrepForNewData(fam, NON_STATE_DATA) # NON_STATE_DATA is constant?
-
-        if rval is not OK: # OK is constant?
-            return rval
-
-        if(fseek(fam.cur_file, 0L, SEEK_END) is not 0): # need to get current file for seek
-            return -1
-
-        if(fam.svar_table is not NULL):
-            rval = CommitSvars(fam)
-            if rval is not OK:
-                return rval
-
-        if(fam.qty_srecs is not 0):
-            rval = CommitSrecs(fam)
-            if rval is not OK:
-                return rval
-
-
-        rval = CommitDir(fam)
-        if rval is not OK:
-            return rval
-
-
-        fd = fam.lock_file_descriptor
-
-        p_fname = NEW_N(char, M_MAX_NAME_LEN, "Lock file NS name buffer")
-        if p_fname:
-            return ALLOC_FAILED
-
-        MakeFnam(NON_STATE_DATA, fam, fam.file_count - 1, p_fname)
-
-        rval = GetNameLock(fam, NON_STATE_DATA)
-        #if rval is not OK:
-
-        if filelock_enable:
-            write_ct = write(fd, p_fname, M_MAX_NAME_LEN)
-            if write_ct is not M_MAX_NAME_LEN:
-                return SHORT_WRITE
-
-
-        # LOCK
-
-        fam.commit_count += 1
-        fam.non_state_ready = FALSE
-
-        return rval
-
-
-    def PrepForNewData(MiliFamily fam, int ftype): # types for clarification, need to change
-        amode = fam.access_mode
-        index = 0
-        rval = -1
-        #open_next
-
-        return OK
-
-
-
-
             
     ############################## Notes ###############################
     # replace read functions one at a time and test combine
@@ -320,6 +10,10 @@
     # bc we don't actually go to info dir is pointing to in readDirs
     # wait until do reach that data in other read functions (svar,srec)
     # then add dir to all_local_dirs so that we have short_names
+    # three dictionaries:
+    # # dictionary for local directories - uses offset in file as index
+    # # dictionary for local directories from all processors for svars, srecs - uses short_name as index
+    # # dictionary for global combined directories that we are committing in the end
     ####################################################################
 
     ######################## classes / indexes #########################
@@ -1490,7 +1184,7 @@
         # mod_idx1 = count integer data + usrface flag
         # mod_idx2 = # characters to read of the state variables assoc w this srec ? calculated in CalcSrecSizes()
 
-        all_i_size, all_c_size, total_size = alcSrecSizes(global_srec_cdata, global_srec_idata)
+        all_i_size, all_c_size, total_size = CalcSrecSizes(global_srec_cdata, global_srec_idata)
         
         all_srec_arrays = []
         formatting_string = None
@@ -1545,6 +1239,316 @@
 
 
 
+
+
+
+
+    class MiliFamily:
+        # Set to None, [], {}, or should actually be init     
+
+        def __init__(self):
+            self.pid = None # getpid()
+            self.my_id = None # family id
+            self.root = None # family root string
+            self.root_len = None
+            self.path = None# path to directory where family is/will be
+            self.file_root = None
+            self.aFile = None # filename ?
+            self.access_mode = None
+            self.num_procs = None
+            #self.post_modified = post_modified
+            #self.visit_file_on = visit_file_on
+            self.db_type = None # Database_type
+            #self.lock_file_descriptor = lock_file_descriptor # lockf() ?
+            #self.st_suffix_width = st_suffix_width
+            self.non_state_ready = None # Bool_type
+            #self.hide_states = hide_states # Bool_type
+            self.char_header = None # DIR_VERSION_IDX, ENDIAN_IDX, HDR, ST_FILE
+            #self.swap_bytes = swap_bytes # swap_bytes()
+            #self.precision_limit = precision_limit # Precision_limit_type, set by read_header()
+            #self.partition_scheme = partition_scheme
+            #self.states_per_file = states_per_file # qty of states per family state_data file
+            #self.bytes_per_file_limit = bytes_per_file_limit # compare to bytes_per_file_limit
+            #self.active_family = active_family # Bool_type
+            #self.written_st_qty = written_st_qty
+            #self.commit_count = commit_count # p_fd
+            #self.cur_file = cur_file # FILE*
+            #self.cur_file_size = cur_file_size
+            #self.cur_index = cur_index # current family id index
+            #self.file_count = file_count # call prep_for_new_data() to update - is this the number of files it takes to hold all info?
+            self.next_free_byte = None # dependent on cur_file_size
+            self.cur_st_file = None # FILE*, seek_state_file()
+            self.cur_st_file_mode = None
+            self.cur_st_file_size = None # should not be larger than fam.bytes_per_file_limit, ABSOLUTE_MAX_FILE_SIZE
+            #self.cur_st_index = cur_st_index # ST_FILE_SUFFIX()
+            #self.st_file_count = st_file_count # file count in active db, includes partial files
+            #self.st_file_index_offset = st_file_index_offset
+            #self.cur_st_offset = cur_st_offset
+            #self.file_st_qty = file_st_qty # compare to fam.states_per_file
+            self.cur_srec_id = None
+            self.state_qty = None
+            self.state_closed = None
+            self.state_dirty = None
+            self.file_map = None # State_file_descriptor*, has state_qtys
+            self.state_map = None # State_descriptor*
+            # Directory data
+            self.directory = None # File_dir*
+            # Parameter data
+            self.param_table = None # Hash_table*
+            # Mesh data
+            self.mesh_type = None # Mesh_type*
+            self.dimensions = None
+            self.meshes = None # Mesh_descriptor**
+            self.qty_meshes = None
+            # State record descriptor data
+            self.srecs = None # Srec**
+            self.srec_meshes = None # Mesh_descriptor**
+            self.qty_srecs = None
+            self.commit_max = None
+            # State variable table and I/O stores
+            self.svar_table = None # Hash_table*
+            self.svar_c_ios = None # IO_mem_store*
+            self.svar_i_ios = None # IO_mem_store*
+            self.svar_hdr = None # int*
+            # Subrecord table
+            self.subrec_table = None # Hash_table*
+
+            # I/O routines
+            #def readFuncs():
+            #    return int
+            #def state_read_funcs():
+            #    return int
+            #def write_funcs():
+            #    return int
+            #def state_write_funcs():
+            #    return int
+
+
+
+
+
+    class StateFileDescriptor():
+        def __init__(self):
+            self.state_qty = None
+
+    class StateDescriptor():
+        def __init__(self):
+            self.file = None # int
+            self.offset = None # LONGLONG
+            self.time = None # float
+            self.srec_format = None # int
+
+    class IO_mem_buffer():
+        def __init__(self):
+            self.data = []
+            self.used = None # size_t
+            self.output = None # size_t
+            self.invalid = [] # Block_list
+
+    class IO_mem_store():
+        def __init__(self):
+            self.IO_mem_buffer = None
+            self.type = None # int
+            self.current_index = None # size_t
+            self.current_output_index = None # size_t
+            self.traverse_index = None # size_t
+            self.traverse_remain = None # size_t
+            self.traverse_next = None # string?
+
+    class File_dir():
+        def __init__(self):
+            self.commit_count = None # int
+            self.qty_entries = None # int
+            self.dir_entries = None # Dir_entry 
+            self.qty_names = None # int
+            self.names = [] # char**
+            self.name_data = None # IO_mem_store
+
+    class MeshType(Enum):
+        UNDEFINED = 0
+        #UNSTRUCTURED
+
+    class MeshDescriptor():
+        def __init__(self):
+            self.name = None # string?
+
+    class Srec():
+        def __init__(self):
+            self.qty_subrecs = None # int
+            self.subrecs = None # Sub_srec**
+            self.size = None # LONGLONG
+            self.status = None # Db_object_status
+
+    class BlockList():
+        def __init__(self):
+            self.object_qty = None # int
+            self.block_qty = None # int
+            self.blocks = [] # Int_range
+
+    class IntRange():
+        def __init__(self):
+            self.prev = None # IntRange
+            self.next = None # IntRange
+            self.start = None # int
+            self.stop = None # int
+
+    class DirEntry():
+        def __init__(self):
+            self.entry = None # 6 numbers so can be array of 6 ints?
+    
+    ############ Create the database / create_family() ##############
+
+    def CreateMiliFamily(fam):
+
+        fam.st_suffix_width = DEFAULT_SUFFIX_WIDTH
+        fam.partition_scheme = DEFAULT_PARTITION_SCHEME
+        fam.states_per_file  = 0
+        fam.bytes_per_file_limit = 0
+        fam.post_modified = 0
+
+        fam.st_file_count = 0
+        fam.file_count = 0
+        fam.cur_index = -1
+        fam.commit_max = -1
+
+        fam.ti_cur_index = -1
+        fam.ti_file_count = 0
+
+        # Create first file and its directory - non_state_file_open()
+        NonStateFileOpen()
+
+        # If fam.param_table is not None, init_header(fam) and mc_init_metadata(fam.my_id)
+        # Q: what are the hash tables created for?
+
+        fam.file_count += 1
+        InitHeader()
+
+        mcInitMetadata()
+
+        return OK
+
+
+    def NonStateFileOpen(fam, index, mode):
+        with open(fname, 'w+') as p_file:
+
+
+        fam.next_free_byte = fam.cur_file_size
+
+        # Set current file index and manage directory
+        fam.cur_index = index
+
+        fam.directory = RENEW_N # Q: figure out renew(file_dir, fam.dir, fcount, 1, "file dir head")
+
+
+
+    def InitHeader(fam):
+        # fam.char_header gets parts from attributes of fam, Q: is header a struct?    
+
+        # fam.char_header[HDR_VERSION_IDX], fam.char_header[DIR_VERSION_IDX]
+
+        # fam.swap_bytes, set fam.char_header[ENDIAN_IDX], fam.
+        return OK
+
+    def WriteHeader(fam):
+        # Write character header to A file    
+
+        # Open file w read/write access
+        NonStateFileOpen(fam, 0, 'a')
+
+        # Check for read/write access()
+
+        write()
+
+        NonStateFileClose(fam)    
+
+
+
+    def DefSvars(fam, qty, names, svar_ints, svar_s):
+        # see where names and qty come from
+        # should have complete list of names and titles
+
+        # Go though the names...what are titles?
+        for name in names:
+            # valid_svar_data() --> check to see if svar?
+
+            # add name to family names
+            fam
+
+            # add title?
+
+            # add agg_type
+
+            # add data_type
+            fam.svar_c_ios
+            fam.svar_i_ios
+
+        return OK    
+
+
+    ############## mc_flush() ################       
+
+    def CommitNonState(fam):
+        p_fname = []
+        fd = 0
+        rval = 0 # ReturnValue type
+        write_cnt = 0
+
+        rval = PrepForNewData(fam, NON_STATE_DATA) # NON_STATE_DATA is constant?
+
+        if rval is not OK: # OK is constant?
+            return rval
+
+        if(fseek(fam.cur_file, 0L, SEEK_END) is not 0): # need to get current file for seek
+            return -1
+
+        if(fam.svar_table is not NULL):
+            rval = CommitSvars(fam)
+            if rval is not OK:
+                return rval
+
+        if(fam.qty_srecs is not 0):
+            rval = CommitSrecs(fam)
+            if rval is not OK:
+                return rval
+
+
+        rval = CommitDir(fam)
+        if rval is not OK:
+            return rval
+
+
+        fd = fam.lock_file_descriptor
+
+        p_fname = NEW_N(char, M_MAX_NAME_LEN, "Lock file NS name buffer")
+        if p_fname:
+            return ALLOC_FAILED
+
+        MakeFnam(NON_STATE_DATA, fam, fam.file_count - 1, p_fname)
+
+        rval = GetNameLock(fam, NON_STATE_DATA)
+        #if rval is not OK:
+
+        if filelock_enable:
+            write_ct = write(fd, p_fname, M_MAX_NAME_LEN)
+            if write_ct is not M_MAX_NAME_LEN:
+                return SHORT_WRITE
+
+
+        # LOCK
+
+        fam.commit_count += 1
+        fam.non_state_ready = FALSE
+
+        return rval
+
+
+    def PrepForNewData(MiliFamily fam, int ftype): # types for clarification, need to change
+        amode = fam.access_mode
+        index = 0
+        rval = -1
+        #open_next
+
+        return OK
 
 
 
