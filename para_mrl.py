@@ -207,6 +207,8 @@ class DataOrganization(Enum):
     ######################### read functions ###########################
 
 
+#def CheckSvarExists(p, sv_name_inner, global_svar_s, global_svar_inners):
+    
 
 def ReadSvars(p, f, this_proc_dirs, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners):
     # svar.c: "delete previous successful entries" ?
@@ -230,16 +232,17 @@ def ReadSvars(p, f, this_proc_dirs, global_svar_header, global_svar_s, global_sv
 
         while int_pos < len(ints):
             exists = False
+            newly_exists = False 
             this_svar_s = []
             this_svar_ints = []
             ints_len = 0
             s_len = 0
 
-            this_svar_s = [s[c_pos], s[c_pos + 1]]
-            sv_name, title = this_svar_s
+            sv_name, title = s[c_pos], s[c_pos + 1]
+            this_svar_s = [sv_name, title]
 
-            this_svar_ints = [ints[int_pos], ints[int_pos + 1]]
-            agg_type, data_type = this_svar_ints
+            agg_type, data_type = ints[int_pos], ints[int_pos + 1]
+            this_svar_ints = [agg_type, data_type]
 
             if sv_name in global_svar_s:
                 exists = True           
@@ -258,16 +261,15 @@ def ReadSvars(p, f, this_proc_dirs, global_svar_header, global_svar_s, global_sv
             all_ints += 2
 
             if agg_type == AggregateType.ARRAY.value or agg_type == AggregateType.VEC_ARRAY.value:
-                int_pos += 1
-                all_ints += 1
                 order, dims = ints[int_pos], []
                 this_svar_ints.append(order)
-                if order > 0:
-                    for k in range(order):
-                        dims.append(ints[int_pos])
-                        int_pos += 1
-                        all_ints += 1
-                    this_svar_ints.extend(dims)
+                int_pos += 1
+                all_ints += 1
+                for k in range(order):
+                    dims.append(ints[int_pos])
+                    int_pos += 1
+                    all_ints += 1
+                this_svar_ints.extend(dims)
 
                 if not exists:
                     global_svar_s[sv_name] = this_svar_s
@@ -278,15 +280,16 @@ def ReadSvars(p, f, this_proc_dirs, global_svar_header, global_svar_s, global_sv
                     ints_len += len(this_svar_ints)
                     s_len += sys.getsizeof(this_svar_s)
                     
-                    exists = True
+                    newly_exists = True
 
             if agg_type == AggregateType.VECTOR.value or agg_type == AggregateType.VEC_ARRAY.value:
+                #print("try this", sv_name, agg_type, int_pos, len(ints))
                 svar_list_size = ints[int_pos]
 
                 if sv_name not in global_svar_ints:
                     this_svar_ints.append(svar_list_size)
                     global_svar_ints[sv_name] = this_svar_ints
-                elif sv_name in global_svar_ints and exists:
+                elif sv_name in global_svar_ints and newly_exists:
                     # exists = this entry was created in this loop, not prev
                     global_svar_ints[sv_name].append(svar_list_size)
                     
@@ -302,22 +305,25 @@ def ReadSvars(p, f, this_proc_dirs, global_svar_header, global_svar_s, global_sv
                 if sv_name not in global_svar_s:
                     this_svar_s.extend(sv_names)
                     global_svar_s[sv_name] = this_svar_s
-                elif sv_name in global_svar_s and exists:
-                    global_svar_s[sv_name].append(sv_names)
+                elif sv_name in global_svar_s and newly_exists:
+                    new_svar = global_svar_s[sv_name] + sv_names
+                    global_svar_s[sv_name] = new_svar
 
                 s_len += sys.getsizeof("".join(sv_names))
 
                 for sv_name_inner in sv_names:
                     # inner svs will have repeats (multiple svars will have same inner svs
                     # but only the first inner_sv (if multiple) will have additional name,title,agg,data
-                    # when an inner sv is already present, add to dict where dict[inner] = [sv_names]
-
+                    # when an inner sv is already present, add to dict where dict[inner][p] = [sv_names]
+                    
+                    #print(int_pos, "all stress inners", svar_list_size, sv_name_inner, "sv_name", sv_name, "agg", agg_type)
                     if sv_name_inner not in global_svar_inners and sv_name_inner not in global_svar_s:
+                        # Add to global svars and iterate
                         inner_name, inner_title = s[c_pos], s[c_pos + 1]
                         inner_s = [inner_name, inner_title]
                         inner_agg, inner_data = ints[int_pos], ints[int_pos + 1]
                         inner_ints = [inner_agg, inner_data]
-
+                        
                         if sv_name not in global_svar_s:
                             # Add all
                             this_svar_s = this_svar_s + inner_s
@@ -327,15 +333,31 @@ def ReadSvars(p, f, this_proc_dirs, global_svar_header, global_svar_s, global_sv
                             global_svar_ints[sv_name] = this_svar_ints
                         else:
                             # Append
-                            global_svar_s[sv_name].extend(inner_s)
-                            global_svar_ints[sv_name].extend(inner_ints)
+                            new_svar_s = global_svar_s[sv_name] + inner_s
+                            global_svar_s[sv_name] = new_svar_s
 
+                            new_svar_ints = global_svar_ints[sv_name] + inner_ints
+                            global_svar_ints[sv_name] = new_svar_ints
+
+                        global_svar_inners[sv_name_inner] = [p]
+                        
                         s_len += 2
                         ints_len += 2
 
                         int_pos += 2
                         all_ints += 2
                         c_pos += 2
+                    elif sv_name_inner in global_svar_inners and sv_name_inner not in global_svar_s:
+                        if p not in global_svar_inners[sv_name_inner]:
+                            new_str = global_svar_inners[sv_name_inner] + [p]
+                            global_svar_inners[sv_name_inner] = new_str
+                            int_pos += 2
+                            all_ints += 2
+                            c_pos += 2
+                            
+                    if sv_name_inner in global_svar_s:
+                        if sv_name_inner in global_svar_inners:
+                            print("what is here in inners", sv_name, sv_name_inner)
 
             global_svar_header[0] += ints_len
             global_svar_header[1] += s_len
@@ -674,6 +696,7 @@ def main():
     global_svar_ints = manager.dict()
     global_svar_inners = manager.dict()
 
+    processes = []
     for i,file_name in enumerate(file_names):
         
         p = Process(target=StartRead, args=(i, file_name, header_dict, \
@@ -684,6 +707,7 @@ def main():
 
         p.start()
         p.join()
+        processes.append(p)
 
     if __debug__:
         print("\nHeader Dict", header_dict)
@@ -691,7 +715,8 @@ def main():
         print("\nGlobal State Maps Dict", global_state_maps)
 
         print("\nGlobal State Variable Ints", global_svar_ints)
-        print("\nGlobal State Variable S", global_svar_s)
+    print("\nGlobal State Variable S", global_svar_s)
+    print("\nGlobal Inner State Variables", global_svar_inners)
 
 if __name__ == '__main__':
     main()
