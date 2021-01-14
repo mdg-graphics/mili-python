@@ -207,7 +207,141 @@ class DataOrganization(Enum):
     ######################### read functions ###########################
 
 
-def ReadParams(p, f, file_tag, dir_num_strings_dict, this_proc_dirs, global_params, this_proc_dim, this_proc_labels, this_proc_matname, this_proc_int_points):
+
+def ReadSvars(p, f, this_proc_dirs, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners):
+    # svar.c: "delete previous successful entries" ?
+    for item in this_proc_dirs[DirectoryType.STATE_VAR_DICT.value]:
+        svar_offset = item[1]
+        f.seek(svar_offset)
+        
+        this_proc_svar_header =  struct.unpack('2i', f.read(8))
+        svar_words, svar_bytes = this_proc_svar_header
+        num_ints = (svar_words - 2)
+        ints = struct.unpack(str(num_ints) + 'i', f.read(num_ints * 4))
+
+        if (sys.version_info > (3, 0)):
+            s = str(struct.unpack(str(svar_bytes) + 's', f.read(svar_bytes))[0])[2:].split('\\x00')  # only works for Python3
+        else:
+            s = struct.unpack(str(svar_bytes) + 's', f.read(svar_bytes))[0].split(b'\x00')
+
+        int_pos = 0
+        c_pos = 0
+        all_ints = 0
+
+        while int_pos < len(ints):
+            exists = False
+            this_svar_s = []
+            this_svar_ints = []
+            ints_len = 0
+            s_len = 0
+
+            this_svar_s = [s[c_pos], s[c_pos + 1]]
+            sv_name, title = this_svar_s
+
+            this_svar_ints = [ints[int_pos], ints[int_pos + 1]]
+            agg_type, data_type = this_svar_ints
+
+            if sv_name in global_svar_s:
+                exists = True           
+
+            if agg_type == AggregateType.SCALAR.value:
+                # If scalar, add to global array before incrementing in case last svar is a scalar
+                if sv_name not in global_svar_ints:
+                    global_svar_ints[sv_name] = this_svar_ints
+                    ints_len += 2
+                if sv_name not in global_svar_s:
+                    global_svar_s[sv_name] = this_svar_s
+                    s_len += 2
+
+            int_pos += 2
+            c_pos += 2
+            all_ints += 2
+
+            if agg_type == AggregateType.ARRAY.value or agg_type == AggregateType.VEC_ARRAY.value:
+                int_pos += 1
+                all_ints += 1
+                order, dims = ints[int_pos], []
+                this_svar_ints.append(order)
+                if order > 0:
+                    for k in range(order):
+                        dims.append(ints[int_pos])
+                        int_pos += 1
+                        all_ints += 1
+                    this_svar_ints.extend(dims)
+
+                if not exists:
+                    global_svar_s[sv_name] = this_svar_s
+                    global_svar_ints[sv_name] = this_svar_ints
+
+                    # Add to sizes - will add these sizes to total
+                    this_svar_s = "".join(this_svar_s)
+                    ints_len += len(this_svar_ints)
+                    s_len += sys.getsizeof(this_svar_s)
+                    
+                    exists = True
+
+            if agg_type == AggregateType.VECTOR.value or agg_type == AggregateType.VEC_ARRAY.value:
+                svar_list_size = ints[int_pos]
+
+                if sv_name not in global_svar_ints:
+                    this_svar_ints.append(svar_list_size)
+                    global_svar_ints[sv_name] = this_svar_ints
+                elif sv_name in global_svar_ints and exists:
+                    # exists = this entry was created in this loop, not prev
+                    global_svar_ints[sv_name].append(svar_list_size)
+                    
+                ints_len += 1
+                int_pos += 1
+                all_ints += 1
+
+                sv_names = []
+                for j in range(svar_list_size):
+                    # Is it possible that some lists of sv_names would be incomplete?
+                    sv_names.append(s[c_pos])
+                    c_pos += 1
+                if sv_name not in global_svar_s:
+                    this_svar_s.extend(sv_names)
+                    global_svar_s[sv_name] = this_svar_s
+                elif sv_name in global_svar_s and exists:
+                    global_svar_s[sv_name].append(sv_names)
+
+                s_len += sys.getsizeof("".join(sv_names))
+
+                for sv_name_inner in sv_names:
+                    # inner svs will have repeats (multiple svars will have same inner svs
+                    # but only the first inner_sv (if multiple) will have additional name,title,agg,data
+                    # when an inner sv is already present, add to dict where dict[inner] = [sv_names]
+
+                    if sv_name_inner not in global_svar_inners and sv_name_inner not in global_svar_s:
+                        inner_name, inner_title = s[c_pos], s[c_pos + 1]
+                        inner_s = [inner_name, inner_title]
+                        inner_agg, inner_data = ints[int_pos], ints[int_pos + 1]
+                        inner_ints = [inner_agg, inner_data]
+
+                        if sv_name not in global_svar_s:
+                            # Add all
+                            this_svar_s = this_svar_s + inner_s
+                            this_svar_ints = this_svar_ints + inner_ints
+                            
+                            global_svar_s[sv_name] = this_svar_s
+                            global_svar_ints[sv_name] = this_svar_ints
+                        else:
+                            # Append
+                            global_svar_s[sv_name].extend(inner_s)
+                            global_svar_ints[sv_name].extend(inner_ints)
+
+                        s_len += 2
+                        ints_len += 2
+
+                        int_pos += 2
+                        all_ints += 2
+                        c_pos += 2
+
+            global_svar_header[0] += ints_len
+            global_svar_header[1] += s_len
+
+
+def ReadParams(p, f, file_tag, this_proc_dirs, dir_num_strings_dict, global_params, this_proc_dim, this_proc_labels, this_proc_matname, this_proc_int_points):
 
     # global_params[name_type][name] =
     # # 's' = params
@@ -466,7 +600,7 @@ def ReadHeader(p, f, local_file_tag, header_dict, indexing_dict): # add file_tag
 
 
 
-def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, global_names, global_params):
+def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, global_names, global_params, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners):
     file_size = os.path.getsize(file_name)
     local_file_tag = None
     mili_taur = None
@@ -499,10 +633,11 @@ def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, globa
         if local_indexing[IndexingArray.NULL_TERMED_NAMES_BYTES.value] > 0:
             ReadNames(p, f, local_file_tag, offset, local_indexing, local_directory_dict, local_dir_strings_dict, global_names)
 
-            this_proc_dim = ReadParams(p, f, local_file_tag, local_dir_strings_dict, local_directory_dict, global_params, this_proc_dim, this_proc_labels, this_proc_matname, this_proc_i_points)
+            this_proc_dim = ReadParams(p, f, local_file_tag, local_directory_dict, local_dir_strings_dict, global_params, this_proc_dim, this_proc_labels, this_proc_matname, this_proc_i_points)
 
             
-            #ReadStateVariables()
+            ReadSvars(p, f, local_directory_dict, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners)
+            #ReadMesh()
             #ReadSubrecords()
 
     if __debug__:
@@ -531,11 +666,21 @@ def main():
     global_names = manager.list()
     global_params = manager.dict()
 
-    for i,file_name in enumerate(file_names):
+    global_svar_header = manager.list()
+    init_svar_header = [0,0]
+    global_svar_header.extend(init_svar_header)
 
+    global_svar_s = manager.dict()
+    global_svar_ints = manager.dict()
+    global_svar_inners = manager.dict()
+
+    for i,file_name in enumerate(file_names):
+        
         p = Process(target=StartRead, args=(i, file_name, header_dict, \
                                             indexing_dict, global_state_maps, \
-                                            global_names, global_params))
+                                            global_names, global_params, \
+                                            global_svar_header, global_svar_s, \
+                                            global_svar_ints, global_svar_inners))
 
         p.start()
         p.join()
@@ -544,6 +689,9 @@ def main():
         print("\nHeader Dict", header_dict)
         print("\nIndexing Dict", indexing_dict)
         print("\nGlobal State Maps Dict", global_state_maps)
+
+        print("\nGlobal State Variable Ints", global_svar_ints)
+        print("\nGlobal State Variable S", global_svar_s)
 
 if __name__ == '__main__':
     main()
