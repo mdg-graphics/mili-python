@@ -1,5 +1,6 @@
 from multiprocessing import Process, Manager
 from enum import Enum
+import collections
 from collections import OrderedDict
 import os
 import struct
@@ -60,6 +61,7 @@ class SvarS(Enum):
     SV_NAMES = 2
     # INNER SV NAME, TITLE
 
+# Change the Mesh Enums
 class MeshElemConns(Enum):
     SUP_CLASS = 0
     QTY_BLOCKS = 1
@@ -204,16 +206,448 @@ class DataOrganization(Enum):
     OBJECT = 1
 
 
+    
+    ######################### commit funtions ##########################
+
+# NOTE: Put combined info into a Mili from mili_python_lib.py - so commit_svars should use Mili attributes
+
+# This is not working yay
+def CommitSvars(a_file, curr_index, global_svar_s, global_svar_ints):
+    # Assume we are calling this bc we already have info - not checking for more than header
+    # Need to have size of data
+    # 1 - svar_hdr ( qty int words idx, qty bytes idx), svar_words, svar_bytes
+    # 2 - add directory entry?
+    # 3 - write out svar_i_ios then svar_c_ios
+
+    # Need to check if svar_bytes is larger than single file size ?
+    # svar_bytes = svar_header[1]
+    # if svar_bytes > FILE_MAX
+
+    # encode('ascii')
+    # turn list of strings into long string?
+
+    combined_header = []
+    all_svar_ints = []
+    all_svar_s = []
+    all_svar_s_bytes = []
+    #formatting_string = None
+    svar_words, svar_bytes = 0, 0 # svar_words - 2 = num_ints
+    for svar_name in global_svar_ints:
+        # Calc sizes here, get rid of in ReadSvars()
+        # Should we create new arrays or keep accessing the arrays repeatedly
+
+        size_ints = len(global_svar_ints[svar_name])
+        size_s = len(global_svar_s[svar_name])
+        
+        svar_words += size_ints
+        svar_bytes += size_s
+
+        for i, sv_piece in enumerate(global_svar_s[svar_name]):
+            # Turn each string into bytes
+                
+            if sys.version_info < (3, 0):
+                sv_piece = bytes(sv_piece)
+            else:
+                sv_piece = bytes(sv_piece, 'utf8')
+
+            all_svar_s_bytes = all_svar_s_bytes + [sv_piece]
+
+        all_svar_ints.extend(global_svar_ints[svar_name])
+        all_svar_s.extend(global_svar_s[svar_name])
+
+    combined_header = [svar_words, svar_bytes]
+
+    a_file.seek(curr_index)
+
+    svar_header = struct.pack('2i', *combined_header)
+    
+    svar_ints = struct.pack(str(svar_words) + 'i', *all_svar_ints) # * to unpack not a pointer
+    a_file.write(svar_ints)
+
+    #print("bytes", all_svar_s_bytes.encode('utf8'))
+    print("list", list(all_svar_s_bytes))
+    for piece in all_svar_s_bytes:
+        a_file.write(piece)
+
+
+    # update directory = [type_idx  mod_idx1  mod_idx2  string_qty  offset  length]
+    #AddDirectory(SVAR, _, _, str_qty_idx, curr_index, svar_byte_len)
+    # update curr_index - maybe return curr_index ?
+
+
+    
     ######################### read functions ###########################
 
 
-#def CheckSvarExists(p, sv_name_inner, global_svar_s, global_svar_inners):
+
+# M_MAT and M_MESH are same across all procs?
+def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strings_dict, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, this_proc_connectivity, this_proc_materials, this_proc_labels, global_floats):
+    # Turn global dir creation into function
     
+    can_proc = [ DirectoryType.CLASS_DEF.value , 
+                 DirectoryType.CLASS_IDENTS.value, 
+                 DirectoryType.NODES.value, 
+                 DirectoryType.ELEM_CONNS.value ]
+
+    for type_id in can_proc:
+        for dir_num in this_proc_dirs[type_id]: # check dir_type_dict
+            entry = this_proc_dirs[type_id][dir_num]
+            mesh_offset = entry[DirArray.OFFSET_IDX.value]
+            if type_id == DirectoryType.CLASS_DEF.value:
+                # mod_idx1 = mesh_id, mod_idx2 = superclass
+                #superclass = this_proc_dirs[dir_proc_array_offset-2] # should get the mod_idx2 of this directory
+
+                dir_strings_whole = dir_strings_dict[type_id][dir_num]
+                dir_strings = dir_strings_whole[1]
+                short_name = dir_strings[0]
+
+                # Need to create a global dictionary definiton
+                if type_id not in global_dir_dict:
+                    global_dir_dict[type_id] = {}
+                if short_name not in global_dir_dict[type_id]:
+                    global_dir_dict[type_id][short_name] = {}
+
+                if type_id not in global_dir_string_dict:
+                    global_dir_string_dict[type_id] = {}
+                if short_name not in global_dir_string_dict[type_id]:
+                    global_dir_string_dict[type_id][short_name] = {}
+                    global_dir_string_dict[type_id][short_name] = dir_strings_whole # global_num_strings is not correct
+                else:
+                    for string in strings:
+                        curr_global_strings_whole = global_dir_string_dict[type_id][short_name]
+                        global_num_strings = curr_global_strings_whole[0]
+                        curr_global_strings = curr_global_strings_whole[1]
+                        if string not in curr_global_strings[1]:
+                            curr_global_strings.append(string)
+                            global_num_strings += 1
+                    global_dir_string_dict[type_id][short_name] = [global_num_strings, curr_global_strings]
+
+                    
+            if type_id == DirectoryType.CLASS_IDENTS.value:
+                f.seek(mesh_offset)
+                
+                dir_strings_whole = dir_strings_dict[type_id][dir_num]
+                dir_strings = dir_strings_whole[1]
+                short_name = dir_strings[0]
+
+                # Need to create a global dictionary definiton
+                if type_id not in global_dir_dict:
+                    global_dir_dict[type_id] = {}
+                if short_name not in global_dir_dict[type_id]:
+                    global_dir_dict[type_id][short_name] = {}
+
+                if type_id not in global_dir_string_dict:
+                    global_dir_string_dict[type_id] = {}
+                if short_name not in global_dir_string_dict[type_id]:
+                    global_dir_string_dict[type_id][short_name] = {}
+                    global_dir_string_dict[type_id][short_name] = dir_strings_whole # global_num_strings is not correct
+                else:
+                    for string in strings:
+                        curr_global_strings_whole = global_dir_string_dict[type_id][short_name]
+                        global_num_strings = curr_global_strings_whole[0]
+                        curr_global_strings = curr_global_strings_whole[1]
+                        if string not in curr_global_strings[1]:
+                            curr_global_strings.append(string)
+                            global_num_strings += 1
+                    global_dir_string_dict[type_id][short_name] = [global_num_strings, curr_global_strings]
+
+                # Add superclass, start, stop
+                sup_class_start_stop = struct.unpack('3i', f.read(12))
+                superclass, start, stop = sup_class_start_stop
+
+                #if short_name not in global_mesh_dictionary[type_id]:
+                #    global_mesh_dictionary[type_id][short_name] = sup_class_start_stop
+                # Maybe we don't need to keep a dictionary for this, can use directories and dir strings to create later?
+
+                # Make local dictionary
+                superclass = Superclass(superclass).name
+                if (superclass, short_name) not in this_proc_labels:
+                    this_proc_labels[(superclass, short_name)] = {}
+
+                id = len(this_proc_labels[(superclass, short_name)])
+                for label in range(start, stop + 1):
+                    id += 1
+                    this_proc_labels[(superclass, short_name)][label] = id
+
+
+            if type_id == DirectoryType.NODES.value:
+                f.seek(mesh_offset)
+
+                dir_strings_whole = dir_strings_dict[type_id][dir_num]
+                dir_strings = dir_strings_whole[1]
+                short_name = dir_strings[0]
+
+                # Need to create a global dictionary definiton
+                if type_id not in global_dir_dict:
+                    global_dir_dict[type_id] = {}
+                if short_name not in global_dir_dict[type_id]:
+                    global_dir_dict[type_id][short_name] = {}
+
+                if type_id not in global_dir_string_dict:
+                    global_dir_string_dict[type_id] = {}
+                if short_name not in global_dir_string_dict[type_id]:
+                    global_dir_string_dict[type_id][short_name] = {}
+                    global_dir_string_dict[type_id][short_name] = dir_strings_whole # global_num_strings is not correct
+                else:
+                    for string in strings:
+                        curr_global_strings_whole = global_dir_string_dict[type_id][short_name]
+                        global_num_strings = curr_global_strings_whole[0]
+                        curr_global_strings = curr_global_strings_whole[1]
+                        if string not in curr_global_strings[1]:
+                            curr_global_strings.append(string)
+                            global_num_strings += 1
+                    global_dir_string_dict[type_id][short_name] = [global_num_strings, curr_global_strings]
+
+                # Add start, stop
+                start, stop = struct.unpack('2i', f.read(8))                    
+
+                # 4 - need to do readParams for self.__dim
+                num_coordinates = this_proc_dim * (stop - start + 1)
+                floats = struct.unpack(str(num_coordinates) + 'f', f.read(4 * num_coordinates))
+                class_name = short_name
+
+                # Need to go through nodes and only add if not already there
+                # Get all dicts which has label:local_id dict using getLabels() - see #3 about whether or not to create same dict struct
+
+                node_label_local_id_dict = {}
+
+                # For label in labels - if not in new dict label:global_id then add to dict and add associated floats to NODES array
+                if ('M_NODE','node') not in this_proc_labels:
+                    return 0
+                else:
+                    node_label_local_id_dict = this_proc_labels[('M_NODE','node')]
+
+                if len(node_label_global_id_dict) < 1:
+                    labels = list(node_label_local_id_dict)
+
+                    floats_pos = 0
+                    for label in labels:
+                        node_label_global_id_dict[label] = node_label_local_id_dict[label]
+                        global_floats[node_label_local_id_dict[label]] = list(floats[floats_pos:floats_pos + this_proc_dim])
+                        floats_pos = floats_pos + this_proc_dim
+                    node_label_global_id_length = len(node_label_global_id_dict)
+
+                    #if len(global_floats) < 1:
+                    #    global_floats[ = list(floats) # changes to global will change floats - bad?
+
+                elif len(node_label_global_id_dict) > 0:
+                    # Remap
+                    sorted_labels = dict(node_label_global_id_dict)
+
+                    floats_pos = 0 # keep track of local pos
+                    id = len(sorted_labels) + 1
+                    for label in node_label_local_id_dict:
+                        if label not in node_label_global_id_dict:
+                            # Sorted_labels in order of ID 1-n
+                            sorted_labels[label] = id
+                            global_floats[id] = list(floats[floats_pos:floats_pos + this_proc_dim])
+                            id += 1
+
+                            # Add floats
+                            #if len(global_floats) < 1:
+                            #    global_floats = list(floats[floats_pos:floats_pos + this_proc_dim])
+                            #else:
+                            #global_floats = global_floats + list(floats[floats_pos:floats_pos + this_proc_dim])
+                            #print("GLOBAL FLOATS", global_floats, "new:", floats[floats_pos:floats_pos + this_proc_dim])
+
+                        # Increment floats_pos of local
+                        floats_pos = floats_pos + this_proc_dim
+
+                    # Ids_to_labels[id] = label sorted in order of ID
+                    ids_to_labels = {value:key for key,value in sorted_labels.items()}
+                    # Sorted_ids_to_labels[id] = label
+                    sorted_ids_to_labels = collections.OrderedDict(sorted(ids_to_labels.items()))
+
+                    for piece in sorted_ids_to_labels:
+                        node_label_global_id_dict[sorted_ids_to_labels[piece]] = piece
+
+
+            if type_id == DirectoryType.ELEM_CONNS.value: #ignore
+                # cannot combine this until have node mapping - skip these and have separate mesh routine for elem_conns
+                # or can put all of these together in a lpcal dictionary to read/collect and then combine all local w global dictionary
+
+                f.seek(mesh_offset)
+
+                dir_strings_whole = dir_strings_dict[type_id][dir_num]
+                dir_strings = dir_strings_whole[1]
+                short_name = dir_strings[0]
+
+                # Need to create a global dictionary definiton
+                if type_id not in global_dir_dict:
+                    global_dir_dict[type_id] = {}
+                if short_name not in global_dir_dict[type_id]:
+                    global_dir_dict[type_id][short_name] = {}
+
+                if type_id not in global_dir_string_dict:
+                    global_dir_string_dict[type_id] = {}
+                if short_name not in global_dir_string_dict[type_id]:
+                    global_dir_string_dict[type_id][short_name] = {}
+                    global_dir_string_dict[type_id][short_name] = dir_strings_whole # global_num_strings is not correct
+                else:
+                    for string in strings:
+                        curr_global_strings_whole = global_dir_string_dict[type_id][short_name]
+                        global_num_strings = curr_global_strings_whole[0]
+                        curr_global_strings = curr_global_strings_whole[1]
+                        if string not in curr_global_strings[1]:
+                            curr_global_strings.append(string)
+                            global_num_strings += 1
+                    global_dir_string_dict[type_id][short_name] = [global_num_strings, curr_global_strings]
+
+                # this dict holds the local connectivities that we will combine later when we have node mapping
+                this_proc_connectivity[short_name] = {} # could it already have an entry with this short name?
+
+                superclass, qty_blocks = struct.unpack('2i', f.read(8))
+                elem_blocks = struct.unpack(str(2 * qty_blocks) + 'i', f.read(8 * qty_blocks))
+
+                elem_qty = entry[DirArray.MOD_IDX2.value]
+                word_qty = ConnWords[Superclass(superclass).name].value # still use these 
+                conn_qty = word_qty - 2
+                mat_offset = word_qty - 1
+                ebuf = struct.unpack(str(elem_qty * word_qty) + 'i', f.read(elem_qty * word_qty * 4))
+                index = 0
+
+                for j in range(qty_blocks):
+                    off = elem_blocks[j * 2] - 1
+                    elem_qty = elem_blocks[j * 2 + 1] - elem_blocks[j * 2] + 1
+
+                    mo_id = 1
+                    for k in range(index, len(ebuf), word_qty):
+
+                        this_proc_connectivity[short_name][mo_id] = []
+                        mat = ebuf[k + conn_qty]
+                        for m in range(0, conn_qty):
+                            node = ebuf[k + m]
+                            this_proc_connectivity[short_name][mo_id].append(node)
+                        part = ebuf[k + mat_offset]
+                        # materials needs to be kept specific to a mesh
+                        if mat not in this_proc_materials:
+                            this_proc_materials[mat] = {}
+                        if short_name not in this_proc_materials[mat]: this_proc_materials[mat][short_name] = []
+                        this_proc_materials[mat][short_name].append(mo_id)
+                        mo_id += 1
+                    index = word_qty * elem_qty
+
+
+# Remap local to global    
+def RemapConns(p, f, this_proc_dirs, dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_global_id_dict, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels):
+
+    #this_proc_labels = getLabels() # return this_proc_labels dictionary with (sup_class, class): {label: local_id} entries
+    classes = list(this_proc_labels)
+    uniform_types = ['M_NODE', 'M_MESH', 'M_MAT'] # For these types can just copy once, so P0 can be the only one to read
+
+    local_node_id_to_label = {value:key for key,value in this_proc_labels[('M_NODE','node')].items()}
+
+    for dir_num in this_proc_dirs[DirectoryType.ELEM_CONNS.value]:
+        entry = this_proc_dirs[DirectoryType.ELEM_CONNS.value][dir_num]
+
+        elem_conns_offset_from_dir = entry[DirArray.OFFSET_IDX.value]
+
+        f.seek(elem_conns_offset_from_dir)
+
+        dir_strings = dir_strings_dict[DirectoryType.ELEM_CONNS.value][dir_num][1]
+        short_name = dir_strings[0] # ! Fix so get short_name from associated strings array
+
+        if short_name not in elem_conns_label_global_id_dict:
+            elem_conns_label_global_id_dict[short_name] = {} # CHECK if short_name already exists
+        #elem_conns_label_global_id_length = 0
+        sup_class, qty_blocks = struct.unpack('2i', f.read(8))
+        sup_class_name = Superclass(sup_class).name
+        local_elem_blocks = struct.unpack(str(2 * qty_blocks) + 'i', f.read(8 * qty_blocks))
+
+        # ! Need to calc these things from arrays:
+        elem_qty = entry[DirArray.MOD_IDX2.value]
+        word_qty = ConnWords[Superclass(sup_class).name].value
+        conn_qty = word_qty - 2
+        mat_offset = word_qty - 1
+
+        ebuf = struct.unpack(str(elem_qty * word_qty) + 'i', f.read(elem_qty * word_qty * 4))
+
+        if sup_class not in uniform_types: # Else same across all procs
+            new_ebuf = [] # easier to have separate array to add to new_elem_conns_array afterwards
+
+            local_elem_id_to_label = {value:key for key,value in this_proc_labels[(sup_class_name, short_name)].items()}
+
+            # Go through elem_blocks to get chunk of ebuf we need
+            # Go through ELEM_CONNS and use label:local_id from getLabels() again
+            index = 0
+            this_proc_label_index = 1
+            for block_num in range(qty_blocks):
+                start = local_elem_blocks[block_num * 2]
+                stop = local_elem_blocks[block_num * 2 + 1]
+
+                for k in range(index, len(ebuf), word_qty): # all elems of this type have same len
+                    mat = ebuf[k + conn_qty]
+                    part = ebuf[k + mat_offset]
+
+                    # Keep track of new global mo_id
+                    mo_id = len(elem_conns_label_global_id_dict[short_name]) + 1
+
+                    if (sup_class_name,short_name) not in global_labels:
+                        global_labels[(sup_class_name,short_name)] = {}
+                    new_sub_entry = global_labels[(sup_class_name,short_name)]
+                    new_sub_entry[mo_id] = local_elem_id_to_label[this_proc_label_index]
+                    global_labels[(sup_class_name,short_name)] = new_sub_entry
+
+                    for m in range(0, conn_qty):
+                        # Get the local node 
+                        local_node_id = ebuf[k + m]
+
+                        # Get label from local_node_id
+                        node_label = local_node_id_to_label[local_node_id]
+                        # Get global_node_id from node_label
+                        global_node_id = node_label_global_id_dict[node_label]
+                        
+                        ##### Update Global Label Dictionary - DONT NEED THIS, just to check
+                        new_elem_conn_entry = elem_conns_label_global_id_dict[short_name]
+                        if mo_id in new_elem_conn_entry:
+                            new_global_id_list = new_elem_conn_entry[mo_id] + [global_node_id]
+                            new_elem_conn_entry[mo_id] = new_global_id_list
+                        else:
+                            new_elem_conn_entry[mo_id] = [global_node_id]
+                        elem_conns_label_global_id_dict[short_name] = new_elem_conn_entry  # mo_id = elem mo_id
+                        #####
+
+                        # Update new_ebuf (nodes,mat,part)
+                        new_ebuf.append(global_node_id)
+                        
+                    # After all conns add mat and part
+                    new_ebuf.extend([mat, part])
+
+                    # Increment indices after m loop within k loop
+                    mo_id += 1
+                    this_proc_label_index += 1
+
+                # Update index after k loop
+                index = word_qty * elem_qty
+
+                # Append/add new_ebuf to ebuf_dict[short_name]
+                if short_name in global_elem_conns_dict:
+                    new_conns_entry = global_elem_conns_dict[short_name]
+                    new_conns_entry[3] = new_conns_entry[3] + new_ebuf
+                    global_elem_conns_dict[short_name] = new_conns_entry # create ebuf enum index
+
+                    # Change stop
+                    new_stop = int(len(global_elem_conns_dict[short_name][3])/word_qty)
+
+                    # Does this affect number of blocks
+                    if qty_blocks == 1:
+                        new_block_entry = global_elem_conns_dict[short_name]
+                        new_block_entry[2] = (global_elem_conns_dict[short_name][2][0], new_stop)
+                        global_elem_conns_dict[short_name] = new_block_entry
+                    else:
+                        print("ReadMesh Error: More than one elem block and not doing anything about it")
+
+                elif short_name not in global_elem_conns_dict:
+                    # And create short_name in elem_conns_dict
+                    global_elem_conns_dict[short_name] = [sup_class, qty_blocks, local_elem_blocks, new_ebuf] # ?
+
+
 
 def ReadSvars(p, f, this_proc_dirs, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners):
     # svar.c: "delete previous successful entries" ?
-    for item in this_proc_dirs[DirectoryType.STATE_VAR_DICT.value]:
-        svar_offset = item[1]
+    for dir_num in this_proc_dirs[DirectoryType.STATE_VAR_DICT.value]:
+        entry = this_proc_dirs[DirectoryType.STATE_VAR_DICT.value][dir_num]
+        svar_offset = entry[DirArray.OFFSET_IDX.value]
         f.seek(svar_offset)
         
         this_proc_svar_header =  struct.unpack('2i', f.read(8))
@@ -225,7 +659,6 @@ def ReadSvars(p, f, this_proc_dirs, global_svar_header, global_svar_s, global_sv
             s = str(struct.unpack(str(svar_bytes) + 's', f.read(svar_bytes))[0])[2:].split('\\x00')  # only works for Python3
         else:
             s = struct.unpack(str(svar_bytes) + 's', f.read(svar_bytes))[0].split(b'\x00')
-
         int_pos = 0
         c_pos = 0
         all_ints = 0
@@ -363,7 +796,7 @@ def ReadSvars(p, f, this_proc_dirs, global_svar_header, global_svar_s, global_sv
             global_svar_header[1] += s_len
 
 
-def ReadParams(p, f, file_tag, this_proc_dirs, dir_num_strings_dict, global_params, this_proc_dim, this_proc_labels, this_proc_matname, this_proc_int_points):
+def ReadParams(p, f, file_tag, this_proc_dirs, dir_num_strings_dict, global_params, this_proc_dim, this_proc_labels, this_proc_matname, this_proc_int_points, this_proc_param_dirs):
 
     # global_params[name_type][name] =
     # # 's' = params
@@ -383,15 +816,14 @@ def ReadParams(p, f, file_tag, this_proc_dirs, dir_num_strings_dict, global_para
 
     can_proc = [ DirectoryType.MILI_PARAM.value, DirectoryType.APPLICATION_PARAM.value, DirectoryType.TI_PARAM.value ]
     for type_id in can_proc:
-        for item in this_proc_dirs[type_id]:
-            dir_num = item[0]
+        for dir_num in this_proc_dirs[type_id]:
             dir_strings = dir_num_strings_dict[type_id][dir_num][1]
             name = dir_strings[0]
-            param_offset = item[1]
+            entry = this_proc_dirs[type_id][dir_num]
+            param_offset = entry[DirArray.OFFSET_IDX.value]
 
             f.seek(param_offset)
 
-            entry = this_proc_dirs[type_id][item]
             dir_length = entry[DirArray.LENGTH_IDX.value]
             
             byte_array = f.read(dir_length)
@@ -457,6 +889,13 @@ def ReadParams(p, f, file_tag, this_proc_dirs, dir_num_strings_dict, global_para
                 if 'ElemIds' in name:
                     this_proc_label_keys = []
 
+                if (sup_class, clas) not in this_proc_param_dirs:
+                    # when remap we need the local dir
+                    this_proc_param_dirs[(sup_class, clas)] = [dir_num]
+                else:
+                    new_arr = this_proc_param_dirs[(sup_class, clas)] + [dir_num]
+                    this_proc_param_dirs[(sup_class, clas)] = new_arr
+
             if 'MAT_NAME' in name: # need to combine? all procs same?
                 # init 1-1000?
                 f.seek(param_offset)
@@ -508,23 +947,21 @@ def ReadNames(p, f, file_tag, offset, this_indexing_array, this_proc_dirs, dir_n
     # Need to make sure list of keys is in order
     dir_types = [k for k in this_proc_dirs]
     for dir_type in dir_types:
-        for item in this_proc_dirs[dir_type].items():
-            item = item[0]
-            dir_num, dir_offset = item
-
+        for dir_num in this_proc_dirs[dir_type]:
+            dir_offset = this_proc_dirs[dir_type][dir_num][DirArray.OFFSET_IDX.value]
             string_offset = dir_num_strings_dict[dir_type][dir_num][DirStringsArray.STRING_OFFSET_IDX.value]
-            string_count = this_proc_dirs[dir_type][item][DirArray.STR_QTY_IDX.value]
+            string_count = this_proc_dirs[dir_type][dir_num][DirArray.STR_QTY_IDX.value]
             
             directory_strings = [ strings[sidx] for sidx in range( string_offset, string_offset + string_count) ]
             dir_num_strings_dict[dir_type][dir_num][DirStringsArray.STRINGS.value] = directory_strings
 
             # Add to global_names if not in there already
-            if global_names is None:
-                global_names = directory_strings
-            else:
-                for string in directory_strings:
-                    if string not in global_names:
-                        global_names.append(string)
+            #if global_names is None:
+            #    global_names = directory_strings
+            #else:
+            #    for string in directory_strings:
+            #        if string not in global_names:
+            #            global_names.append(string)
 
 
     
@@ -563,19 +1000,18 @@ def ReadDirectories(p, f, file_size, offset, file_tag, this_header_array, this_i
         # number of strings isn't in the byte array - create another var or just sum dir index ?
         this_byte_array = struct.unpack(file_tag + '6' + int_long, byte_array)
         # Dictionary to map offset to number of strings for that dir
-        this_dir_offset = this_byte_array[DirArray.OFFSET_IDX.value]
+        #this_dir_offset = this_byte_array[DirArray.OFFSET_IDX.value]
 
         this_dir_type = this_byte_array[DirArray.TYPE_IDX.value]
         if this_dir_type not in dir_type_dict:
             dir_type_dict[this_dir_type] = OrderedDict()
             dir_strings_dict[this_dir_type] = OrderedDict()
-        dir_type_dict[this_dir_type][(i, this_dir_offset)] = list(this_byte_array)
+        dir_type_dict[this_dir_type][i] = list(this_byte_array)
         dir_strings_dict[this_dir_type][i] = {}
         dir_strings_dict[this_dir_type][i][DirStringsArray.STRING_OFFSET_IDX.value] = number_of_strings
 
         this_dir_string_qty = this_byte_array[DirArray.STR_QTY_IDX.value]
         number_of_strings += this_dir_string_qty
-  
     return offset
 
     
@@ -622,7 +1058,7 @@ def ReadHeader(p, f, local_file_tag, header_dict, indexing_dict): # add file_tag
 
 
 
-def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, global_names, global_params, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners):
+def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, global_names, global_params, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, global_floats, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels):
     file_size = os.path.getsize(file_name)
     local_file_tag = None
     mili_taur = None
@@ -642,8 +1078,14 @@ def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, globa
     this_proc_i_points = {}
 
     this_proc_dim = None
+    this_proc_param_dirs = {}
+
+    # Local mesh dictionaries
+    local_connectivity = {}
+    local_materials = {}
 
     with open(file_name, 'rb') as f:
+        # Fix so passing dictionaries isnt necessary
         local_file_tag, mili_taur = ReadHeader(p, f, local_file_tag, header_dict, indexing_dict)
         local_header = header_dict[p]
         local_indexing = list(indexing_dict[p])
@@ -655,11 +1097,12 @@ def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, globa
         if local_indexing[IndexingArray.NULL_TERMED_NAMES_BYTES.value] > 0:
             ReadNames(p, f, local_file_tag, offset, local_indexing, local_directory_dict, local_dir_strings_dict, global_names)
 
-            this_proc_dim = ReadParams(p, f, local_file_tag, local_directory_dict, local_dir_strings_dict, global_params, this_proc_dim, this_proc_labels, this_proc_matname, this_proc_i_points)
+            this_proc_dim = ReadParams(p, f, local_file_tag, local_directory_dict, local_dir_strings_dict, global_params, this_proc_dim, this_proc_labels, this_proc_matname, this_proc_i_points, this_proc_param_dirs)
 
             
             ReadSvars(p, f, local_directory_dict, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners)
-            #ReadMesh()
+            ReadMesh(p, f, this_proc_dim, local_indexing, local_directory_dict, local_dir_strings_dict, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, local_connectivity, local_materials, this_proc_labels, global_floats)
+            RemapConns(p, f, local_directory_dict, local_dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_global_id_dict, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels)
             #ReadSubrecords()
 
     if __debug__:
@@ -685,7 +1128,7 @@ def main():
     header_dict = manager.dict()
     indexing_dict = manager.dict()
     global_state_maps = manager.dict()
-    global_names = manager.list()
+    global_names = manager.list() # not necessary
     global_params = manager.dict()
 
     global_svar_header = manager.list()
@@ -696,6 +1139,15 @@ def main():
     global_svar_ints = manager.dict()
     global_svar_inners = manager.dict()
 
+    global_dir_dict = manager.dict()
+    global_dir_string_dict = manager.dict()
+    node_labels_global_id_dict = manager.dict()
+    global_floats = manager.dict()
+    
+    elem_conns_label_global_id_dict = manager.dict()
+    global_elem_conns_dict = manager.dict()
+    global_labels = manager.dict()
+
     processes = []
     for i,file_name in enumerate(file_names):
         
@@ -703,11 +1155,22 @@ def main():
                                             indexing_dict, global_state_maps, \
                                             global_names, global_params, \
                                             global_svar_header, global_svar_s, \
-                                            global_svar_ints, global_svar_inners))
+                                            global_svar_ints, global_svar_inners, \
+                                            global_dir_dict, global_dir_string_dict, \
+                                            node_labels_global_id_dict, global_floats, \
+                                            elem_conns_label_global_id_dict, global_elem_conns_dict,
+                                            global_labels))
 
         p.start()
         p.join()
         processes.append(p)
+
+    # Commits
+    file_name = 'afile_d3samp6'
+    curr_wrt_index = 0
+    #with open(file_name, 'wb') as a_file:
+        #CommitSvars(a_file, curr_wrt_index, global_svar_s, global_svar_ints)
+        
 
     if __debug__:
         print("\nHeader Dict", header_dict)
@@ -715,8 +1178,13 @@ def main():
         print("\nGlobal State Maps Dict", global_state_maps)
 
         print("\nGlobal State Variable Ints", global_svar_ints)
-    print("\nGlobal State Variable S", global_svar_s)
-    print("\nGlobal Inner State Variables", global_svar_inners)
+        print("\nGlobal State Variable S", global_svar_s)
+        print("\nGlobal Inner State Variables", global_svar_inners)
+        print("\nGlobal Node Labels", node_labels_global_id_dict)
+        print("\nGlobal Floats", global_floats, len(global_floats))
+        print("\nGlobal Elem Conns", global_elem_conns_dict)
+    else:
+        print("To Print Strings: 'python3 -O para_mrl.py'")
 
 if __name__ == '__main__':
     main()
