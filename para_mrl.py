@@ -278,7 +278,8 @@ def CommitSvars(a_file, curr_index, global_svar_s, global_svar_ints):
 
     
     ######################### read functions ###########################
-
+    
+    
 def FindSuperclass(this_proc_dirs, dir_strings_dict, short_name):
     dir_type = DirectoryType.CLASS_DEF.value
     for dir_num in dir_strings_dict[dir_type]:
@@ -458,10 +459,51 @@ def ReadSubrecords(p, f, this_proc_dirs, dir_strings_dict, node_label_global_id_
                 global_subrec_idata[(name,class_name)] = this_subrec_global_idata
                 global_subrec_cdata[(name,class_name)] = this_subrec_global_cdata
 
+                
+def AlreadyHaveNode(p, sorted_labels, this_proc_node_labels, have_label, add_node):
+    # global_labels = OrderedDict(label: global_id,...)
+    # # index is global id 
+    # this_proc_labels = local labels
+    # have_label flag array shows if that label has already been added
+    # add_node flag array will have len > (num of unique labels) bc will have repeats
+
+    # Add all node labels to list of global labels
+    # order needs to be the same as array for global ids
+    for node_label in this_proc_node_labels:
+        sorted_labels[(node_label,p)] = len(sorted_labels) + 1
+
+    # Sort labels in ascending order
+    ascending_labels = [key[0] for key in sorted_labels.keys()]
+    ascending_labels.sort()
+
+    # Max label
+    max_label = ascending_labels[-1]
+
+    if max_label > len(have_label):
+        # Make sure have_label is long enough, curr length should = old max label + 1
+        curr_len_have_label = len(have_label)
+        length_to_add = max_label - curr_len_have_label
+
+        for i in range(length_to_add):
+            have_label.append(0)
+
+    # len of add_node should be sum of all nodes on all procs, not unique
+    for i in range(len(this_proc_node_labels)):
+        add_node.append(0)
+
+    for label in this_proc_node_labels:
+        if have_label[label-1] != 1:
+            # Have not come across this node yet
+            have_label[label-1] = 1
+
+            # Currently, there is only one of label in the array, so can get index in global_label_array
+            global_node_id = sorted_labels[(label,p)]
+            add_node[global_node_id-1] = 1
+    
     
 
 # M_MAT and M_MESH are same across all procs?
-def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strings_dict, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, this_proc_connectivity, this_proc_materials, this_proc_labels, global_floats, global_floats_consec):
+def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strings_dict, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, this_proc_connectivity, this_proc_materials, this_proc_labels, global_floats, global_floats_consec, have_label, add_node):
     # Turn global dir creation into function
     
     can_proc = [ DirectoryType.CLASS_DEF.value , 
@@ -593,10 +635,20 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
                     node_label_local_id_dict = this_proc_labels[('M_NODE','node')]
 
                 if len(node_label_consec_global_ids) < 1:
-                    labels = list(node_label_local_id_dict)
+                    labels = list(node_label_local_id_dict) #we are relying on this to be in order
+
+                    # Set up have_label - need to find max label, add_node
+                    max_label = labels
+                    max_label.sort()
+                    max_label = max_label[-1]
+
+                    for i in range(len(labels)):
+                        add_node.append(0)
+                    for i in range(max_label):
+                        have_label.append(0)
 
                     floats_pos = 0
-                    for label in labels:
+                    for i, label in enumerate(labels):
                         # consec dictionaries can have multiple global ids for a label (from diff procs)
                         #node_label_global_id_dict[label] = node_label_local_id_dict[label]
                         node_label_consec_global_ids[(label, p)] = node_label_local_id_dict[label]
@@ -604,7 +656,11 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
                         #global_floats[node_label_local_id_dict[label]] = list(floats[floats_pos:floats_pos + this_proc_dim])
                         global_floats_consec[node_label_local_id_dict[label]] = list(floats[floats_pos:floats_pos + this_proc_dim])
                         floats_pos = floats_pos + this_proc_dim
-                    #node_label_global_id_length = len(node_label_global_id_dict)
+
+                        # add_node, have_label
+                        add_node[i] = 1
+                        have_label[label-1] = 1
+                        
 
                 elif len(node_label_consec_global_ids) > 0:
                     # Remap to global ids
@@ -612,6 +668,9 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
 
                     floats_pos = 0 # keep track of local pos
                     id = len(sorted_labels) + 1
+                    
+                    AlreadyHaveNode(p, sorted_labels, node_label_local_id_dict, have_label, add_node)
+                    
                     for label in node_label_local_id_dict:
                         #if label not in node_label_global_id_dict:
                             # Sorted_labels in order of ID 1-n
@@ -634,6 +693,7 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
                     sorted_ids_to_labels = collections.OrderedDict(sorted(sorted_labels.items()))
 
                     for piece in sorted_ids_to_labels:
+                        # array[id] = label, p
                         node_label_consec_global_ids[piece] = sorted_ids_to_labels[piece]
 
 
@@ -1235,7 +1295,7 @@ def ReadHeader(p, f, local_file_tag, header_dict, indexing_dict): # add file_tag
 
 
 
-def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, global_names, global_params, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, global_floats, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, global_subrec_idata, global_subrec_cdata, global_srec_headers, node_label_consec_global_ids, global_floats_consec):
+def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, global_names, global_params, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, global_floats, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, have_label, add_node, global_subrec_idata, global_subrec_cdata, global_srec_headers, node_label_consec_global_ids, global_floats_consec):
     file_size = os.path.getsize(file_name)
     local_file_tag = None
     mili_taur = None
@@ -1276,12 +1336,13 @@ def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, globa
 
             this_proc_dim = ReadParams(p, f, local_file_tag, local_directory_dict, local_dir_strings_dict, global_params, this_proc_dim, this_proc_labels, this_proc_matname, this_proc_i_points, this_proc_param_dirs)
 
-            
             ReadSvars(p, f, local_directory_dict, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners)
-            ReadMesh(p, f, this_proc_dim, local_indexing, local_directory_dict, local_dir_strings_dict, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, local_connectivity, local_materials, this_proc_labels, global_floats, global_floats_consec)
-            RemapConns(p, f, local_directory_dict, local_dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_global_id_dict, node_label_consec_global_ids, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels)
             
-            ReadSubrecords(p, f, local_directory_dict, local_dir_strings_dict, node_label_global_id_dict, node_label_consec_global_ids, global_elem_conns_dict, this_proc_labels, global_labels, global_srec_headers, global_subrec_idata, global_subrec_cdata)
+            ReadMesh(p, f, this_proc_dim, local_indexing, local_directory_dict, local_dir_strings_dict, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, local_connectivity, local_materials, this_proc_labels, global_floats, global_floats_consec, have_label, add_node)
+            #print("READMESH", have_label, add_node)
+            #RemapConns(p, f, local_directory_dict, local_dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_global_id_dict, node_label_consec_global_ids, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels)
+            
+            #ReadSubrecords(p, f, local_directory_dict, local_dir_strings_dict, node_label_global_id_dict, node_label_consec_global_ids, global_elem_conns_dict, this_proc_labels, global_labels, global_srec_headers, global_subrec_idata, global_subrec_cdata)
 
     if __debug__:
         print("\nLocal Dir Dict", local_directory_dict)
@@ -1328,10 +1389,17 @@ def main():
     global_elem_conns_dict = manager.dict()
     global_labels = manager.dict()
 
+    # List to check if we have label in global space already
+    have_label = manager.list()
+    # List to act as mask for node adding to global data
+    add_node = manager.list()
+
     global_subrec_idata = manager.dict()
     global_subrec_cdata = manager.dict()
     global_srec_headers = manager.dict()
 
+
+    #barrier = manager.Barrier(len(file_names))
     processes = []
     for i,file_name in enumerate(file_names):
         
@@ -1344,6 +1412,7 @@ def main():
                                             node_label_global_id_dict, global_floats, \
                                             elem_conns_label_global_id_dict, \
                                             global_elem_conns_dict, global_labels, \
+                                            have_label, add_node, \
                                             global_subrec_idata, global_subrec_cdata, \
                                             global_srec_headers, \
                                             node_label_consec_global_ids, global_floats_consec))
@@ -1351,6 +1420,9 @@ def main():
         p.start()
         p.join()
         processes.append(p)
+
+    #for p in processes:
+    #    p.join()
 
     # Commits
     file_name = 'afile_d3samp6'
@@ -1367,14 +1439,21 @@ def main():
         print("\nGlobal State Variable Ints", global_svar_ints)
         print("\nGlobal State Variable S", global_svar_s)
         print("\nGlobal Inner State Variables", global_svar_inners)
-        print("\nGlobal Node Labels", node_label_global_id_dict)
+        print("\nGlobal Node Labels", node_label_consec_global_ids)
         print("\nGlobal Labels", global_labels)
         print("\nGlobal Floats", global_floats, len(global_floats))
         print("\nGlobal Elem Conns", global_elem_conns_dict)
+
+        print("\nTo print less: 'python3 -0 para_mrl.py'")
     else:
-        print("To Print Strings: 'python3 -O para_mrl.py'")
-    print("\nGlobal Subrecord Idata", global_subrec_idata)
-    print("\nGlobal Subrecord Cdata", global_subrec_cdata)
+        print("To Print Debug Strings: 'python3 para_mrl.py'")
+
+    print("\nGlobal \"Have Label\" Array", len(have_label), have_label)
+    print("\nGlobal Mask Array", len(add_node), add_node)
+    print("\nGlobal Node Labels", node_label_consec_global_ids)
+        
+    #print("\nGlobal Subrecord Idata", global_subrec_idata)
+    #print("\nGlobal Subrecord Cdata", global_subrec_cdata)
 
         
 if __name__ == '__main__':
