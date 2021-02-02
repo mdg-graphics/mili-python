@@ -503,7 +503,7 @@ def AlreadyHaveNode(p, sorted_labels, this_proc_node_labels, have_label, add_nod
     
 
 # M_MAT and M_MESH are same across all procs?
-def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strings_dict, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, this_proc_connectivity, this_proc_materials, this_proc_labels, global_floats, global_floats_consec, have_label, add_node):
+def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strings_dict, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, this_proc_connectivity, this_proc_materials, this_proc_labels, global_floats, global_floats_consec, have_label, add_node, node_local_id_to_global_id):
     # Turn global dir creation into function
     
     can_proc = [ DirectoryType.CLASS_DEF.value , 
@@ -652,6 +652,7 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
                         # consec dictionaries can have multiple global ids for a label (from diff procs)
                         #node_label_global_id_dict[label] = node_label_local_id_dict[label]
                         node_label_consec_global_ids[(label, p)] = node_label_local_id_dict[label]
+                        node_local_id_to_global_id[(node_label_local_id_dict[label], p)] = node_label_local_id_dict[label]
                         
                         #global_floats[node_label_local_id_dict[label]] = list(floats[floats_pos:floats_pos + this_proc_dim])
                         global_floats_consec[node_label_local_id_dict[label]] = list(floats[floats_pos:floats_pos + this_proc_dim])
@@ -681,19 +682,21 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
                         # To keep in consecutive order - should we just have repeats of labels?:
                         sorted_labels[(label, p)] = id
                         global_floats_consec[id] = list(floats[floats_pos:floats_pos + this_proc_dim])
+
+                        # Map (local id, proc): global_id
+                        node_local_id_to_global_id[(node_label_local_id_dict[label], p)] = id
+                        
                         id += 1
 
                         # Increment floats_pos of local
                         floats_pos = floats_pos + this_proc_dim
 
-                    # Ids_to_labels[id] = label sorted in order of ID
-                    #ids_to_labels = {value:key for key,value in sorted_labels.items()}
-
                     # Sorted_ids_to_labels[id] = label
                     sorted_ids_to_labels = collections.OrderedDict(sorted(sorted_labels.items()))
 
                     for piece in sorted_ids_to_labels:
-                        # array[id] = label, p
+                        # sorted_ids_to_labels[(label, proc)] = global_id
+                        # piece = (label, p)
                         node_label_consec_global_ids[piece] = sorted_ids_to_labels[piece]
 
 
@@ -1295,7 +1298,7 @@ def ReadHeader(p, f, local_file_tag, header_dict, indexing_dict): # add file_tag
 
 
 
-def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, global_names, global_params, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, global_floats, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, have_label, add_node, global_subrec_idata, global_subrec_cdata, global_srec_headers, node_label_consec_global_ids, global_floats_consec):
+def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, global_names, global_params, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, global_floats, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, have_label, add_node, global_subrec_idata, global_subrec_cdata, global_srec_headers, node_label_consec_global_ids, node_local_id_to_global_id, global_floats_consec):
     file_size = os.path.getsize(file_name)
     local_file_tag = None
     mili_taur = None
@@ -1338,7 +1341,7 @@ def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, globa
 
             ReadSvars(p, f, local_directory_dict, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners)
             
-            ReadMesh(p, f, this_proc_dim, local_indexing, local_directory_dict, local_dir_strings_dict, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, local_connectivity, local_materials, this_proc_labels, global_floats, global_floats_consec, have_label, add_node)
+            ReadMesh(p, f, this_proc_dim, local_indexing, local_directory_dict, local_dir_strings_dict, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, local_connectivity, local_materials, this_proc_labels, global_floats, global_floats_consec, have_label, add_node, node_local_id_to_global_id)
             #print("READMESH", have_label, add_node)
             #RemapConns(p, f, local_directory_dict, local_dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_global_id_dict, node_label_consec_global_ids, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels)
             
@@ -1381,7 +1384,8 @@ def main():
     global_dir_dict = manager.dict()
     global_dir_string_dict = manager.dict()
     node_label_global_id_dict = manager.dict()
-    node_label_consec_global_ids = manager.dict() # consec: labels can have more than one global id
+    node_label_consec_global_ids = manager.dict() # (label, proc): global_id --> labels can have more than one global id
+    node_local_id_to_global_id = manager.dict() # (local id, proc): global_id
     global_floats = manager.dict()
     global_floats_consec = manager.dict() # consec
     
@@ -1415,7 +1419,8 @@ def main():
                                             have_label, add_node, \
                                             global_subrec_idata, global_subrec_cdata, \
                                             global_srec_headers, \
-                                            node_label_consec_global_ids, global_floats_consec))
+                                            node_label_consec_global_ids, \
+                                            node_local_id_to_global_id, global_floats_consec))
 
         p.start()
         p.join()
@@ -1451,6 +1456,7 @@ def main():
     print("\nGlobal \"Have Label\" Array", len(have_label), have_label)
     print("\nGlobal Mask Array", len(add_node), add_node)
     print("\nGlobal Node Labels", node_label_consec_global_ids)
+    print("\nGlobal Local ID:Global ID", node_local_id_to_global_id)
         
     #print("\nGlobal Subrecord Idata", global_subrec_idata)
     #print("\nGlobal Subrecord Cdata", global_subrec_cdata)
