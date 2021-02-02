@@ -459,6 +459,10 @@ def ReadSubrecords(p, f, this_proc_dirs, dir_strings_dict, node_label_global_id_
                 global_subrec_idata[(name,class_name)] = this_subrec_global_idata
                 global_subrec_cdata[(name,class_name)] = this_subrec_global_cdata
 
+
+#def CompressNodes(p, have_label, add_node, global_floats_consec, node_label_consec_global_ids):
+    
+                
                 
 def AlreadyHaveNode(p, sorted_labels, this_proc_node_labels, have_label, add_node):
     # global_labels = OrderedDict(label: global_id,...)
@@ -767,7 +771,7 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
 
 
 # Remap local to global    
-def RemapConns(p, f, this_proc_dirs, dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_global_id_dict, node_label_consec_global_ids, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels):
+def RemapConns(p, f, this_proc_dirs, dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_global_id_dict, node_label_consec_global_ids, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, node_local_id_to_global_id):
 
     #this_proc_labels = getLabels() # return this_proc_labels dictionary with (sup_class, class): {label: local_id} entries
     classes = list(this_proc_labels)
@@ -834,7 +838,10 @@ def RemapConns(p, f, this_proc_dirs, dir_strings_dict, this_proc_param_dirs, thi
                         node_label = local_node_id_to_label[local_node_id]
                         # Get global_node_id from node_label
                         #global_node_id = node_label_global_id_dict[node_label]
-                        global_node_id = node_label_consec_global_ids[(node_label, p)]
+
+                        # label:global vs local:global
+                        #global_node_id = node_label_consec_global_ids[(node_label, p)]
+                        global_node_id = node_local_id_to_global_id[(local_node_id, p)]
                         
                         ##### Update Global Label Dictionary - DONT NEED THIS, just to check
                         new_elem_conn_entry = elem_conns_label_global_id_dict[short_name]
@@ -871,7 +878,8 @@ def RemapConns(p, f, this_proc_dirs, dir_strings_dict, this_proc_param_dirs, thi
                     # Does this affect number of blocks
                     if qty_blocks == 1:
                         new_block_entry = global_elem_conns_dict[short_name]
-                        new_block_entry[MeshElemConns.ELEM_BLOCKS.value] = (global_elem_conns_dict[short_name][MeshElemConns.ELEM_BLOCKS.value][MeshECElemBlocks.STOP.value], new_stop)
+                        #new_block_entry[MeshElemConns.ELEM_BLOCKS.value] = (global_elem_conns_dict[short_name][MeshElemConns.ELEM_BLOCKS.value][MeshECElemBlocks.STOP.value], new_stop)
+                        new_block_entry[MeshElemConns.ELEM_BLOCKS.value] = (1, new_stop)
                         global_elem_conns_dict[short_name] = new_block_entry
                     else:
                         print("ReadMesh Error: More than one elem block and not doing anything about it")
@@ -1342,8 +1350,8 @@ def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, globa
             ReadSvars(p, f, local_directory_dict, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners)
             
             ReadMesh(p, f, this_proc_dim, local_indexing, local_directory_dict, local_dir_strings_dict, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, local_connectivity, local_materials, this_proc_labels, global_floats, global_floats_consec, have_label, add_node, node_local_id_to_global_id)
-            #print("READMESH", have_label, add_node)
-            #RemapConns(p, f, local_directory_dict, local_dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_global_id_dict, node_label_consec_global_ids, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels)
+
+            RemapConns(p, f, local_directory_dict, local_dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_global_id_dict, node_label_consec_global_ids, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, node_local_id_to_global_id)
             
             #ReadSubrecords(p, f, local_directory_dict, local_dir_strings_dict, node_label_global_id_dict, node_label_consec_global_ids, global_elem_conns_dict, this_proc_labels, global_labels, global_srec_headers, global_subrec_idata, global_subrec_cdata)
 
@@ -1447,16 +1455,17 @@ def main():
         print("\nGlobal Node Labels", node_label_consec_global_ids)
         print("\nGlobal Labels", global_labels)
         print("\nGlobal Floats", global_floats, len(global_floats))
-        print("\nGlobal Elem Conns", global_elem_conns_dict)
 
         print("\nTo print less: 'python3 -0 para_mrl.py'")
     else:
         print("To Print Debug Strings: 'python3 para_mrl.py'")
 
+    print("\nGlobal Floats", global_floats_consec, len(global_floats_consec))
     print("\nGlobal \"Have Label\" Array", len(have_label), have_label)
     print("\nGlobal Mask Array", len(add_node), add_node)
     print("\nGlobal Node Labels", node_label_consec_global_ids)
     print("\nGlobal Local ID:Global ID", node_local_id_to_global_id)
+    print("\nGlobal Elem Conns", global_elem_conns_dict)
         
     #print("\nGlobal Subrecord Idata", global_subrec_idata)
     #print("\nGlobal Subrecord Cdata", global_subrec_cdata)
