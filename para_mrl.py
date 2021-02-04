@@ -210,6 +210,41 @@ class DataOrganization(Enum):
     
     ######################### commit funtions ##########################
 
+def CommitMesh(a_file, offset, header_array, global_dirs, global_dir_strings, dim, floats, elem_conns, node_local_id_to_global_id):
+
+    ### NODES ###
+    node_start = 1
+    node_stop = len(floats)
+
+    # Create nodes dictionary entry
+    node_type_idx = DirectoryType.NODES.value
+    node_mesh_id = 1
+    node_num_nodes = node_stop/dim
+    node_str_qty_idx = global_dir_strings[DirectoryType.NODES.value]['node'][DirStringsArray.STRINGS.value]
+    node_offset = offset
+
+    # Get precision before calculating bytes - header array from every proc is the same (start + stop + prec*floats)
+    #prec = header_array[HeaderArray.PRECISION_FLAG.value] # find how to interpret prec flag??
+    prec = 4
+    node_len = 8 + prec*node_stop
+
+    # Add directory to global dirs
+    global_dirs[node_type_idx]['node'] = [node_type_idx, node_mesh_id, node_num_nodes, node_str_qty_idx, node_offset, node_len]
+
+    # add start, stop to beginning of floats array
+    floats.insert(0, node_stop)
+    floats.insert(0, node_start)
+    
+    # Write nodes to a_file
+    floats = struct.pack('2i' + str(node_stop) + 'f', *floats) # * to unpack not a pointer
+    a_file.write(floats)
+
+    
+    ### ELEM_CONNS ###
+    
+    # Create elem_conns dictionary entries (each short_name has own entry)
+    
+
 # NOTE: Put combined info into a Mili from mili_python_lib.py - so commit_svars should use Mili attributes
 
 # This is not working yay
@@ -418,7 +453,7 @@ def ReadSubrecords(p, f, this_proc_dirs, dir_strings_dict, node_label_global_id_
                                     block_tuple = b_t
                             start_blk, stop_blk = block_tuple
 
-                            # Add older global ids HERE
+                            # Add older global ids
                             # For elem labels there will be no repeats, so can add all labels
                             for id_in_block in range(stop_blk-start_blk+1):
                                 id_num = start_blk+id_in_block
@@ -460,9 +495,37 @@ def ReadSubrecords(p, f, this_proc_dirs, dir_strings_dict, node_label_global_id_
                 global_subrec_cdata[(name,class_name)] = this_subrec_global_cdata
 
 
-#def CompressNodes(p, have_label, add_node, global_floats_consec, node_label_consec_global_ids):
+def CompressNodes(p, add_node, global_floats_consec, node_local_id_to_global_id):
+    # Go through mask array and node info and compress data into final array
+    floats = []
+    node_mapping = {}
+    nodes_per_proc = {}
+
+    # Switch keys and values in node_local_id_to_global_id so we can access entries by id
+    node_global_id_to_local_id = {value:key for key,value in node_local_id_to_global_id.items()}
     
-                
+    for node_flag in range(len(add_node)):
+        if add_node[node_flag] == 1:
+            # need to add 1 below bc global_floats_consec starts at 1
+            floats.extend(global_floats_consec[node_flag+1])
+            
+            # need to add 1 below bc node_global_id_to_local_id starts at 1
+            node_mapping[node_global_id_to_local_id[node_flag+1]] = node_flag+1
+
+            # increment number of nodes for that proc
+            proc = node_global_id_to_local_id[node_flag+1][1]
+            if proc not in nodes_per_proc:
+                nodes_per_proc[proc] = 0
+
+            nodes_per_proc[proc] = nodes_per_proc[proc] + 1
+
+    print(len(floats)/3, "COMPRESSED FLOATS", floats)
+    print(len(node_mapping), "COMPRESSED NODE IDS", node_mapping)
+    print("NODES PER PROC", nodes_per_proc)
+
+    return floats, node_mapping, nodes_per_proc
+            
+                            
                 
 def AlreadyHaveNode(p, sorted_labels, this_proc_node_labels, have_label, add_node):
     # global_labels = OrderedDict(label: global_id,...)
@@ -536,17 +599,19 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
                     global_dir_string_dict[type_id] = {}
                 if short_name not in global_dir_string_dict[type_id]:
                     global_dir_string_dict[type_id][short_name] = {}
-                    global_dir_string_dict[type_id][short_name] = dir_strings_whole # global_num_strings is not correct
+                    temp_string_dict = global_dir_string_dict[type_id]
+                    # The number of strings here is meaningless...
+                    temp_string_dict[short_name] = dir_strings_whole
+                    global_dir_string_dict[type_id] = temp_string_dict
                 else:
-                    for string in strings:
+                    for string in dir_strings:
                         curr_global_strings_whole = global_dir_string_dict[type_id][short_name]
                         global_num_strings = curr_global_strings_whole[0]
                         curr_global_strings = curr_global_strings_whole[1]
-                        if string not in curr_global_strings[1]:
+                        if string not in curr_global_strings:
                             curr_global_strings.append(string)
                             global_num_strings += 1
                     global_dir_string_dict[type_id][short_name] = [global_num_strings, curr_global_strings]
-
                     
             if type_id == DirectoryType.CLASS_IDENTS.value:
                 f.seek(mesh_offset)
@@ -565,13 +630,16 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
                     global_dir_string_dict[type_id] = {}
                 if short_name not in global_dir_string_dict[type_id]:
                     global_dir_string_dict[type_id][short_name] = {}
-                    global_dir_string_dict[type_id][short_name] = dir_strings_whole # global_num_strings is not correct
+                    temp_string_dict = global_dir_string_dict[type_id]
+                    # The number of strings here is meaningless...
+                    temp_string_dict[short_name] = dir_strings_whole
+                    global_dir_string_dict[type_id] = temp_string_dict
                 else:
-                    for string in strings:
+                    for string in dir_strings:
                         curr_global_strings_whole = global_dir_string_dict[type_id][short_name]
                         global_num_strings = curr_global_strings_whole[0]
                         curr_global_strings = curr_global_strings_whole[1]
-                        if string not in curr_global_strings[1]:
+                        if string not in curr_global_strings:
                             curr_global_strings.append(string)
                             global_num_strings += 1
                     global_dir_string_dict[type_id][short_name] = [global_num_strings, curr_global_strings]
@@ -612,13 +680,16 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
                     global_dir_string_dict[type_id] = {}
                 if short_name not in global_dir_string_dict[type_id]:
                     global_dir_string_dict[type_id][short_name] = {}
-                    global_dir_string_dict[type_id][short_name] = dir_strings_whole # global_num_strings is not correct
+                    temp_string_dict = global_dir_string_dict[type_id]
+                    # The number of strings here is meaningless...
+                    temp_string_dict[short_name] = dir_strings_whole
+                    global_dir_string_dict[type_id] = temp_string_dict
                 else:
-                    for string in strings:
+                    for string in dir_strings:
                         curr_global_strings_whole = global_dir_string_dict[type_id][short_name]
                         global_num_strings = curr_global_strings_whole[0]
                         curr_global_strings = curr_global_strings_whole[1]
-                        if string not in curr_global_strings[1]:
+                        if string not in curr_global_strings:
                             curr_global_strings.append(string)
                             global_num_strings += 1
                     global_dir_string_dict[type_id][short_name] = [global_num_strings, curr_global_strings]
@@ -724,13 +795,16 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
                     global_dir_string_dict[type_id] = {}
                 if short_name not in global_dir_string_dict[type_id]:
                     global_dir_string_dict[type_id][short_name] = {}
-                    global_dir_string_dict[type_id][short_name] = dir_strings_whole # global_num_strings is not correct
+                    temp_string_dict = global_dir_string_dict[type_id]
+                    # The number of strings here is meaningless...
+                    temp_string_dict[short_name] = dir_strings_whole
+                    global_dir_string_dict[type_id] = temp_string_dict
                 else:
-                    for string in strings:
+                    for string in dir_strings:
                         curr_global_strings_whole = global_dir_string_dict[type_id][short_name]
                         global_num_strings = curr_global_strings_whole[0]
                         curr_global_strings = curr_global_strings_whole[1]
-                        if string not in curr_global_strings[1]:
+                        if string not in curr_global_strings:
                             curr_global_strings.append(string)
                             global_num_strings += 1
                     global_dir_string_dict[type_id][short_name] = [global_num_strings, curr_global_strings]
@@ -1306,7 +1380,7 @@ def ReadHeader(p, f, local_file_tag, header_dict, indexing_dict): # add file_tag
 
 
 
-def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, global_names, global_params, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, global_floats, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, have_label, add_node, global_subrec_idata, global_subrec_cdata, global_srec_headers, node_label_consec_global_ids, node_local_id_to_global_id, global_floats_consec):
+def StartRead(p, file_name, header_dict, indexing_dict, dims, global_state_maps, global_names, global_params, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, global_floats, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, have_label, add_node, global_subrec_idata, global_subrec_cdata, global_srec_headers, node_label_consec_global_ids, node_local_id_to_global_id, global_floats_consec):
     file_size = os.path.getsize(file_name)
     local_file_tag = None
     mili_taur = None
@@ -1346,12 +1420,14 @@ def StartRead(p, file_name, header_dict, indexing_dict, global_state_maps, globa
             ReadNames(p, f, local_file_tag, offset, local_indexing, local_directory_dict, local_dir_strings_dict, global_names)
 
             this_proc_dim = ReadParams(p, f, local_file_tag, local_directory_dict, local_dir_strings_dict, global_params, this_proc_dim, this_proc_labels, this_proc_matname, this_proc_i_points, this_proc_param_dirs)
+            dims[p] = this_proc_dim
 
             ReadSvars(p, f, local_directory_dict, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners)
             
             ReadMesh(p, f, this_proc_dim, local_indexing, local_directory_dict, local_dir_strings_dict, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, local_connectivity, local_materials, this_proc_labels, global_floats, global_floats_consec, have_label, add_node, node_local_id_to_global_id)
 
             RemapConns(p, f, local_directory_dict, local_dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_global_id_dict, node_label_consec_global_ids, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, node_local_id_to_global_id)
+            #CompressNodes(p, add_node, global_floats_consec, node_local_id_to_global_id)
             
             #ReadSubrecords(p, f, local_directory_dict, local_dir_strings_dict, node_label_global_id_dict, node_label_consec_global_ids, global_elem_conns_dict, this_proc_labels, global_labels, global_srec_headers, global_subrec_idata, global_subrec_cdata)
 
@@ -1377,6 +1453,7 @@ def main():
     manager = Manager()
     header_dict = manager.dict()
     indexing_dict = manager.dict()
+    dims = manager.dict()
     global_state_maps = manager.dict()
     global_names = manager.list() # not necessary
     global_params = manager.dict()
@@ -1416,7 +1493,7 @@ def main():
     for i,file_name in enumerate(file_names):
         
         p = Process(target=StartRead, args=(i, file_name, header_dict, \
-                                            indexing_dict, global_state_maps, \
+                                            indexing_dict, dims, global_state_maps, \
                                             global_names, global_params, \
                                             global_svar_header, global_svar_s, \
                                             global_svar_ints, global_svar_inners, \
@@ -1434,14 +1511,18 @@ def main():
         p.join()
         processes.append(p)
 
+    floats, node_mapping, nodes_per_proc = CompressNodes(p, add_node, global_floats_consec, node_local_id_to_global_id)
+
     #for p in processes:
     #    p.join()
 
     # Commits
     file_name = 'afile_d3samp6'
     curr_wrt_index = 0
-    #with open(file_name, 'wb') as a_file:
+    with open(file_name, 'wb') as a_file:
         #CommitSvars(a_file, curr_wrt_index, global_svar_s, global_svar_ints)
+
+        CommitMesh(a_file, curr_wrt_index, header_dict[0], global_dir_dict, global_dir_string_dict, dims[0], floats, global_elem_conns_dict, node_local_id_to_global_id) #, elem_local_id_to_global_id)
         
 
     if __debug__:
@@ -1466,6 +1547,8 @@ def main():
     print("\nGlobal Node Labels", node_label_consec_global_ids)
     print("\nGlobal Local ID:Global ID", node_local_id_to_global_id)
     print("\nGlobal Elem Conns", global_elem_conns_dict)
+
+    print("\nGlobal Strings", global_dir_string_dict)
         
     #print("\nGlobal Subrecord Idata", global_subrec_idata)
     #print("\nGlobal Subrecord Cdata", global_subrec_cdata)
