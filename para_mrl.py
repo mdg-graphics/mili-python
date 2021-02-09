@@ -219,8 +219,8 @@ def CommitMesh(a_file, offset, header_array, global_dirs, global_dir_strings, di
     # Create nodes dictionary entry
     node_type_idx = DirectoryType.NODES.value
     node_mesh_id = 1
-    node_num_nodes = node_stop/dim
-    node_str_qty_idx = global_dir_strings[DirectoryType.NODES.value]['node'][DirStringsArray.STRINGS.value]
+    node_num_nodes = int(node_stop/dim)
+    node_str_qty_idx = len(global_dir_strings[DirectoryType.NODES.value]['node'][DirStringsArray.STRINGS.value])
     node_offset = offset
 
     # Get precision before calculating bytes - header array from every proc is the same (start + stop + prec*floats)
@@ -229,20 +229,53 @@ def CommitMesh(a_file, offset, header_array, global_dirs, global_dir_strings, di
     node_len = 8 + prec*node_stop
 
     # Add directory to global dirs
-    global_dirs[node_type_idx]['node'] = [node_type_idx, node_mesh_id, node_num_nodes, node_str_qty_idx, node_offset, node_len]
+    global_dirs[node_type_idx] = {}
+    temp_dirs = global_dirs[node_type_idx]
+    temp_dirs['node'] = [node_type_idx, node_mesh_id, node_num_nodes, node_str_qty_idx, node_offset, node_len]
+    global_dirs[node_type_idx] = temp_dirs
 
     # add start, stop to beginning of floats array
     floats.insert(0, node_stop)
     floats.insert(0, node_start)
     
     # Write nodes to a_file
-    floats = struct.pack('2i' + str(node_stop) + 'f', *floats) # * to unpack not a pointer
+    floats = struct.pack('2i' + str(node_stop) + 'f', *floats) # * to unpack not a pointer, floats are double prec in python?
     a_file.write(floats)
-
+    
+    offset = offset + node_len # Q: Do we need to multiply by size of item to get offset
     
     ### ELEM_CONNS ###
     
-    # Create elem_conns dictionary entries (each short_name has own entry)
+    # Go through different kinds of elems
+    for elem_type in elem_conns.keys():
+        # Create elem_conns entries (each short_name has own entry)
+        ec_type_idx = DirectoryType.ELEM_CONNS.value
+        ec_mesh_id = 1
+        ec_num_elems = elem_conns[elem_type][MeshElemConns.ELEM_BLOCKS.value][MeshECElemBlocks.STOP.value]
+        ec_str_qty_idx = len(global_dir_strings[DirectoryType.ELEM_CONNS.value][elem_type][DirStringsArray.STRINGS.value])
+        ec_offset = offset
+
+        ec_entry_start = elem_conns[elem_type][:2] + [num for num in elem_conns[elem_type][2]]
+
+        prec = 4
+        sup_class_name = Superclass(elem_conns[elem_type][MeshElemConns.SUP_CLASS.value]).name
+        sup_class_conns = ConnWords[sup_class_name].value
+
+        # Write length of entire elem conns entry for this elem type
+        ec_num_ints = 4 + ec_num_elems*sup_class_conns
+        ec_entry = struct.pack(str(ec_num_ints) + 'i', *(ec_entry_start + elem_conns[elem_type][MeshElemConns.EBUF.value]))
+        a_file.write(ec_entry)
+
+        ec_len = prec*ec_num_ints
+
+        # Add directory to global dirs
+        if ec_type_idx not in global_dirs:
+            global_dirs[ec_type_idx] = {}
+        temp_dirs = global_dirs[ec_type_idx]
+        temp_dirs[elem_type] = [ec_type_idx, ec_mesh_id, ec_num_elems, ec_str_qty_idx, ec_offset, ec_len]
+        global_dirs[ec_type_idx] = temp_dirs
+        
+        offset = offset + ec_len
     
 
 # NOTE: Put combined info into a Mili from mili_python_lib.py - so commit_svars should use Mili attributes
@@ -519,9 +552,9 @@ def CompressNodes(p, add_node, global_floats_consec, node_local_id_to_global_id)
 
             nodes_per_proc[proc] = nodes_per_proc[proc] + 1
 
-    print(len(floats)/3, "COMPRESSED FLOATS", floats)
-    print(len(node_mapping), "COMPRESSED NODE IDS", node_mapping)
-    print("NODES PER PROC", nodes_per_proc)
+    #print(len(floats)/3, "COMPRESSED FLOATS", floats)
+    #print(len(node_mapping), "COMPRESSED NODE IDS", node_mapping)
+    #print("NODES PER PROC", nodes_per_proc)
 
     return floats, node_mapping, nodes_per_proc
             
@@ -816,7 +849,7 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
                 elem_blocks = struct.unpack(str(2 * qty_blocks) + 'i', f.read(8 * qty_blocks))
 
                 elem_qty = entry[DirArray.MOD_IDX2.value]
-                word_qty = ConnWords[Superclass(superclass).name].value # still use these 
+                word_qty = ConnWords[Superclass(superclass).name].value
                 conn_qty = word_qty - 2
                 mat_offset = word_qty - 1
                 ebuf = struct.unpack(str(elem_qty * word_qty) + 'i', f.read(elem_qty * word_qty * 4))
@@ -1535,20 +1568,20 @@ def main():
         print("\nGlobal Inner State Variables", global_svar_inners)
         print("\nGlobal Node Labels", node_label_consec_global_ids)
         print("\nGlobal Labels", global_labels)
-        print("\nGlobal Floats", global_floats, len(global_floats))
+        print("\nGlobal Floats", global_floats_consec, len(global_floats_consec))
 
         print("\nTo print less: 'python3 -0 para_mrl.py'")
     else:
         print("To Print Debug Strings: 'python3 para_mrl.py'")
 
-    print("\nGlobal Floats", global_floats_consec, len(global_floats_consec))
-    print("\nGlobal \"Have Label\" Array", len(have_label), have_label)
-    print("\nGlobal Mask Array", len(add_node), add_node)
+    #print("\nGlobal \"Have Label\" Array", len(have_label), have_label)
+    #print("\nGlobal Mask Array", len(add_node), add_node)
     print("\nGlobal Node Labels", node_label_consec_global_ids)
     print("\nGlobal Local ID:Global ID", node_local_id_to_global_id)
     print("\nGlobal Elem Conns", global_elem_conns_dict)
 
     print("\nGlobal Strings", global_dir_string_dict)
+    print("\nGlobal Directories", global_dir_dict)
         
     #print("\nGlobal Subrecord Idata", global_subrec_idata)
     #print("\nGlobal Subrecord Cdata", global_subrec_cdata)
