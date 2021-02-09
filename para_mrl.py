@@ -218,7 +218,7 @@ def CommitMesh(a_file, offset, header_array, global_dirs, global_dir_strings, di
 
     # Create nodes dictionary entry
     node_type_idx = DirectoryType.NODES.value
-    node_mesh_id = 1
+    node_mesh_id = 0
     node_num_nodes = int(node_stop/dim)
     node_str_qty_idx = len(global_dir_strings[DirectoryType.NODES.value]['node'][DirStringsArray.STRINGS.value])
     node_offset = offset
@@ -250,7 +250,7 @@ def CommitMesh(a_file, offset, header_array, global_dirs, global_dir_strings, di
     for elem_type in elem_conns.keys():
         # Create elem_conns entries (each short_name has own entry)
         ec_type_idx = DirectoryType.ELEM_CONNS.value
-        ec_mesh_id = 1
+        ec_mesh_id = 0
         ec_num_elems = elem_conns[elem_type][MeshElemConns.ELEM_BLOCKS.value][MeshECElemBlocks.STOP.value]
         ec_str_qty_idx = len(global_dir_strings[DirectoryType.ELEM_CONNS.value][elem_type][DirStringsArray.STRINGS.value])
         ec_offset = offset
@@ -528,7 +528,7 @@ def ReadSubrecords(p, f, this_proc_dirs, dir_strings_dict, node_label_global_id_
                 global_subrec_cdata[(name,class_name)] = this_subrec_global_cdata
 
 
-def CompressNodes(p, add_node, global_floats_consec, node_local_id_to_global_id):
+def CompressNodes(p, num_node_labels, add_node, global_floats_consec, node_local_id_to_global_id):
     # Go through mask array and node info and compress data into final array
     floats = []
     node_mapping = {}
@@ -543,18 +543,16 @@ def CompressNodes(p, add_node, global_floats_consec, node_local_id_to_global_id)
             floats.extend(global_floats_consec[node_flag+1])
             
             # need to add 1 below bc node_global_id_to_local_id starts at 1
-            node_mapping[node_global_id_to_local_id[node_flag+1]] = node_flag+1
+            proc = node_global_id_to_local_id[node_flag+1][1]
+            if proc not in node_mapping:
+                node_mapping[proc] = []
+            node_mapping[proc].append(node_flag+1)
 
             # increment number of nodes for that proc
-            proc = node_global_id_to_local_id[node_flag+1][1]
             if proc not in nodes_per_proc:
                 nodes_per_proc[proc] = 0
 
             nodes_per_proc[proc] = nodes_per_proc[proc] + 1
-
-    #print(len(floats)/3, "COMPRESSED FLOATS", floats)
-    #print(len(node_mapping), "COMPRESSED NODE IDS", node_mapping)
-    #print("NODES PER PROC", nodes_per_proc)
 
     return floats, node_mapping, nodes_per_proc
             
@@ -1460,7 +1458,6 @@ def StartRead(p, file_name, header_dict, indexing_dict, dims, global_state_maps,
             ReadMesh(p, f, this_proc_dim, local_indexing, local_directory_dict, local_dir_strings_dict, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, local_connectivity, local_materials, this_proc_labels, global_floats, global_floats_consec, have_label, add_node, node_local_id_to_global_id)
 
             RemapConns(p, f, local_directory_dict, local_dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_global_id_dict, node_label_consec_global_ids, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, node_local_id_to_global_id)
-            #CompressNodes(p, add_node, global_floats_consec, node_local_id_to_global_id)
             
             #ReadSubrecords(p, f, local_directory_dict, local_dir_strings_dict, node_label_global_id_dict, node_label_consec_global_ids, global_elem_conns_dict, this_proc_labels, global_labels, global_srec_headers, global_subrec_idata, global_subrec_cdata)
 
@@ -1544,10 +1541,10 @@ def main():
         p.join()
         processes.append(p)
 
-    floats, node_mapping, nodes_per_proc = CompressNodes(p, add_node, global_floats_consec, node_local_id_to_global_id)
+    floats, node_mapping, nodes_per_proc = CompressNodes(p, len(have_label), add_node, global_floats_consec, node_local_id_to_global_id)
 
-    #for p in processes:
-    #    p.join()
+    for p in processes:
+        p.join()
 
     # Commits
     file_name = 'afile_d3samp6'
@@ -1557,7 +1554,6 @@ def main():
 
         CommitMesh(a_file, curr_wrt_index, header_dict[0], global_dir_dict, global_dir_string_dict, dims[0], floats, global_elem_conns_dict, node_local_id_to_global_id) #, elem_local_id_to_global_id)
         
-
     if __debug__:
         print("\nHeader Dict", header_dict)
         print("\nIndexing Dict", indexing_dict)
@@ -1576,8 +1572,12 @@ def main():
 
     #print("\nGlobal \"Have Label\" Array", len(have_label), have_label)
     #print("\nGlobal Mask Array", len(add_node), add_node)
+    #print("\nGlobal Local ID:Global ID", node_local_id_to_global_id)
+
+    #print("\nGlobal Compressed Floats", floats)
+
     print("\nGlobal Node Labels", node_label_consec_global_ids)
-    print("\nGlobal Local ID:Global ID", node_local_id_to_global_id)
+    print("\nGlobal Node Local ID:Global ID, per proc", node_mapping)
     print("\nGlobal Elem Conns", global_elem_conns_dict)
 
     print("\nGlobal Strings", global_dir_string_dict)
