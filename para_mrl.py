@@ -210,8 +210,37 @@ class DataOrganization(Enum):
     
     ######################### commit funtions ##########################
 
-def CommitMesh(a_file, offset, header_array, global_dirs, global_dir_strings, dim, floats, elem_conns, node_local_id_to_global_id):
+def CommitDirectories(a_file, global_dirs):    
+    # Commit from os.SEEK_END - (indexing array, state_map_len*num_state_maps, dir_len*num_dirs)
+    all_dirs = []
+    num_dirs = 0
+    for dir_type in global_dirs:
+        for short_name in global_dirs[dir_type]:
+            all_dirs = all_dirs + global_dirs[dir_type][short_name]
+            num_dirs += 1
 
+    #offset = -(4*len(indexing_array) + 6*num_dirs)
+    offset = -(16 + 6*num_dirs)
+    a_file.seek(offset, os.SEEK_END)
+
+    all_dirs = struct.pack(str(6*num_dirs) + 'i', *all_dirs)
+    a_file.write(all_dirs)
+    
+    
+def CommitMesh(a_file, offset, header_array, global_dirs, global_dir_strings, dim, floats, elem_conns, node_local_id_to_global_id, global_class_idents):
+    ### CLASS DEFS ### - Global directory is same as local, only need to commit directories
+
+    ### CLASS IDENTS ###
+    for short_name in global_class_idents:
+        # Change offset in directories
+        temp_dir = global_dirs[DirectoryType.CLASS_IDENTS.value]
+        temp_dir[short_name][DirArray.OFFSET_IDX.value] = offset
+        global_dirs[DirectoryType.CLASS_IDENTS.value] = temp_dir
+        offset = offset + global_dirs[DirectoryType.CLASS_IDENTS.value][short_name][DirArray.LENGTH_IDX.value]
+        
+        class_ident = struct.pack('3i', *(global_class_idents[short_name]))
+        a_file.write(class_ident)
+        
     ### NODES ###
     node_start = 1
     node_stop = len(floats)
@@ -526,7 +555,7 @@ def ReadSubrecords(p, f, this_proc_dirs, dir_strings_dict, node_label_global_id_
 
                 global_subrec_idata[(name,class_name)] = this_subrec_global_idata
                 global_subrec_cdata[(name,class_name)] = this_subrec_global_cdata
-
+        
 
 def CompressNodes(p, num_node_labels, add_node, global_floats_consec, node_local_id_to_global_id):
     # Go through mask array and node info and compress data into final array
@@ -601,7 +630,7 @@ def AlreadyHaveNode(p, sorted_labels, this_proc_node_labels, have_label, add_nod
     
 
 # M_MAT and M_MESH are same across all procs?
-def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strings_dict, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, this_proc_connectivity, this_proc_materials, this_proc_labels, global_floats, global_floats_consec, have_label, add_node, node_local_id_to_global_id):
+def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strings_dict, global_class_idents, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, this_proc_connectivity, this_proc_materials, this_proc_labels, global_floats, global_floats_consec, have_label, add_node, node_local_id_to_global_id):
     # Turn global dir creation into function
     
     can_proc = [ DirectoryType.CLASS_DEF.value , 
@@ -623,7 +652,9 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
                 if type_id not in global_dir_dict:
                     global_dir_dict[type_id] = {}
                 if short_name not in global_dir_dict[type_id]:
-                    global_dir_dict[type_id][short_name] = {}
+                    temp_dirs = global_dir_dict[type_id]
+                    temp_dirs[short_name] = entry
+                    global_dir_dict[type_id] = temp_dirs
 
                 # Directory string dictionary entry
                 if type_id not in global_dir_string_dict:
@@ -655,7 +686,9 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
                 if type_id not in global_dir_dict:
                     global_dir_dict[type_id] = {}
                 if short_name not in global_dir_dict[type_id]:
-                    global_dir_dict[type_id][short_name] = {}
+                    temp_dirs = global_dir_dict[type_id]
+                    temp_dirs[short_name] = this_proc_dirs[type_id][dir_num] # NOTE: offset and len given here will not be correct for global
+                    global_dir_dict[type_id] = temp_dirs
 
                 if type_id not in global_dir_string_dict:
                     global_dir_string_dict[type_id] = {}
@@ -682,6 +715,10 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
                 #if short_name not in global_mesh_dictionary[type_id]:
                 #    global_mesh_dictionary[type_id][short_name] = sup_class_start_stop
                 # Maybe we don't need to keep a dictionary for this, can use directories and dir strings to create later?
+
+                # If processor 0, save these bc same across all procs?
+                if p == 0:
+                    global_class_idents[short_name] = sup_class_start_stop
 
                 # Make local dictionary
                 superclass = Superclass(superclass).name
@@ -1411,7 +1448,7 @@ def ReadHeader(p, f, local_file_tag, header_dict, indexing_dict): # add file_tag
 
 
 
-def StartRead(p, file_name, header_dict, indexing_dict, dims, global_state_maps, global_names, global_params, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, global_floats, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, have_label, add_node, global_subrec_idata, global_subrec_cdata, global_srec_headers, node_label_consec_global_ids, node_local_id_to_global_id, global_floats_consec):
+def StartRead(p, file_name, header_dict, indexing_dict, dims, global_state_maps, global_class_idents, global_names, global_params, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, global_floats, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, have_label, add_node, global_subrec_idata, global_subrec_cdata, global_srec_headers, node_label_consec_global_ids, node_local_id_to_global_id, global_floats_consec):
     file_size = os.path.getsize(file_name)
     local_file_tag = None
     mili_taur = None
@@ -1455,7 +1492,7 @@ def StartRead(p, file_name, header_dict, indexing_dict, dims, global_state_maps,
 
             ReadSvars(p, f, local_directory_dict, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners)
             
-            ReadMesh(p, f, this_proc_dim, local_indexing, local_directory_dict, local_dir_strings_dict, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, local_connectivity, local_materials, this_proc_labels, global_floats, global_floats_consec, have_label, add_node, node_local_id_to_global_id)
+            ReadMesh(p, f, this_proc_dim, local_indexing, local_directory_dict, local_dir_strings_dict, global_class_idents, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, local_connectivity, local_materials, this_proc_labels, global_floats, global_floats_consec, have_label, add_node, node_local_id_to_global_id)
 
             RemapConns(p, f, local_directory_dict, local_dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_global_id_dict, node_label_consec_global_ids, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, node_local_id_to_global_id)
             
@@ -1485,6 +1522,7 @@ def main():
     indexing_dict = manager.dict()
     dims = manager.dict()
     global_state_maps = manager.dict()
+    global_class_idents = manager.dict()
     global_names = manager.list() # not necessary
     global_params = manager.dict()
 
@@ -1524,7 +1562,7 @@ def main():
         
         p = Process(target=StartRead, args=(i, file_name, header_dict, \
                                             indexing_dict, dims, global_state_maps, \
-                                            global_names, global_params, \
+                                            global_class_idents, global_names, global_params, \
                                             global_svar_header, global_svar_s, \
                                             global_svar_ints, global_svar_inners, \
                                             global_dir_dict, global_dir_string_dict, \
@@ -1552,7 +1590,9 @@ def main():
     with open(file_name, 'wb') as a_file:
         #CommitSvars(a_file, curr_wrt_index, global_svar_s, global_svar_ints)
 
-        CommitMesh(a_file, curr_wrt_index, header_dict[0], global_dir_dict, global_dir_string_dict, dims[0], floats, global_elem_conns_dict, node_local_id_to_global_id) #, elem_local_id_to_global_id)
+        CommitMesh(a_file, curr_wrt_index, header_dict[0], global_dir_dict, global_dir_string_dict, dims[0], floats, global_elem_conns_dict, node_local_id_to_global_id, global_class_idents) #, elem_local_id_to_global_id)
+
+        CommitDirectories(a_file, global_dir_dict)
         
     if __debug__:
         print("\nHeader Dict", header_dict)
@@ -1586,6 +1626,10 @@ def main():
     #print("\nGlobal Subrecord Idata", global_subrec_idata)
     #print("\nGlobal Subrecord Cdata", global_subrec_cdata)
 
+
         
 if __name__ == '__main__':
     main()
+
+### NOTES ###
+# Can change global header dict and index dict to local arrays, create different global header and index LISTS to pass between commit functions - Q: is there any reason to keep a global indexing array?
