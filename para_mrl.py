@@ -210,6 +210,13 @@ class DataOrganization(Enum):
     
     ######################### commit funtions ##########################
 
+def CommitHeader(a_file, offset, mili_taur, header_array):
+    full_header = struct.pack('4i6b', *(mili_taur + header_array))
+    a_file.write(full_header)
+    offset = offset + 16
+    return offset
+    
+    
 def CommitDirectories(a_file, global_dirs):    
     # Commit from os.SEEK_END - (indexing array, state_map_len*num_state_maps, dir_len*num_dirs)
     all_dirs = []
@@ -387,7 +394,7 @@ def FindSuperclass(this_proc_dirs, dir_strings_dict, short_name):
     return 0
     
     
-def ReadSubrecords(p, f, this_proc_dirs, dir_strings_dict, node_label_global_id_dict, node_label_consec_global_ids, global_elem_conns_dict, this_proc_labels, global_labels, global_srec_headers, global_subrec_idata, global_subrec_cdata):
+def ReadSubrecords(p, f, this_proc_dirs, dir_strings_dict, node_label_consec_global_ids, global_elem_conns_dict, this_proc_labels, global_labels, global_srec_headers, global_subrec_idata, global_subrec_cdata):
 
     type_id = DirectoryType.STATE_REC_DATA.value
     global_id_node_labels = {value:key for key,value in node_label_consec_global_ids.items()}
@@ -455,7 +462,6 @@ def ReadSubrecords(p, f, this_proc_dirs, dir_strings_dict, node_label_global_id_
                         if this_proc_labels[('M_NODE', 'node')][this_subrec_node_label] in this_subrec_local_ids:
                             # Get global node id for this label and add if was part of one of this subrecs start-stop blocks
                             # All these ids should match
-                            #global_node_id = node_label_global_id_dict[this_subrec_node_label]
 
                             global_node_id = node_label_consec_global_ids[(this_subrec_node_label, p)]
                             this_subrec_global_ids.append(global_node_id)
@@ -557,7 +563,7 @@ def ReadSubrecords(p, f, this_proc_dirs, dir_strings_dict, node_label_global_id_
                 global_subrec_cdata[(name,class_name)] = this_subrec_global_cdata
         
 
-def CompressNodes(p, num_node_labels, add_node, global_floats_consec, node_local_id_to_global_id):
+def CompressNodes(p, num_node_labels, add_node, have_label, global_floats_consec, node_local_id_to_global_id, node_label_consec_global_ids):
     # Go through mask array and node info and compress data into final array
     floats = []
     node_mapping = {}
@@ -565,24 +571,39 @@ def CompressNodes(p, num_node_labels, add_node, global_floats_consec, node_local
 
     # Switch keys and values in node_local_id_to_global_id so we can access entries by id
     node_global_id_to_local_id = {value:key for key,value in node_local_id_to_global_id.items()}
-    
+
+    # How to do this better?
+    global_id_node_labels = {value:key for key,value in node_label_consec_global_ids.items()}
+
     for node_flag in range(len(add_node)):
+        print("node flag", node_flag)
+        gid = None
+        iftype = None
         if add_node[node_flag] == 1:
             # need to add 1 below bc global_floats_consec starts at 1
             floats.extend(global_floats_consec[node_flag+1])
             
-            # need to add 1 below bc node_global_id_to_local_id starts at 1
-            proc = node_global_id_to_local_id[node_flag+1][1]
-            if proc not in node_mapping:
-                node_mapping[proc] = []
-            node_mapping[proc].append(node_flag+1)
+            gid = node_flag+1
+            iftype = "if"
+        else:
+            # If is a repeat, replace this global id with older global id
+            label = global_id_node_labels[node_flag+1][0]
+            p = have_label[label-1]
+            gid = node_label_consec_global_ids[(label, p)]
+            iftype = "else"
 
-            # increment number of nodes for that proc
-            if proc not in nodes_per_proc:
-                nodes_per_proc[proc] = 0
+        # need to add 1 below bc node_global_id_to_local_id starts at 1
+        proc = node_global_id_to_local_id[node_flag+1][1]
+            
+        if proc not in node_mapping:
+            node_mapping[proc] = []
+        node_mapping[proc].append(gid)
 
-            nodes_per_proc[proc] = nodes_per_proc[proc] + 1
-
+        # increment number of nodes for that proc
+        if proc not in nodes_per_proc:
+            nodes_per_proc[proc] = 0
+        nodes_per_proc[proc] = nodes_per_proc[proc] + 1
+            
     return floats, node_mapping, nodes_per_proc
             
                             
@@ -612,16 +633,16 @@ def AlreadyHaveNode(p, sorted_labels, this_proc_node_labels, have_label, add_nod
         length_to_add = max_label - curr_len_have_label
 
         for i in range(length_to_add):
-            have_label.append(0)
+            have_label.append(-1)
 
     # len of add_node should be sum of all nodes on all procs, not unique
     for i in range(len(this_proc_node_labels)):
         add_node.append(0)
 
     for label in this_proc_node_labels:
-        if have_label[label-1] != 1:
+        if have_label[label-1] == -1:
             # Have not come across this node yet
-            have_label[label-1] = 1
+            have_label[label-1] = p
 
             # Currently, there is only one of label in the array, so can get index in global_label_array
             global_node_id = sorted_labels[(label,p)]
@@ -630,7 +651,7 @@ def AlreadyHaveNode(p, sorted_labels, this_proc_node_labels, have_label, add_nod
     
 
 # M_MAT and M_MESH are same across all procs?
-def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strings_dict, global_class_idents, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, this_proc_connectivity, this_proc_materials, this_proc_labels, global_floats, global_floats_consec, have_label, add_node, node_local_id_to_global_id):
+def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strings_dict, global_class_idents, global_dir_dict, global_dir_string_dict, node_label_consec_global_ids, this_proc_connectivity, this_proc_materials, this_proc_labels, global_floats_consec, have_label, add_node, node_local_id_to_global_id):
     # Turn global dir creation into function
     
     can_proc = [ DirectoryType.CLASS_DEF.value , 
@@ -788,22 +809,20 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
                     for i in range(len(labels)):
                         add_node.append(0)
                     for i in range(max_label):
-                        have_label.append(0)
+                        have_label.append(-1)
 
                     floats_pos = 0
                     for i, label in enumerate(labels):
                         # consec dictionaries can have multiple global ids for a label (from diff procs)
-                        #node_label_global_id_dict[label] = node_label_local_id_dict[label]
                         node_label_consec_global_ids[(label, p)] = node_label_local_id_dict[label]
                         node_local_id_to_global_id[(node_label_local_id_dict[label], p)] = node_label_local_id_dict[label]
                         
-                        #global_floats[node_label_local_id_dict[label]] = list(floats[floats_pos:floats_pos + this_proc_dim])
                         global_floats_consec[node_label_local_id_dict[label]] = list(floats[floats_pos:floats_pos + this_proc_dim])
                         floats_pos = floats_pos + this_proc_dim
 
                         # add_node, have_label
                         add_node[i] = 1
-                        have_label[label-1] = 1
+                        have_label[label-1] = p
                         
 
                 elif len(node_label_consec_global_ids) > 0:
@@ -816,12 +835,6 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
                     AlreadyHaveNode(p, sorted_labels, node_label_local_id_dict, have_label, add_node)
                     
                     for label in node_label_local_id_dict:
-                        #if label not in node_label_global_id_dict:
-                            # Sorted_labels in order of ID 1-n
-                            #sorted_labels[label] = id
-                            #global_floats[id] = list(floats[floats_pos:floats_pos + this_proc_dim])
-                            #id += 1
-
                         # To keep in consecutive order - should we just have repeats of labels?:
                         sorted_labels[(label, p)] = id
                         global_floats_consec[id] = list(floats[floats_pos:floats_pos + this_proc_dim])
@@ -913,7 +926,7 @@ def ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_strin
 
 
 # Remap local to global    
-def RemapConns(p, f, this_proc_dirs, dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_global_id_dict, node_label_consec_global_ids, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, node_local_id_to_global_id):
+def RemapConns(p, f, this_proc_dirs, dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_consec_global_ids, global_elem_conns_dict, global_labels, node_local_id_to_global_id, elem_processor_offsets):
 
     #this_proc_labels = getLabels() # return this_proc_labels dictionary with (sup_class, class): {label: local_id} entries
     classes = list(this_proc_labels)
@@ -931,9 +944,6 @@ def RemapConns(p, f, this_proc_dirs, dir_strings_dict, this_proc_param_dirs, thi
         dir_strings = dir_strings_dict[DirectoryType.ELEM_CONNS.value][dir_num][1]
         short_name = dir_strings[0] # ! Fix so get short_name from associated strings array
 
-        if short_name not in elem_conns_label_global_id_dict:
-            elem_conns_label_global_id_dict[short_name] = {} # CHECK if short_name already exists
-        #elem_conns_label_global_id_length = 0
         sup_class, qty_blocks = struct.unpack('2i', f.read(8))
         sup_class_name = Superclass(sup_class).name
         local_elem_blocks = struct.unpack(str(2 * qty_blocks) + 'i', f.read(8 * qty_blocks))
@@ -963,37 +973,48 @@ def RemapConns(p, f, this_proc_dirs, dir_strings_dict, this_proc_param_dirs, thi
                     mat = ebuf[k + conn_qty]
                     part = ebuf[k + mat_offset]
 
-                    # Keep track of new global mo_id
-                    mo_id = len(elem_conns_label_global_id_dict[short_name]) + 1
-
                     if (sup_class_name,short_name) not in global_labels:
                         global_labels[(sup_class_name,short_name)] = {}
+
+                    # Keep track of new global mo_id
+                    mo_id = len(global_labels[(sup_class_name,short_name)]) + 1
+                    
                     new_sub_entry = global_labels[(sup_class_name,short_name)]
                     new_sub_entry[local_elem_id_to_label[this_proc_label_index]] = mo_id
                     global_labels[(sup_class_name,short_name)] = new_sub_entry
 
+                    # if 'currs' not in elem_processor_offsets:
+                    #     elem_processor_offsets['currs'] = {}
+                    # if short_name not in elem_processor_offsets['currs']:
+                    #     elem_processor_offsets['currs'][short_name] = 0
+                    # if p not in elem_processor_offsets:
+                    #     elem_processor_offsets[p] = {}
+                    # if short_name not in elem_processor_offsets[p]:
+                    #     temp = elem_processor_offsets[p]
+                    #     temp[short_name] = -1
+                    #     elem_processor_offsets[p] = temp
+                    # if p == 0:
+                    #     temp = elem_processor_offsets[p]
+                    #     temp[short_name] = mo_id
+                    #     elem_processor_offsets[p] = temp
+                    # else:
+                    #     print("adfdsfad", p)
+                    #     temp = elem_processor_offsets[p]
+                    #     temp[short_name] = mo_id + elem_processor_offsets[p-1][short_name]
+                    #     elem_processor_offsets[p] = temp
+                    # print("EPO", elem_processor_offsets, mo_id)
+                    
                     for m in range(0, conn_qty):
                         # Get the local node 
                         local_node_id = ebuf[k + m]
 
                         # Get label from local_node_id
                         node_label = local_node_id_to_label[local_node_id]
+                        
                         # Get global_node_id from node_label
-                        #global_node_id = node_label_global_id_dict[node_label]
-
-                        # label:global vs local:global
+                        # dicts below - label:global vs local:global
                         #global_node_id = node_label_consec_global_ids[(node_label, p)]
                         global_node_id = node_local_id_to_global_id[(local_node_id, p)]
-                        
-                        ##### Update Global Label Dictionary - DONT NEED THIS, just to check
-                        new_elem_conn_entry = elem_conns_label_global_id_dict[short_name]
-                        if mo_id in new_elem_conn_entry:
-                            new_global_id_list = new_elem_conn_entry[mo_id] + [global_node_id]
-                            new_elem_conn_entry[mo_id] = new_global_id_list
-                        else:
-                            new_elem_conn_entry[mo_id] = [global_node_id]
-                        elem_conns_label_global_id_dict[short_name] = new_elem_conn_entry  # mo_id = elem mo_id
-                        #####
 
                         # Update new_ebuf (nodes,mat,part)
                         new_ebuf.append(global_node_id)
@@ -1421,13 +1442,12 @@ def ReadStateMaps(p, f, file_tag, this_proc_indexing_array):
 
     return state_maps, offset
 
-def ReadHeader(p, f, local_file_tag, header_dict, indexing_dict): # add file_tag to header_array
+def ReadHeader(p, f, local_file_tag, indexing_dict): # add file_tag to header_array
     # Precision flag should be same across procs ??
     header = f.read(16)
     mili_taur = struct.unpack('4s', header[:4])[0].decode('ascii')
 
     header_array = struct.unpack('6b', header[4:10])
-    header_dict[p] = (list(header_array))
     header_version, dir_version, endian_flag, precision_flag, state_file_suffix_length, partition_flag = header_array
 
     if endian_flag == 1:
@@ -1444,11 +1464,11 @@ def ReadHeader(p, f, local_file_tag, header_dict, indexing_dict): # add file_tag
         # Use to keep track of total number of directories across all processors to keep track of dir_num assignment
         indexing_dict['totals'] = [0, 0, 0, 0]
 
-    return local_file_tag, mili_taur
+    return local_file_tag, mili_taur, header_array
 
 
 
-def StartRead(p, file_name, header_dict, indexing_dict, dims, global_state_maps, global_class_idents, global_names, global_params, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, global_floats, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, have_label, add_node, global_subrec_idata, global_subrec_cdata, global_srec_headers, node_label_consec_global_ids, node_local_id_to_global_id, global_floats_consec):
+def StartRead(p, file_name, header_array, indexing_dict, dims, global_state_maps, global_class_idents, global_names, global_params, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners, global_dir_dict, global_dir_string_dict, global_elem_conns_dict, global_labels, have_label, add_node, global_subrec_idata, global_subrec_cdata, global_srec_headers, node_label_consec_global_ids, node_local_id_to_global_id, elem_processor_offsets, global_floats_consec):
     file_size = os.path.getsize(file_name)
     local_file_tag = None
     mili_taur = None
@@ -1476,9 +1496,12 @@ def StartRead(p, file_name, header_dict, indexing_dict, dims, global_state_maps,
 
     with open(file_name, 'rb') as f:
         # Fix so passing dictionaries isnt necessary
-        local_file_tag, mili_taur = ReadHeader(p, f, local_file_tag, header_dict, indexing_dict)
-        local_header = header_dict[p]
+        local_file_tag, mili_taur, local_header = ReadHeader(p, f, local_file_tag, indexing_dict)
         local_indexing = list(indexing_dict[p])
+
+        if p == 0:
+            # If processor 0, write header array and save local header as global header - need precision when committing?
+            header_array = local_header
 
         global_state_maps[p], offset = ReadStateMaps(p, f, local_file_tag, local_indexing)
 
@@ -1492,11 +1515,11 @@ def StartRead(p, file_name, header_dict, indexing_dict, dims, global_state_maps,
 
             ReadSvars(p, f, local_directory_dict, global_svar_header, global_svar_s, global_svar_ints, global_svar_inners)
             
-            ReadMesh(p, f, this_proc_dim, local_indexing, local_directory_dict, local_dir_strings_dict, global_class_idents, global_dir_dict, global_dir_string_dict, node_label_global_id_dict, node_label_consec_global_ids, local_connectivity, local_materials, this_proc_labels, global_floats, global_floats_consec, have_label, add_node, node_local_id_to_global_id)
+            ReadMesh(p, f, this_proc_dim, local_indexing, local_directory_dict, local_dir_strings_dict, global_class_idents, global_dir_dict, global_dir_string_dict, node_label_consec_global_ids, local_connectivity, local_materials, this_proc_labels, global_floats_consec, have_label, add_node, node_local_id_to_global_id)
 
-            RemapConns(p, f, local_directory_dict, local_dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_global_id_dict, node_label_consec_global_ids, elem_conns_label_global_id_dict, global_elem_conns_dict, global_labels, node_local_id_to_global_id)
+            RemapConns(p, f, local_directory_dict, local_dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_consec_global_ids, global_elem_conns_dict, global_labels, node_local_id_to_global_id, elem_processor_offsets)
             
-            #ReadSubrecords(p, f, local_directory_dict, local_dir_strings_dict, node_label_global_id_dict, node_label_consec_global_ids, global_elem_conns_dict, this_proc_labels, global_labels, global_srec_headers, global_subrec_idata, global_subrec_cdata)
+            #ReadSubrecords(p, f, local_directory_dict, local_dir_strings_dict, node_label_consec_global_ids, global_elem_conns_dict, this_proc_labels, global_labels, global_srec_headers, global_subrec_idata, global_subrec_cdata)
 
     if __debug__:
         print("\nLocal Dir Dict", local_directory_dict)
@@ -1518,7 +1541,7 @@ def main():
                   '/g/g12/pham22/mili-python/parallel/d3samp6.plt007A']
 
     manager = Manager()
-    header_dict = manager.dict()
+    header_array = manager.list()
     indexing_dict = manager.dict()
     dims = manager.dict()
     global_state_maps = manager.dict()
@@ -1536,17 +1559,17 @@ def main():
 
     global_dir_dict = manager.dict()
     global_dir_string_dict = manager.dict()
-    node_label_global_id_dict = manager.dict()
+    
     node_label_consec_global_ids = manager.dict() # (label, proc): global_id --> labels can have more than one global id
     node_local_id_to_global_id = manager.dict() # (local id, proc): global_id
-    global_floats = manager.dict()
+
     global_floats_consec = manager.dict() # consec
     
-    elem_conns_label_global_id_dict = manager.dict() # not necessary - Use to check
-    global_elem_conns_dict = manager.dict()
-    global_labels = manager.dict()
+    global_elem_conns_dict = manager.dict() # all elem_conns entries
+    global_labels = manager.dict() # element labels separated by class
+    elem_processor_offsets = manager.dict()
 
-    # List to check if we have label in global space already
+    # List to check if we have node label in global space already
     have_label = manager.list()
     # List to act as mask for node adding to global data
     add_node = manager.list()
@@ -1560,26 +1583,25 @@ def main():
     processes = []
     for i,file_name in enumerate(file_names):
         
-        p = Process(target=StartRead, args=(i, file_name, header_dict, \
+        p = Process(target=StartRead, args=(i, file_name, header_array, \
                                             indexing_dict, dims, global_state_maps, \
                                             global_class_idents, global_names, global_params, \
                                             global_svar_header, global_svar_s, \
                                             global_svar_ints, global_svar_inners, \
                                             global_dir_dict, global_dir_string_dict, \
-                                            node_label_global_id_dict, global_floats, \
-                                            elem_conns_label_global_id_dict, \
                                             global_elem_conns_dict, global_labels, \
                                             have_label, add_node, \
                                             global_subrec_idata, global_subrec_cdata, \
                                             global_srec_headers, \
                                             node_label_consec_global_ids, \
-                                            node_local_id_to_global_id, global_floats_consec))
+                                            node_local_id_to_global_id, \
+                                            elem_processor_offsets, global_floats_consec))
 
         p.start()
         p.join()
         processes.append(p)
 
-    floats, node_mapping, nodes_per_proc = CompressNodes(p, len(have_label), add_node, global_floats_consec, node_local_id_to_global_id)
+    floats, node_mapping, nodes_per_proc = CompressNodes(p, len(have_label), add_node, have_label, global_floats_consec, node_local_id_to_global_id, node_label_consec_global_ids)
 
     for p in processes:
         p.join()
@@ -1588,14 +1610,15 @@ def main():
     file_name = 'afile_d3samp6'
     curr_wrt_index = 0
     with open(file_name, 'wb') as a_file:
+        
         #CommitSvars(a_file, curr_wrt_index, global_svar_s, global_svar_ints)
 
-        CommitMesh(a_file, curr_wrt_index, header_dict[0], global_dir_dict, global_dir_string_dict, dims[0], floats, global_elem_conns_dict, node_local_id_to_global_id, global_class_idents) #, elem_local_id_to_global_id)
+        CommitMesh(a_file, curr_wrt_index, header_array, global_dir_dict, global_dir_string_dict, dims[0], floats, global_elem_conns_dict, node_local_id_to_global_id, global_class_idents)
 
         CommitDirectories(a_file, global_dir_dict)
         
     if __debug__:
-        print("\nHeader Dict", header_dict)
+        #print("\nHeader Dict", header_dict)
         print("\nIndexing Dict", indexing_dict)
         print("\nGlobal State Maps Dict", global_state_maps)
 
@@ -1616,12 +1639,14 @@ def main():
 
     #print("\nGlobal Compressed Floats", floats)
 
-    print("\nGlobal Node Labels", node_label_consec_global_ids)
+    print("\nGlobal Node Labels", len(node_label_consec_global_ids), node_label_consec_global_ids)
     print("\nGlobal Node Local ID:Global ID, per proc", node_mapping)
     print("\nGlobal Elem Conns", global_elem_conns_dict)
 
     print("\nGlobal Strings", global_dir_string_dict)
     print("\nGlobal Directories", global_dir_dict)
+
+    print("\nGlobal Labels", global_labels)
         
     #print("\nGlobal Subrecord Idata", global_subrec_idata)
     #print("\nGlobal Subrecord Cdata", global_subrec_cdata)
