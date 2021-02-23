@@ -214,24 +214,45 @@ class DataOrganization(Enum):
 def __InitWrite(afile_name, mili_taur, header_array, num_state_maps):
     header_offset = 0
     indexing_offset = -16
+
     with open(afile_name, 'wb') as a_file:
         a_file.seek(header_offset)
+        #Encode string, add 6 header ints, add 6 more ints to create full length 16 byte header
+        mili_taur = bytes(str(mili_taur), 'ascii')
+        a_file.write(mili_taur)
 
-        # Encode string, add 6 header ints, add 6 more ints to create full length 16 byte header
-        mili_taur = mili_taur.encode('ascii')
-        header_array = header_array + (0,0,0,0,0,0)
+        header_array = list(header_array)
+        header_array.extend([0,0,0,0,0,0])
+
         header_array = struct.pack('12b', *header_array)
-        header_array = mili_taur + header_array
-        print("header array", header_array)
+        header_array = header_array
         a_file.write(header_array)
 
-        # Write indexing array at end
-        a_file.seek(os.SEEK_END)
+        #Write indexing array at end
+        a_file.seek(0, os.SEEK_END)
         indexing_array = [0,0,0,num_state_maps]
-        print("len inde", len(indexing_array), num_state_maps)
         indexing_array = struct.pack('4i', *indexing_array)
-        print("ind", indexing_array)
         a_file.write(indexing_array)
+
+
+def __CommitStateMaps(a_file, file_tag, state_maps, number_state_maps, global_dirs):
+    num_items_in_sm = 4
+    
+    # Check number state maps against length of array we have
+    if number_state_maps != (len(state_maps)/4):
+        # 4 numbers per state map, fix hardcode later
+        print("State Map Error")
+            
+    offset = -16
+    state_map_length = 20
+    a_file.seek(offset, os.SEEK_END)
+
+    for state_map_num in range(1, number_state_maps):
+        a_file.seek(-1 * state_map_length, 1)
+
+        state_map = state_maps[state_map_num*4:state_map_num*4 + 4]
+        state_map = struct.pack(file_tag + 'iqfi', *state_map)
+        a_file.write(state_map)
         
     
 def __CommitDirectories(a_file, global_dirs):    
@@ -353,17 +374,10 @@ def __CommitSvars(a_file, offset, global_svar_s, global_svar_ints):
         svar_bytes += size_s
 
         for i, sv_piece in enumerate(global_svar_s[svar_name]):
-            # Turn each string into bytes
-                
-            #if sys.version_info < (3, 0):
-            #    sv_piece = bytes(sv_piece)
-            #else:
-            #    sv_piece = bytes(sv_piece, 'utf8')
-
             all_svar_s_bytes = all_svar_s_bytes + sv_piece + '\x00'
 
         all_svar_ints.extend(global_svar_ints[svar_name])
-        all_svar_s.extend(global_svar_s[svar_name])
+        #all_svar_s.extend(global_svar_s[svar_name])
 
     combined_header = [svar_words, svar_bytes]
 
@@ -375,12 +389,10 @@ def __CommitSvars(a_file, offset, global_svar_s, global_svar_ints):
 
     # Write ints
     svar_ints = struct.pack(str(svar_words) + 'i', *all_svar_ints)
-    print("ints", all_svar_ints)
     a_file.write(svar_ints)
 
     # Write s
     all_svar_s_bytes = bytes(all_svar_s_bytes, 'ascii')
-    print("all", all_svar_s_bytes)
     a_file.write(all_svar_s_bytes)
 
     offset = offset + len(svar_header) + svar_header[0] + svar_header[1]
@@ -440,7 +452,7 @@ def __ReadSubrecords(p, f, this_proc_dirs, dir_strings_dict, node_label_consec_g
             this_subrec_cdata = [name, class_name]
             c_pos += 2
             svars = cdata[c_pos:c_pos + qty_svars]
-            this_subrec_cdata.extend(svars)
+            this_subrec_cdata.append(svars)
             c_pos += qty_svars
 
             global_srec_headers[(name,class_name)] = this_srec_array
@@ -458,7 +470,7 @@ def __ReadSubrecords(p, f, this_proc_dirs, dir_strings_dict, node_label_consec_g
                 if start == stop:
                     this_subrec_local_ids.append(start)
 
-
+            #print("this_subrec", this_subrec_cdata, this_subrec_idata)
             if qty_id_blks > 0:
                 # Get this subrecord's global id
                 this_subrec_global_ids = []
@@ -472,7 +484,7 @@ def __ReadSubrecords(p, f, this_proc_dirs, dir_strings_dict, node_label_consec_g
                             global_node_id = node_label_consec_global_ids[(this_subrec_node_label, p)]
                             this_subrec_global_ids.append(global_node_id)
                             this_subrec_node_labels.append(this_subrec_node_label)
-                elif class_name == 'mat':
+                elif class_name == 'mat' or class_name == 'glob':
                     if p == 0:
                         this_subrec_global_ids = this_subrec_local_ids
                 else:
@@ -493,13 +505,17 @@ def __ReadSubrecords(p, f, this_proc_dirs, dir_strings_dict, node_label_consec_g
 
                     # Global cdata array - to get svars get from index 2 to end
                     this_subrec_global_cdata = global_subrec_cdata[(name,class_name)]
-                    this_subrec_global_svars = this_subrec_global_cdata[SubrecCdata.SVARS.value:]
+                    #print("cdata", this_subrec_global_cdata)
+                    this_subrec_global_svars = this_subrec_global_cdata[SubrecCdata.SVARS.value]
+                    #print("this subrec global svars", this_subrec_global_svars)
 
                     # Add svars if missing
                     for svar in svars:
                         if svar not in this_subrec_global_svars:
                             this_subrec_global_svars.append(svar)
+                    #print("BEFORE svars", this_subrec_global_cdata)
                     this_subrec_global_cdata[SubrecCdata.SVARS.value] = this_subrec_global_svars
+                    #print("AFTER svars", this_subrec_global_cdata)
 
                     # Global idata array
                     this_subrec_global_idata = global_subrec_idata[(name,class_name)]
@@ -583,19 +599,16 @@ def __CompressNodes(p, num_node_labels, add_node, have_label, global_floats_cons
 
     for node_flag in range(len(add_node)):
         gid = None
-        iftype = None
         if add_node[node_flag] == 1:
             # need to add 1 below bc global_floats_consec starts at 1
             floats.extend(global_floats_consec[node_flag+1])
             
             gid = node_flag+1
-            iftype = "if"
         else:
             # If is a repeat, replace this global id with older global id
             label = global_id_node_labels[node_flag+1][0]
             p = have_label[label-1]
             gid = node_label_consec_global_ids[(label, p)]
-            iftype = "else"
 
         # need to add 1 below bc node_global_id_to_local_id starts at 1
         proc = node_global_id_to_local_id[node_flag+1][1]
@@ -799,6 +812,7 @@ def __ReadMesh(p, f, this_proc_dim, this_indexing_array, this_proc_dirs, dir_str
 
                 # For label in labels - if not in new dict label:global_id then add to dict and add associated floats to NODES array
                 if ('M_NODE','node') not in this_proc_labels:
+                    print("ReadMesh Node Error")
                     return 0
                 else:
                     node_label_local_id_dict = this_proc_labels[('M_NODE','node')]
@@ -1073,6 +1087,7 @@ def __ReadSvars(p, f, this_proc_dirs, global_svar_header, global_svar_s, global_
         int_pos = 0
         c_pos = 0
         all_ints = 0
+        #print(p, "strings", s)
 
         while int_pos < len(ints):
             exists = False
@@ -1423,13 +1438,12 @@ def __ReadDirectories(p, f, file_size, offset, file_tag, this_header_array, inde
     return offset
 
     
-def __ReadStateMaps(p, f, file_tag, this_proc_indexing_array):
+def __ReadStateMaps(p, f, file_tag, this_proc_indexing_array, state_maps):
     # Why does this return offset
     offset = -16
     state_map_length = 20
     f.seek(offset, os.SEEK_END)
     number_of_state_maps = this_proc_indexing_array[IndexingArray.NUM_STATE_MAPS.value]
-    state_maps = {}
 
     for num in range(1, 1 + number_of_state_maps):
         f.seek(-1 * state_map_length, 1)
@@ -1437,8 +1451,8 @@ def __ReadStateMaps(p, f, file_tag, this_proc_indexing_array):
         state_map = struct.unpack(file_tag + 'iqfi', byte_array)
         state_map = list(state_map)
         file_number, file_offset, time, state_map_id = state_map
-
-        state_maps[file_offset] = state_map
+        
+        state_maps.extend(state_map)
         f.seek(-1 * state_map_length, 1)
 
     return state_maps, offset
@@ -1468,9 +1482,10 @@ def __ReadHeader(p, f, local_file_tag, indexing_dict): # add file_tag to header_
     return local_file_tag, mili_taur, header_array
 
 
-def __TransformFileName(f):
-    # Get name of open file
-    f = str(f.name)
+def __TransformFileName(f, file_stat):
+    if file_stat == "open":
+        # Get name of open file
+        f = str(f.name)
 
     # Trim beginning directory info
     if '/' in f:
@@ -1481,7 +1496,7 @@ def __TransformFileName(f):
         f = f[:f.rfind('.')]
 
     # Add "afile_" - temp naming convention
-    f = "afile_" + f
+    f = "afile_" + f + 'A'
 
     # Add ".pltA"
     #f = f + ".pltA"
@@ -1514,6 +1529,8 @@ def __StartRead(p, file_name, header_array, indexing_dict, dims, global_state_ma
     local_connectivity = {}
     local_materials = {}
 
+    afile_name = __TransformFileName(file_name, "closed")
+
     with open(file_name, 'rb') as f:
         # Fix so passing dictionaries isnt necessary
         local_file_tag, mili_taur, local_header = __ReadHeader(p, f, local_file_tag, indexing_dict)
@@ -1521,12 +1538,15 @@ def __StartRead(p, file_name, header_array, indexing_dict, dims, global_state_ma
 
         if p == 0:
             # If processor 0, write header array and save local header as global header - need precision when committing?
-            header_array = local_header
-            afile_name = __TransformFileName(f)
+            for num in local_header:
+                header_array.append(num)
+
             __InitWrite(afile_name, mili_taur, local_header, local_indexing[IndexingArray.NUM_STATE_MAPS.value])
 
-        global_state_maps[p], offset = __ReadStateMaps(p, f, local_file_tag, local_indexing)
+            #offset = __ReadStateMaps(p, f, local_file_tag, local_indexing, global_state_maps)
+            
 
+        offset = -16 # can assume P0 will always set offset, so can leave as uninitialized var above...
         offset = __ReadDirectories(p, f, file_size, offset, local_file_tag, local_header, indexing_dict, local_dir_strings_dict, local_directory_dict)
 
         if local_indexing[IndexingArray.NULL_TERMED_NAMES_BYTES.value] > 0:
@@ -1541,14 +1561,8 @@ def __StartRead(p, file_name, header_array, indexing_dict, dims, global_state_ma
 
             __RemapConns(p, f, local_directory_dict, local_dir_strings_dict, this_proc_param_dirs, this_proc_labels, node_label_consec_global_ids, global_elem_conns_dict, global_labels, node_local_id_to_global_id, elem_processor_offsets)
             
-            #ReadSubrecords(p, f, local_directory_dict, local_dir_strings_dict, node_label_consec_global_ids, global_elem_conns_dict, this_proc_labels, global_labels, global_srec_headers, global_subrec_idata, global_subrec_cdata)
-
-    if __debug__:
-        print("\nLocal Dir Dict", local_directory_dict)
-        print("\nLocal Dir Strings Dict", local_dir_strings_dict)
-        print("\nGlobal Names", global_names)
-        print("\nParams", global_params,"\n\nLabels", this_proc_labels, "\n\nMatname", this_proc_matname, "\n\nI_pts", this_proc_i_points)
-        
+            __ReadSubrecords(p, f, local_directory_dict, local_dir_strings_dict, node_label_consec_global_ids, global_elem_conns_dict, this_proc_labels, global_labels, global_srec_headers, global_subrec_idata, global_subrec_cdata)
+      
 
 def main():
     
@@ -1566,7 +1580,7 @@ def main():
     header_array = manager.list()
     indexing_dict = manager.dict()
     dims = manager.dict()
-    global_state_maps = manager.dict()
+    global_state_maps = manager.list()
     global_class_idents = manager.dict()
     global_names = manager.list() # not necessary
     global_params = manager.dict()
@@ -1603,7 +1617,6 @@ def main():
     global_srec_headers = manager.dict()
 
 
-    #barrier = manager.Barrier(len(file_names))
     processes = []
     for i,file_name in enumerate(file_names):
         
@@ -1619,7 +1632,7 @@ def main():
                                             global_srec_headers, \
                                             node_label_consec_global_ids, \
                                             node_local_id_to_global_id, \
-                                            elem_processor_offsets, global_floats_consec))
+                                              elem_processor_offsets, global_floats_consec))
 
         p.start()
         p.join()
@@ -1631,50 +1644,48 @@ def main():
         p.join()
 
     # Commits
-    afile_name = 'afile_d3samp6'
+    afile_name = __TransformFileName(file_names[0], "closed")
     curr_wrt_index = 16
-    with open(afile_name, 'wb') as a_file:
-        
-        curr_wrt_index = __CommitSvars(a_file, curr_wrt_index, global_svar_s, global_svar_ints)
+    mili_taur = 'mili'
+    with open(afile_name, 'ab+') as a_file:
+
+        #__InitWrite(a_file, mili_taur, header_array, indexing_dict[0][IndexingArray.NUM_STATE_MAPS.value])
 
         __CommitMesh(a_file, curr_wrt_index, header_array, global_dir_dict, global_dir_string_dict, dims[0], floats, global_elem_conns_dict, node_local_id_to_global_id, global_class_idents)
+        
+        #curr_wrt_index = __CommitSvars(a_file, curr_wrt_index, global_svar_s, global_svar_ints)
+        
+        file_tag = ''
+        endian_flag = header_array[HeaderArray.ENDIAN_FLAG.value]
+        if endian_flag == 1:
+            file_tag = '>'
+        else:
+            file_tag = '<'
+        #__CommitStateMaps(a_file, file_tag, global_state_maps, indexing_dict[0][IndexingArray.NUM_STATE_MAPS.value], global_dir_dict)
 
-        __CommitDirectories(a_file, global_dir_dict)
+
+        #__CommitDirectories(a_file, global_dir_dict)
+        print("\n")
         
     if __debug__:
-        #print("\nHeader Dict", header_dict)
-        print("\nIndexing Dict", indexing_dict)
-        print("\nGlobal State Maps Dict", global_state_maps)
+        print("\nGlobal Node Labels", len(node_label_consec_global_ids), node_label_consec_global_ids)
+        print("\nGlobal Node Local ID:Global ID, per proc", node_mapping)
+        print("\nGlobal Elem Conns", global_elem_conns_dict)
 
-        print("\nGlobal State Variable Ints", global_svar_ints)
-        print("\nGlobal State Variable S", global_svar_s)
-        print("\nGlobal Inner State Variables", global_svar_inners)
-        print("\nGlobal Node Labels", node_label_consec_global_ids)
+        print("\nGlobal Strings", global_dir_string_dict)
+        print("\nGlobal Directories", global_dir_dict)
+
         print("\nGlobal Labels", global_labels)
-        print("\nGlobal Floats", global_floats_consec, len(global_floats_consec))
+        print("\nGlobal Element Label Offsets", elem_processor_offsets)
 
+        #print("\nGlobal State Maps Dict", global_state_maps)
+
+        print("\nGlobal Subrecord Idata", global_subrec_idata)
+        print("\nGlobal Subrecord Cdata", global_subrec_cdata)
+        
         print("\nTo print less: 'python3 -0 para_mrl.py'")
     else:
         print("To Print Debug Strings: 'python3 para_mrl.py'")
-
-    #print("\nGlobal \"Have Label\" Array", len(have_label), have_label)
-    #print("\nGlobal Mask Array", len(add_node), add_node)
-    #print("\nGlobal Local ID:Global ID", node_local_id_to_global_id)
-    #print("\nGlobal Compressed Floats", floats)
-
-    print("\nGlobal Node Labels", len(node_label_consec_global_ids), node_label_consec_global_ids)
-    print("\nGlobal Node Local ID:Global ID, per proc", node_mapping)
-    print("\nGlobal Elem Conns", global_elem_conns_dict)
-
-    print("\nGlobal Strings", global_dir_string_dict)
-    print("\nGlobal Directories", global_dir_dict)
-
-    print("\nGlobal Labels", global_labels)
-    print("\nGlobal Element Label Offsets", elem_processor_offsets)
-        
-    #print("\nGlobal Subrecord Idata", global_subrec_idata)
-    #print("\nGlobal Subrecord Cdata", global_subrec_cdata)
-
 
         
 if __name__ == '__main__':
