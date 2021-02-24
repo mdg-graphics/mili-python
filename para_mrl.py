@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from multiprocessing import Process, Manager
 from enum import Enum
 import collections
@@ -7,6 +8,7 @@ import struct
 import sys
 import re
 import psutil
+from mili_combiner_optparser import parseParameters, gather_A_files
 
 
     ######################## classes / indexes #########################
@@ -1566,15 +1568,24 @@ def __StartRead(p, file_name, header_array, indexing_dict, dims, global_state_ma
 
 def main():
     
+    params = parseParameters(sys.argv[1:]) 
+    if params is None:
+        sys.exit(1)
+
+    file_names = gather_A_files(params)
+    if len(file_names) <= 0:
+        print(f"Error while gathering A files. No A files were found in the directory '{params['input_dir']}' with the base name '{params['input_file']}'")
+        sys.exit(1)
+
     #file_name = '/g/g12/pham22/mili-python/d3samp6.pltA'
-    file_names = ['/g/g12/pham22/mili-python/parallel/d3samp6.plt000A', \
-                  '/g/g12/pham22/mili-python/parallel/d3samp6.plt001A', \
-                  '/g/g12/pham22/mili-python/parallel/d3samp6.plt002A', \
-                  '/g/g12/pham22/mili-python/parallel/d3samp6.plt003A', \
-                  '/g/g12/pham22/mili-python/parallel/d3samp6.plt004A', \
-                  '/g/g12/pham22/mili-python/parallel/d3samp6.plt005A', \
-                  '/g/g12/pham22/mili-python/parallel/d3samp6.plt006A', \
-                  '/g/g12/pham22/mili-python/parallel/d3samp6.plt007A']
+    #file_names = ['/g/g12/pham22/mili-python/parallel/d3samp6.plt000A', \
+    #              '/g/g12/pham22/mili-python/parallel/d3samp6.plt001A', \
+    #              '/g/g12/pham22/mili-python/parallel/d3samp6.plt002A', \
+    #              '/g/g12/pham22/mili-python/parallel/d3samp6.plt003A', \
+    #              '/g/g12/pham22/mili-python/parallel/d3samp6.plt004A', \
+    #              '/g/g12/pham22/mili-python/parallel/d3samp6.plt005A', \
+    #              '/g/g12/pham22/mili-python/parallel/d3samp6.plt006A', \
+    #              '/g/g12/pham22/mili-python/parallel/d3samp6.plt007A']
 
     manager = Manager()
     header_array = manager.list()
