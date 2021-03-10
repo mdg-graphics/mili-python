@@ -1185,7 +1185,7 @@ class Mili:
                 label, mo_search = mo_search
                 if mo_search >= start and mo_search <= end:
                     mo_idx_found.append([label, mo_index + mo_search - start])
-            mo_index += end - start
+            mo_index += (end - start) + 1
 
         indices[sub] = defaultdict(list)
 
