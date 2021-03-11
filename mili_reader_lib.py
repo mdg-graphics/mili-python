@@ -494,7 +494,7 @@ class Mili:
     '''
     def getStateMaps(self):
         if self.__parallel_mode: return self.__getHelper("get state maps")
-        if len(self.__milis) > 1: return [m.getStateMpas() for m in self.__milis]
+        if len(self.__milis) > 1: return [m.getStateMaps() for m in self.__milis]
         return self.__state_maps
 
     '''
@@ -631,8 +631,10 @@ class Mili:
                     byte_array = f.read(directory.length_idx)
                     ints = struct.unpack(self.__tag + str(int(directory.length_idx / 4)) + 'i', byte_array)
                     first, last, node_labels = ints[0], ints[1], ints[2:]
+        
+                    if ('M_NODE', 'node') not in self.__labels:
+                        self.__labels[('M_NODE', 'node')] = {}
 
-                    self.__labels[('M_NODE', 'node')] = {}
                     for j in range (first - 1, last):
                         self.__labels[('M_NODE', 'node')][node_labels[j]] = j + 1
                         self.__labeltomili[('M_NODE', 'node')][node_labels[j]].append(self.__mili_num)
@@ -651,7 +653,9 @@ class Mili:
 
                     sup_class = name[sup_class_idx : sup_class_end_idx]
                     clas = name[class_idx : class_end_idx]
-                    self.__labels[(sup_class, clas)] = {}
+
+                    if (sup_class, clas) not in self.__labels:
+                        self.__labels[(sup_class, clas)] = {}
 
                     for j in range(len(ints)):
                         if 'ElemIds' in name:
@@ -1292,7 +1296,7 @@ class Mili:
         sup_class = self.__mesh_object_class_datas[class_name].superclass
         sup_class = Superclass(sup_class).name
         labels = self.__labels[(sup_class, class_name)]
-        return ret
+
         for elem in elems:
             id, class_name_elem = elem
             for k in labels.keys():
