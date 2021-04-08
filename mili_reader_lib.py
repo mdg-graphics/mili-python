@@ -35,6 +35,8 @@ import struct
 import sys
 import time
 import re
+import atexit
+import pdb
 
 from enum import Enum
 import psutil
@@ -431,7 +433,7 @@ and subrecords. It also has a number of querying functions that a user can call
 to access this data. Takes in the path of the file to read
 '''
 class Mili:
-    def __init__(self, read_file=None, parallel_read=False):
+    def __init__(self, read_file=None, parallel_read=False, processors=None):
         self.__milis = []  # list of parallel mili files
         self.__parent_conns = []  # list of parent connection, index number
         self.__mili_num = None  # Number of mili file (processor number)
@@ -470,12 +472,23 @@ class Mili:
         self.__error_file = None
         self.__parallel_mode = parallel_read
 
-        if read_file: self.read(read_file, parallel_read=self.__parallel_mode)
+        if processors is not None and  processors <= 1:
+            processors = 1
+            self.__parallel_mode = False
+
+        if read_file: self.read(read_file, parallel_read=self.__parallel_mode, processors=processors)
+
+        # This ensures that all connections are closed, when program end/ ctrl+c or ctrl+d are used
+        # in the interactive console. Previously the closing of these connections was handled by
+        # The __del__, which is not guaranteed to be called and could cause the reader to hang
+        # when parallel_mode was set to True
+        atexit.register(self.closeAllConnections)
+
     
     '''
     Close down all connections
     '''
-    def __del__(self):
+    def closeAllConnections(self):
         for conn in self.__parent_conns:
             conn, i = conn
             conn.send("End")
@@ -528,6 +541,14 @@ class Mili:
         if self.__parallel_mode: return self.__getHelper("get materials")
         if len(self.__milis) > 1: return [m.getMaterials() for m in self.__milis]
         return self.__materials
+
+    '''
+    Getter for Nodes
+    '''
+    def getNodes(self):
+        if self.__parallel_mode: return self.__getHelper("get nodes")
+        if len(self.__milis) > 1: return [m.getNodes() for m in self.__milis]
+        return self.__nodes
     
     '''
     Get error file
@@ -774,6 +795,11 @@ class Mili:
                         if not 'strain' in self.__int_points: self.__int_points['strain'] = {}
                         self.__int_points['strain'][sv_name] = self.__int_points[sv_name[:-1]]
 
+                    for sv in sv_names:
+                        if not sv in self.__int_points:
+                            self.__int_points[sv] = {}
+                        self.__int_points[sv][sv_name] = self.__int_points[sv_name[:-1]]
+
     '''
     Reads in directory information from the Mili file
     '''
@@ -994,18 +1020,27 @@ class Mili:
         ret = ''
         type_to_str = {'M_STRING' : 's', 'M_FLOAT' : 'f', 'M_FLOAT4' : 'f', 'M_FLOAT8' : 'd', 'M_INT' : 'i', 'M_INT4' : 'i', 'M_INT8' : 'q'}
 
-        for sv_name in subrecord.svar_names:
-            sv, sub = self.__state_variables[sv_name]
-            datatype = DataType(sv.data_type).name
-            ret += type_to_str[datatype] * sv.atom_qty(self.__state_variables)
-
-
         if subrecord.organization == DataOrganization.OBJECT.value:
-            ret_final = ret * subrecord.mo_qty
+            # If subrecord is Object ordered there will only be 1 data type
+            datatype = None
+            atom_qty_per_label = 0
+            for sv_name in subrecord.svar_names:
+                sv, sub = self.__state_variables[sv_name]
+                datatype = DataType(sv.data_type).name
+                atom_qty_per_label += sv.atom_qty(self.__state_variables)
+    
+            subrec_mo_qty = atom_qty_per_label * subrecord.mo_qty
+            datatype_str = type_to_str[datatype]
+            ret_final = str(subrec_mo_qty) + datatype_str
+            ret_final = f"{subrec_mo_qty}{datatype_str}"
         else:
-            ret_final = str()
-            for c in ret:
-                ret_final += c * subrecord.mo_qty
+            ret_final = ""
+            for sv_name in subrecord.svar_names:
+                sv, sub = self.__state_variables[sv_name]
+                datatype = DataType(sv.data_type).name
+                datatype_str = type_to_str[datatype]
+                atom_qty_per_label = sv.atom_qty(self.__state_variables)
+                ret_final += f"{(subrecord.mo_qty * atom_qty_per_label)}{datatype_str}"
 
         return ret_final
 
@@ -1013,7 +1048,7 @@ class Mili:
     This function calls the other reader functions one at a time, spanning the entire
     Mili file.
     '''
-    def read(self, file_name, labeltomili=None, mili_num=None, parallel_read=False):
+    def read(self, file_name, labeltomili=None, mili_num=None, parallel_read=False, processors=None):
         if self.__filename:
             self.__error('This mili object is already instantiated. You must create another.')
             return
@@ -1033,10 +1068,9 @@ class Mili:
         # remove the 'A' at the end of the filename for recursive parallel read
         parallel = [ rootfile[:-1] for rootfile in parallel ]
         
-
         if len( parallel ) > 1:
             self.__filename = file_name
-            self.__split_reads(orig, parallel_read)
+            self.__split_reads(orig, parallel_read, processors)
             return
         else:
             if parallel_read:
@@ -1098,7 +1132,7 @@ class Mili:
 
                 ### SUBRECORD DATA ###
                 self.__readSubrecords(f)
-        
+
         if self.__mili_num is not None:
             return [self.__labeltomili, self.__mesh_object_class_datas]
 
@@ -1129,8 +1163,8 @@ class Mili:
             for name in names:
                 for label in labels:
                     item = Item(name, None, None, label, class_name, modify)
-                    if name in res[state_number-1]:
-                        item.set(res[state_number-1][name][label])
+                    if name in res[state_number]:
+                        item.set(res[state_number][name][label])
                         state.items.append(item)
 
         return answer
@@ -1146,6 +1180,8 @@ class Mili:
         elif 'strain' in name and 'strain' in self.__int_points:
             elem_sets = self.__int_points['strain']
             vars = self.__state_variables['strain'][0].svars
+        elif name in self.__int_points:
+            elem_sets = self.__int_points[name]
         else:
             return False
 
@@ -1161,97 +1197,34 @@ class Mili:
     '''
     Given a single state variable name, a number of states, and a number of label(s) return the requested value(s)
     '''
-    def __variable_at_state(self, subrecord, labels, name, variables, sup_class, clas, sub, res, state, modify=False, int_points=False):
-        
-        mo_search_arr = []
+    def __variable_at_state(self, state, subrecord, subrec_label_indexes, name, variables, sub, res, modify=False, int_points=False):
         indices = {}
         temp_res = { state : { name : {} } }
-        #values = {}  # from label to value
         
-        # Deal with names like vector[component]
-        _, child_variables = self.__parse_name(name)
-        child_variables = [child_variables]
-        # These are the mo_ids we are interested in for this subrecord
-        labels_we_have = list( set(labels) & set(self.__labels[(sup_class,clas)]) )
-        
-        if len(labels_we_have) == 0:
-            return None
-        for label in labels_we_have:
-            mo_search_arr.append([label, self.__labels[(sup_class, clas)][label]])
-
-        mo_index = 0
-        mo_idx_found = []
-
-        # Search subrecord blocks to find what index the mo_ids are at
-        for range in subrecord.mo_blocks:
-            start, end = range
-            for mo_search in mo_search_arr:
-                label, mo_search = mo_search
-                if mo_search >= start and mo_search <= end:
-                    mo_idx_found.append([label, mo_index + mo_search - start])
-            mo_index += (end - start) + 1
-
         indices[sub] = defaultdict(list)
 
-        # Deal with aggregate types and create list of state variable names
-                
-        if name in self.__state_variables and AggregateType(self.__state_variables[name][0].agg_type).name == 'VECTOR':
-            child_variables = self.__state_variables[name][0].svars
-        
         sv_names = []
         sv_group_start = {}
         sv_group_start[0] = 0
         sv_group_len = {}
         group_idx = 0
         
-        for sv in subrecord.svar_names:
-            sv_var = self.__state_variables[sv][0]
-            sv_group_len[group_idx] = max(1, len(sv_var.svars))
-            if group_idx: sv_group_start[group_idx] = sv_group_start[group_idx - 1] + sv_group_len[group_idx]
-            if len(sv_var.svars) > 0:
-                for sv_name in sv_var.svars:
-                    sv_names.append(sv_name)
-            else:
-                sv_names.append(sv)
-            group_idx += 1
-            
-        var_indexes = []
-        for child in child_variables:
-            if child not in sv_names:
-                return self.__error(child + ' not a valid variable name')
-            # var_indexes.append(sv_names.index(child))
-            for sv_group in subrecord.svar_names:
-                if sv_group == child: 
-                    var_indexes.append([subrecord.svar_names.index(sv_group), 0])
-                sv = self.__state_variables[sv_group][0].svars
-                if child in sv:
-                    var_indexes.append([subrecord.svar_names.index(sv_group), sv.index(child)])
-        # Add correct values given organizational structure and correct indexing
         if int_points:
-            int_points, num_int_points = int_points[:-1], int_points[-1:][0]
-
-        for mo_index in mo_idx_found:
-            if int_points: indexes = {}
-            else: indexes = []
-            label, mo_index = mo_index
-            for var_index in var_indexes:
-                var_index, var_in_group = var_index
-                if int_points: var_index = var_in_group
-                if int_points and var_index not in indexes: indexes[var_index] = {}
-                if int_points:
-                    
-                    offset = mo_index * len(sv_names) * num_int_points
-                    
-                    for int_point in int_points:
-                        index = offset + var_index * num_int_points + int_point - 1
-                        indexes[var_index][int_point] = index
+            for sv in subrecord.svar_names:
+                sv_var = self.__state_variables[sv][0]
+                sv_group_len[group_idx] = max(1, len(sv_var.svars))
+                if group_idx: sv_group_start[group_idx] = sv_group_start[group_idx - 1] + sv_group_len[group_idx-1]
+                if len(sv_var.svars) > 0:
+                    sv_names += [ sv_name for sv_name in sv_var.svars ]
                 else:
-                    if subrecord.organization == DataOrganization.OBJECT.value:
-                        indexes.append(mo_index * len(sv_names) + sv_group_start[var_index] + var_in_group)
-                    else:
-                        indexes.append(sv_group_start[var_index] * subrecord.mo_qty + sv_group_len[var_index] * mo_index + var_in_group)
-
-            # 3 different aggregate types here - constructing the res
+                    sv_names.append(sv)
+                group_idx += 1
+            
+        is_vector_type = name in self.__state_variables \
+                         and AggregateType(self.__state_variables[name][0].agg_type).name == 'VECTOR'
+        is_object_ordered = subrecord.organization == DataOrganization.OBJECT.value
+        
+        for label, indexes in subrec_label_indexes.items():
             if int_points:
                 
                 indices[sub][label] = {}
@@ -1267,16 +1240,17 @@ class Mili:
                     for int_point in int_points:
                         
                         temp_res[state][name][label][sv_name][int_point] = variables[indexes[index][int_point]]
-                        indices[sub][label][sv_names[index]][int_point] = indexes[index][int_point]
+                        if modify:
+                            indices[sub][label][sv_names[index]][int_point] = indexes[index][int_point]
                     v_index += 1
-            elif name in self.__state_variables and AggregateType(self.__state_variables[name][0].agg_type).name == 'VECTOR':
-                temp_res[state][name][label] = []
-                for index in indexes:
-                    temp_res[state][name][label].append(variables[index])
-                    indices[sub][label].append(index)
+            elif is_vector_type:
+                temp_res[state][name][label] = [ variables[index] for index in indexes ]
+                if modify:
+                    indices[sub][label] += indexes
             else:
                 temp_res[state][name][label] = variables[indexes[0]]
-                indices[sub][label].append(indexes[0])
+                if modify:
+                    indices[sub][label].append(indexes[0])
 
         # the nested form of the dicts needs to be identical iirc
         self.__recurMergeDicts(res,temp_res)
@@ -1386,7 +1360,7 @@ class Mili:
     '''
     Create processes and read the files
     '''
-    def __split_reads(self, file_name, parallel_read):
+    def __split_reads(self, file_name, parallel_read, processors=None):
         # Handle case of multiple state files
         is_first = True
         end_dir = file_name.rfind(os.sep)
@@ -1401,21 +1375,45 @@ class Mili:
         # strip the A off the end
         parallel = [ f[:-1] for f in parallel ] 
         
+        # Add directory name before each file
+        parallel = [ dir_name + os.sep + p for p in parallel ]
+        
         cpus = psutil.cpu_count(logical=False)
+        if processors is None:
+            processors = cpus
+        if processors > cpus:
+            processors = cpus 
+
         self.__parent_conns = []
-        i = 0
         if len(parallel) > 1:
             self.__filename = file_name
-            for p in parallel:
-                mili = Mili()
-                self.__milis.append(mili)
-                if parallel_read:
+            
+            if parallel_read:
+                # Split files into even groups between processors
+                parallel_count = len(parallel)
+                parallel_groups = [ [] for i in range(processors) ]
+                cur = 0
+                i = 0
+                while cur < parallel_count:
+                    parallel_groups[i].append( parallel[cur] ) 
+                    cur += 1
+                    i += 1
+                    if i == processors:
+                        i = 0
+
+                for mili_num, group in enumerate(parallel_groups):
+                    mili = Mili()
+                    self.__milis.append(mili)
                     parent_conn, child_conn = mp.Pipe()
-                    pr = mp.Process(target=self.__child_read, args=(mili, child_conn, dir_name + os.sep + p, i,))
-                    self.__parent_conns.append([parent_conn, i])
+                    pr = mp.Process(target=self.__child_read, args=(mili, child_conn, group, mili_num,))
+                    self.__parent_conns.append([parent_conn, mili_num])
                     pr.start()
-                else:
-                    labeltomili, mesh_objects = mili.read(dir_name + os.sep + p, mili.__labeltomili, i)
+            else:
+                i = 0
+                for p in parallel:
+                    mili = Mili()
+                    self.__milis.append(mili)
+                    labeltomili, mesh_objects = mili.read(p, mili.__labeltomili, i)
                     if(is_first):
                         is_first=False
                         self.__number_of_state_maps = mili.__number_of_state_maps
@@ -1427,7 +1425,8 @@ class Mili:
                         labmap = mili.__labels[class_name]
                         for label_key in labmap:
                             self.__labeltomili[class_name][label_key].append(i)
-                i += 1
+                    i += 1
+
                 
         if parallel_read:
             # Receive reads from children
@@ -1436,7 +1435,9 @@ class Mili:
                 for conn in self.__parent_conns:
                     conn, i = conn
                     if (conn.poll()):
-                        child_number, mesh_objects, labels = conn.recv()
+                        child_number, mesh_objects, labels, number_of_state_maps = conn.recv()
+                        if self.__number_of_state_maps is None:
+                            self.__number_of_state_maps = number_of_state_maps
                         for mesh_obj in mesh_objects:
                             if mesh_obj not in self.__mesh_object_class_datas:
                                 self.__mesh_object_class_datas[mesh_obj] = mesh_objects[mesh_obj]
@@ -1447,19 +1448,48 @@ class Mili:
                                 self.__labeltomili[class_name][label_key].append(i)
                 
                         activeChildren -= 1
-                        
         
     '''
     Child read and wait process
     '''
-    def __child_read(self, mili, conn, file_name, i):
+    def __child_read(self, mili, conn, file_names, i):
         # Read the file
-        mili.__labeltomili, mesh_objects = mili.read(file_name, mili.__labeltomili, i)
-        
+
+        if len(file_names) == 1:
+            file_name = file_names[0]
+            mili.__labeltomili, mesh_objects = mili.read(file_name, mili.__labeltomili, i)
+            all_labels = mili.__labels
+        else:
+            j = 0
+            is_first = True
+            all_labels = {}
+            for file_name in file_names:
+                nested_mili = Mili()
+                mili.__milis.append(nested_mili)
+                nested_mili.__labeltomili, mesh_objects = nested_mili.read(file_name, nested_mili.__labeltomili, j)
+                if is_first:
+                    is_first = False
+                    mili.__number_of_state_maps = nested_mili.__number_of_state_maps 
+                for mesh_obj in mesh_objects:
+                    if mesh_obj not in mili.__mesh_object_class_datas:
+                        mili.__mesh_object_class_datas[mesh_obj] = mesh_objects[mesh_obj]
+
+                for class_name in nested_mili.__labels:
+                    labmap = nested_mili.__labels[class_name]
+
+                    if class_name in all_labels:
+                        all_labels[class_name].update(nested_mili.__labels[class_name])
+                    else:
+                        all_labels[class_name] = labmap
+
+                    for label_key in labmap:
+                        mili.__labeltomili[class_name][label_key].append(j)
+                        
+                j += 1
+                
         # Send back mesh information and labels
-        conn.send([i, mesh_objects, mili.__labels])
+        conn.send([i, mili.__mesh_object_class_datas, all_labels, mili.__number_of_state_maps])
         
-        answ = defaultdict(dict)
         # ## Wait for querys
         while True:
             # sleep for 5 nanoseconds to reduce contention, this speeds us up by like 3x (just the read goes from 1.7 -> 0.6s on my system)
@@ -1500,17 +1530,24 @@ class Mili:
                 elif query[0] == "get materials":
                     materials = mili.getMaterials()
                     conn.send(materials)
+                elif query[0] == "get nodes":
+                    nodes = mili.getNodes()
+                    conn.send(nodes)
                 else:
                     sv, class_name, material, label, state_numbers, modify, int_points, raw, answ = query
-                    
+
+                    if state_numbers is None:
+                        state_numbers = [] 
+
                     answer = mili.query(sv, class_name, material, label, state_numbers, modify, int_points, raw, answ)
-                
+
                     if not answer:
                         conn.send("Fail")
                     else:
                         state_number_zero = state_numbers if not isinstance(state_numbers, list) else state_numbers[0]
-                        if answ and sv in answ[state_number_zero]:
-                            send_answer = self.__create_answer(answ, sv, material, label, class_name, state_numbers, modify, raw)
+
+                        if answer and sv in answer[state_number_zero]:
+                            send_answer = self.__create_answer(answer, sv, material, label, class_name, state_numbers, modify, raw)
                             conn.send(send_answer)
                         else:
                             conn.send("Fail")
@@ -1549,7 +1586,7 @@ class Mili:
     The following is the structure of the result that is passed to create answer
     res[state][name][label] = value
     '''
-    def query(self, names, class_name, material=None, labels=None, state_numbers=None, modify=False, int_points=False, raw_data=True, res=None):
+    def query(self, names, class_name, material=None, labels=None, state_numbers=None, modify=False, int_points=False, raw_data=True, res=None, use_exact_int_point=False):
         # default args are instantiated at function definition, not when called, this makes mutable types cache modifications between calls
         res = res if res is not None else defaultdict(dict)
         processed_integration_point = False
@@ -1601,6 +1638,11 @@ class Mili:
         if type(state_numbers) is not list or type(state_numbers[0]) is not int:
             return self.__error('state numbers must be an integer or list of integers')
 
+        # Create local list of int points
+        selected_int_points = False
+        if int_points:
+            selected_int_points = [ip for ip in int_points]
+        
         # Deal with parallel Mili file case
         if len(self.__milis):
             answ = defaultdict(dict)
@@ -1626,7 +1668,6 @@ class Mili:
                             milis.add(m)
                     milis = list(milis)
                 if not labels: milis = set([i for i in range(len(self.__milis))])
-                
                 if self.__parallel_mode:
                     mili_conns = []
                     for mili_index in milis:
@@ -1646,78 +1687,213 @@ class Mili:
                     for mili_index in milis:
                         resp = self.__milis[mili_index].query(sv, class_name, material, mili_to_labels[mili_index], state_numbers, modify, int_points, True, answ)
                         # answ is modified in-place, shouldn't need to check/append if something isn't found, should avoid in-place modifications if something isn't found (which is currently happening)
-                        
                 if answ is not None and len(answ) == 0:
                     answ = None
 
             return self.__create_answer(answ, names, material, labels, class_name, state_numbers, modify, raw_data)
 
-        # Run Correct Function
-        for state in state_numbers:
-            if state < 1 or state > len(self.__state_maps):
-                return self.__error('There is no state ' + str(state))
-            state_map = self.__state_maps[state-1]
-            
-            with open(self.__state_map_filename[state_map.file_number], 'rb') as f:
-                state_subrecord_start_offset = state_map.file_offset+8
-                
-                for name in names:
-                    # Handle case of vector[component]
-                    vector, variables = self.__parse_name(name)
-                    if not vector: vector = variables
+        for name in names:
+            # Handle case of vector[component]
+            vector, variables = self.__parse_name(name)
+            if not vector: vector = variables
 
-                    if self.__is_vec_array(vector, class_name):
-                        if 'stress' in name: elem_sets = self.__int_points['stress']
-                        elif 'strain' in name: elem_sets = self.__int_points['strain']
+            # Get the State Variable object and Subrecord numbers for each name
+            if self.__is_vec_array(vector, class_name):
+                if 'stress' in name: elem_sets = self.__int_points['stress']
+                elif 'strain' in name: elem_sets = self.__int_points['strain']
+                elif vector in self.__int_points: elem_sets = self.__int_points[vector]
 
-                        for set_name in elem_sets.keys():
-                            
-                            temp_sv, temp_subrecords = self.__state_variables[set_name]
-                            temp_subrecord = self.__srec_container.subrecs[temp_subrecords[0]]
-                            if temp_subrecord.class_name == class_name:
-                                sv, subrecords = temp_sv, temp_subrecords
-                        if(not processed_integration_point):
-                            if not int_points:
-                                int_points = list(self.__is_vec_array(vector, class_name))
-                            else:
-                                possible_int_points = self.__is_vec_array(vector, class_name)
-                                for i in range(len(int_points)):
-                                    ip = int_points[i]
-                                    if ip not in possible_int_points:
-                                        _, ip = min(enumerate(possible_int_points), key=lambda x: abs(x[1] - ip))
-                                        self.__error(str(ip) + ' is not an integration point, but the closest is ' + str(ip))
-                                        int_points[i] = ip
-                            int_points.append(len(self.__is_vec_array(vector, class_name)))
-                        processed_integration_point = True
-                    elif vector: 
-                        if vector not in self.__state_variables:
-                            return self.__error('There is no variable ' + vector)
-                        sv, subrecords = self.__state_variables[vector]
+                subrecords = []
+                for set_name in elem_sets.keys():
+                    temp_sv, temp_subrecords = self.__state_variables[set_name]
+                    subrecords += temp_subrecords
+                #sv, subrecords = self.__state_variables[vector]
+                if(not processed_integration_point):
+                    if not selected_int_points:
+                        selected_int_points = list(self.__is_vec_array(vector, class_name))
                     else:
-                        if name not in self.__state_variables:
-                            return self.__error('There is no variable ' + name)
-                        sv, subrecords = self.__state_variables[name]
-                     
-                    for sub in subrecords:
-                        f.seek(state_subrecord_start_offset)
-                        
-                        subrecord = self.__srec_container.subrecs[sub]
-                        f.seek(subrecord.offset, 1)
-                        byte_array = f.read(subrecord.size)
-                        s = self.__set_string(subrecord)
-                        
-                        var_data = struct.unpack(self.__tag + s, byte_array)
+                        possible_int_points = self.__is_vec_array(vector, class_name)
+                        for i in range(len(selected_int_points)):
+                            ip = selected_int_points[i]
+                            if ip not in possible_int_points:
+                                if use_exact_int_point is True:
+                                    return None
+                                old_ip = ip
+                                _, ip = min(enumerate(possible_int_points), key=lambda x: abs(x[1] - ip))
+                                self.__error(str(old_ip) + ' is not an integration point, but the closest is ' + str(ip))
+                                selected_int_points[i] = ip
+                    selected_int_points.append(len(self.__is_vec_array(vector, class_name)))
+                processed_integration_point = True
+            elif vector: 
+                if vector not in self.__state_variables:
+                    return self.__error('There is no variable ' + vector)
+                sv, subrecords = self.__state_variables[vector]
+            else:
+                if name not in self.__state_variables:
+                    return self.__error('There is no variable ' + name)
+                sv, subrecords = self.__state_variables[name]
 
-                        if class_name == subrecord.class_name:
-                            sup_class = self.__mesh_object_class_datas[subrecord.class_name].superclass
-                            sup_class = Superclass(sup_class).name
+            # Get only subrecords/subrec num that match the requested class name
+            subrecords = [(self.__srec_container.subrecs[s], s) for s in subrecords if self.__srec_container.subrecs[s].class_name == class_name]
+
+            # get Super class name for requested class
+            sup_class = self.__mesh_object_class_datas[class_name].superclass
+            sup_class = Superclass(sup_class).name
+
+            # Determine the mo_ids we are interested in for these subrecords
+            labels_we_have = list( set(labels) & set(self.__labels[(sup_class, class_name)]) )
+            
+            if len(labels_we_have) == 0:
+                return None
+            
+            _, child_variables = self.__parse_name(name)
+            child_variables = [child_variables]
+            if name in self.__state_variables and AggregateType(self.__state_variables[name][0].agg_type).name == 'VECTOR':
+                child_variables = self.__state_variables[name][0].svars
+
+            if selected_int_points:
+                selected_int_points, num_int_points = selected_int_points[:-1], selected_int_points[-1:][0]
+                vector, variables = self.__parse_name(name)
+                if not vector: vector = variables
+                possible_int_points = self.__is_vec_array(vector, class_name)
+                if possible_int_points is not False:
+                    possible_int_points = list(possible_int_points)
+                else:
+                    # If there are no possible int_points set selected_int_points to False to
+                    # avoid errors
+                    selected_int_points = False
+
+            indices = {}
+            srec_label_indexes = {} # { subrecord name --> { label : indexes } }
+
+            sup_class_labels = self.__labels[(sup_class, class_name)]
+            # For each subrecord, determine which elements (labels) appear in that subrecord
+            # and create a dictionary entry for each subrecord that contains the labels in that
+            # subrecord and the indexes at which the data for that label appears in the subrecord
+            for subrecord, sub in subrecords:
+                mo_idx = 0
+                found_mo_ids = []
+                append_mo_ids = found_mo_ids.append
+                for block_range in subrecord.mo_blocks:
+                    start, end = block_range
+                    for label in labels_we_have:
+                        target_mo = sup_class_labels[label]
+                        if target_mo >= start and target_mo <= end:
+                            append_mo_ids([label, mo_idx + target_mo - start])
+                    mo_idx += (end - start) + 1
+
+                if len(subrecord.mo_blocks) == 0:
+                    # Handle case for Global values, assume label 1
+                    found_mo_ids = [[1,0]]
+
+                srec_label_indexes[subrecord.name] = {}
+                #
+                sv_names = []
+                sv_group_start = {}
+                sv_group_start[0] = 0
+                sv_group_len = {}
+                group_idx = 0
+                
+                for sv in subrecord.svar_names:
+                    sv_var = self.__state_variables[sv][0]
+                    sv_group_len[group_idx] = max(1, len(sv_var.svars))
+                    if group_idx: sv_group_start[group_idx] = sv_group_start[group_idx - 1] + sv_group_len[group_idx-1]
+                    if len(sv_var.svars) > 0:
+                        for sv_name in sv_var.svars:
+                            sv_names.append(sv_name)
+                    else:
+                        sv_names.append(sv)
+                    group_idx += 1
+                    
+                var_indexes = []
+                for child in child_variables:
+                    if child not in sv_names:
+                        return self.__error(child + ' not a valid variable name')
+                    for sv_group in subrecord.svar_names:
+                        if sv_group == child: 
+                            var_indexes.append([subrecord.svar_names.index(sv_group), 0])
+                        sv = self.__state_variables[sv_group][0].svars
+                        if child in sv:
+                            var_indexes.append([subrecord.svar_names.index(sv_group), sv.index(child)])
+
+                # Simplify some of the booleans used in looping below. Performing these checks for every
+                # mo_index can add significant time in larger queries
+                is_vector_type = name in self.__state_variables \
+                                 and AggregateType(self.__state_variables[name][0].agg_type).name == 'VECTOR'
+                is_object_ordered = subrecord.organization == DataOrganization.OBJECT.value
+                len_sv_names = len(sv_names)
+                #
+                for mo_index in found_mo_ids:
+                    label, mo_index = mo_index
+                    if selected_int_points: indexes = {}
+                    else: indexes = []
+                    
+                    for var_index in var_indexes:
+                        var_index, var_in_group = var_index
+                        if selected_int_points: var_index = var_in_group
+                        if selected_int_points and var_index not in indexes: indexes[var_index] = {}
+                        if selected_int_points:
+                            
+                            offset = mo_index * len_sv_names * num_int_points
+                            
+                            for int_point in selected_int_points:
+                                index = offset + var_index + (len_sv_names * possible_int_points.index(int_point))
+                                indexes[var_index][int_point] = index
+                        else:
+                            if is_object_ordered:
+                                indexes.append(mo_index * len_sv_names + sv_group_start[var_index] + var_in_group)
+                            else:
+                                indexes.append(sv_group_start[var_index] * subrecord.mo_qty + sv_group_len[var_index] * mo_index + var_in_group)
+                    srec_label_indexes[subrecord.name][label] = indexes
+
+            # Get only subrecords that contain elements that are being queried
+            subrecords = [ [srec, num] for srec,num in subrecords if srec_label_indexes[srec.name] != {} ]
+
+            if subrecords == []:
+                return None
+
+            # Determine which states (of those requested) appear in each of the state files.
+            # This way we can open each file only once and process all the states that appear in it
+            # rather than opening a state file for each iteration
+            state_file_dict = {}
+            for state in state_numbers:
+                if state < 1 or state > len(self.__state_maps):
+                    return self.__error('There is no state ' + str(state))
+                state_map = self.__state_maps[state-1]
+                fname = self.__state_map_filename[state_map.file_number]
+                try:
+                    state_file_dict[fname].append(state)
+                except KeyError:
+                    state_file_dict[fname] = [ state ]
+            
+            # Before reading and querying results, generate string representations of each subrecord
+            # and pre compile structs for unpacking the data
+            subrec_unpack_funcs = {}
+            for subrecord, sub in subrecords:
+                subrec_name = subrecord.name
+                str_repr = self.__tag + self.__set_string(subrecord)
+                subrec_unpack_func = struct.Struct(str_repr).unpack
+                subrec_unpack_funcs[subrec_name] = subrec_unpack_func
+
+            for state_file_name, state_nums in state_file_dict.items():
+                with open(state_file_name, 'rb') as state_file:
+                    # Loop over all states that appear in this state file
+                    for state in state_nums:
+                        state_offset = self.__state_maps[state-1].file_offset+8
+
+                        for subrecord, sub in subrecords:
+                            state_file.seek(state_offset + subrecord.offset)
+                            byte_array = state_file.read(subrecord.size)
+                            #### Offset into byte array and parse out the values we want
+                            var_data = subrec_unpack_funcs[subrecord.name](byte_array)
 
                             if modify:
-                                return self.__variable_at_state(subrecord, labels, name, var_data, sup_class, subrecord.class_name, sub, res, state-1, modify, int_points)
+                                return self.__variable_at_state(state, subrecord, srec_label_indexes[subrecord.name], name, var_data, sub, res, modify, selected_int_points)
                             else:
-                                res = self.__variable_at_state(subrecord, labels, name, var_data, sup_class, subrecord.class_name, sub, res, state-1, modify, int_points)
-        
+                                res = self.__variable_at_state(state, subrecord, srec_label_indexes[subrecord.name], name, var_data, sub, res, modify, selected_int_points)
+
         return self.__create_answer(res, names, material, labels, class_name, state_numbers, modify, raw_data)
+
 
     '''
     Given a specific material. Find all mo_ids with that material and return
@@ -1927,10 +2103,9 @@ class Mili:
             state_numbers = [state_numbers]
         if type(labels) is int:
             labels = [labels]
-        if int_points:
-            int_points = int_points[:len(int_points) - 1]
         if type(state_variable) is not str:
             return self.__error('state variable must be a string')
+
         for state in state_numbers:
             if state < 1 or state > len(self.__state_maps):
                 return self.__error('There is no state ' + str(state))
@@ -1967,46 +2142,38 @@ class Mili:
                     sv, subrecords = self.__state_variables[name]
 
                 for sub in subrecords:
+                    # Read in subrecord
                     subrecord = self.__srec_container.subrecs[sub]
                     f.seek(state_subrecord_start_offset+subrecord.offset)
+                    data = f.read( subrecord.size )
                     s = self.__set_string(subrecord)
+                    var_data = list( struct.unpack(self.__tag + s, data) )
 
-                    # Iterate through s, the string representation of the subrecord, adding
-                    # offset along the way
-                    for label in labels:
-                        if int_points:
+                    # Update value in subrecord
+                    if int_points:
+                        # indices has form: indices[sub][label][sv_name][int_point] = position in subrecord
+                        vector, component = self.__parse_name(name)
+                        if vector: n = vector
+                        else: n = name
+
+                        for label in labels:
                             for sv_name in indices[sub][label]:
                                 int_point_to_index = indices[sub][label][sv_name]
                                 for ip in int_points:
-                                    offset = 0
-                                    for i in range(indices[sub][label][sv_name][ip]):
-                                        char = s[i]
-                                        offset += ExtSize[type_to_str[char]].value
-                                    f.seek(offset, 1)
-
-                                    vector, component = self.__parse_name(name)
-                                    if vector: n = vector
-                                    else: n = name
-
-                                    byte_array = struct.pack(self.__tag + s[int_point_to_index[ip]], value[state][n][label][sv_name][ip])
-                                    f.write(byte_array)
-                                    f.seek(-offset - len(byte_array), 1)
-                        else:
-                            for idx in range(len(indices[sub][label])):
-                                offset = 0
-                                for i in range(indices[sub][label][idx]):
-                                    char = s[i]
-                                    offset += ExtSize[type_to_str[char]].value
-
-                                # Seek to variable location and write in the byte array
-                                f.seek(offset, 1)
-                                if type(value[state][name][label]) is not list:
-                                    value[state][name][label] = [value[state][name][label]]
-                                to_write = value[state][name][label][idx]
-                                byte_array = struct.pack(self.__tag + s[indices[sub][label][idx]], to_write)
-                                
-                                f.write(byte_array)
-                                f.seek(-offset - len(byte_array), 1)
+                                    var_data[int_point_to_index[ip]] = value[state][n][label][sv_name][ip]
+                                        
+                    else:
+                        # indices has form: indices[sub][label] = list of positions in subrecord
+                        for label in labels:
+                            if type(value[state][name][label]) is not list:
+                                value[state][name][label] = [ value[state][name][label] ]
+                            for idx in range( len(indices[sub][label]) ):
+                                var_data[indices[sub][label][idx]] = value[state][name][label][idx]
+                    
+                    # Write out updated subrecord
+                    byte_array = struct.pack(self.__tag + s, *var_data)
+                    f.seek(state_subrecord_start_offset + subrecord.offset)
+                    f.write(byte_array)
 
                 if 'post_modified' in self.__params:
                     file_number, directory = self.__params['post_modified']
@@ -2036,7 +2203,8 @@ def main():
                        modify=False, 
                        int_points=False, 
                        raw_data=True, 
-                       res=None):
+                       res=None,
+                       use_exact_int_point=False):
     """
     #f = 'parallel/d3samp6.plt'
     #f='/p/lustre1/depiero/2020_08_19_073746_4370645/'
