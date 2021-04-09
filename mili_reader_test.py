@@ -545,12 +545,12 @@ class TestMiliParallelReaderThreaded(unittest.TestCase):
     def setUp(self):
         file_name = 'parallel/d3samp6.plt'
         self.mili = reader.Mili()
-        self.mili.read(file_name, parallel_read=False)
+        self.mili.read(file_name, parallel_read=True)
         self.mili.setErrorFile()   
 
     def tearDown(self):
         # Ensures that created processes are all killed at end of testing
-        del self.mili
+        self.mili.closeAllConnections()
     
     '''
      Testing invalid inputs

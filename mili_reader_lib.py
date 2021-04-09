@@ -493,6 +493,7 @@ class Mili:
             conn, i = conn
             conn.send("End")
             conn.close()
+        self.__parent_conns = []
     
     '''
     Getter for params
@@ -1380,9 +1381,14 @@ class Mili:
         
         cpus = psutil.cpu_count(logical=False)
         if processors is None:
+            # If processors not set, limit to number of cpus
             processors = cpus
         if processors > cpus:
+            # If more processors requested than cpus, limit to cpus
             processors = cpus 
+        if processors > len(parallel):
+            # If more processors requested than "A" files, limit to number of "A" files
+            processors = len(parallel)
 
         self.__parent_conns = []
         if len(parallel) > 1:
@@ -1495,6 +1501,7 @@ class Mili:
             # sleep for 5 nanoseconds to reduce contention, this speeds us up by like 3x (just the read goes from 1.7 -> 0.6s on my system)
             if conn.poll(5/1000000):
                 query = conn.recv()
+
                 if query == "End":
                     conn.close()
                     return
