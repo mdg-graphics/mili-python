@@ -560,17 +560,18 @@ class Mili:
     
     def __getHelper(self, message):
         mili_conns = []
-        ret = []
+        ret = {}
         for mili_index in range(len(self.__parent_conns)):
             mili_conn, i = self.__parent_conns[mili_index]
             mili_conn.send([message])
-            mili_conns.append(mili_conn)
+            mili_conns.append([mili_conn,i])
         
         while len(ret) < len(mili_conns):
             for mili_conn in mili_conns:
+                mili_conn, i = mili_conn
                 if mili_conn.poll():
                     query_response = mili_conn.recv()
-                    ret.append(query_response)
+                    ret[i] = query_response
         return ret
     '''
     Reads the data for statemap locations from the Mili file.
@@ -1507,6 +1508,9 @@ class Mili:
                     return
                 if query[0] == "Error file":
                     mili.__error_file = query[1]
+                    if len(self.__milis):
+                        for m in mili.__milis:
+                            m.__error_file = query[1]
                 elif query[0] == "labels of material":
                     material = query[1]
                     conn.send(mili.labels_of_material(material))
