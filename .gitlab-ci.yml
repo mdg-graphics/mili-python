@@ -4,7 +4,7 @@ workflow:
         - when: always
 
 before_script:
-    - python --version
+    - python3 --version
 
 stages:
     - Test
@@ -15,4 +15,4 @@ run_tests:
         - rzgenie
         - shell
     script:
-        - python mili_reader_test.py
+        - python3 mili_reader_test.py
