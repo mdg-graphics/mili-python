@@ -1,0 +1,18 @@
+workflow:
+    rules:
+        - if: $CI_MERGE_REQUEST_ID
+        - when: always
+
+before_script:
+    - python3 --version
+
+stages:
+    - Test
+
+run_tests:
+    stage: Test
+    tags:
+        - rzgenie
+        - shell
+    script:
+        - python3 mili_reader_test.py
