@@ -427,13 +427,22 @@ class Search:
             self.__table[variable_name][mili_class_name] = []
         self.__table[variable_name][mili_class_name].append(subrecord)
                     
-'''
-A Mili object contains data structures to store objects such as directories
-and subrecords. It also has a number of querying functions that a user can call
-to access this data. Takes in the path of the file to read
-'''
 class Mili:
-    def __init__(self, read_file=None, parallel_read=False, processors=None):
+    def __init__(self, read_file=None, parallel_read=False, processors=None, a_files=None):
+        """Mili Class.
+
+        A Mili object contains data structures to store objects such as directories
+        and subrecords. It also has a number of querying functions that a user can call
+        to access this data. Takes in the path of the file to read.
+
+        Args:
+            read_file (str): The base name of the plot file data. Defaults to None.
+            parallel_read (bool): Flag to turn on/off reading in parallel. Defaults to False.
+            processors (int): The number of processors to use when reading in parallel. Defaults
+                to None. This means that all available processors are used.
+            a_files (List[int]): List of A file processor suffixes to read in. This defaults to None,
+                but can be used to limit the A files that are read in, if desired.
+        """
         self.__milis = []  # list of parallel mili files
         self.__parent_conns = []  # list of parent connection, index number
         self.__mili_num = None  # Number of mili file (processor number)
@@ -472,11 +481,14 @@ class Mili:
         self.__error_file = None
         self.__parallel_mode = parallel_read
 
+        # Number of A files. Defaults to 1. If there are multiple A files, then this will be updates by __split_reads
+        self.A_file_count = 1 
+
         if processors is not None and  processors <= 1:
             processors = 1
             self.__parallel_mode = False
 
-        if read_file: self.read(read_file, parallel_read=self.__parallel_mode, processors=processors)
+        if read_file: self.read(read_file, parallel_read=self.__parallel_mode, processors=processors, a_files=a_files)
 
         # This ensures that all connections are closed, when program end/ ctrl+c or ctrl+d are used
         # in the interactive console. Previously the closing of these connections was handled by
@@ -1046,11 +1058,21 @@ class Mili:
 
         return ret_final
 
-    '''
-    This function calls the other reader functions one at a time, spanning the entire
-    Mili file.
-    '''
-    def read(self, file_name, labeltomili=None, mili_num=None, parallel_read=False, processors=None):
+    def read(self, file_name, labeltomili=None, mili_num=None, parallel_read=False, processors=None, a_files=None):
+        """Reads in Mili plot file.
+
+        This function calls the other reader functions one at a time, spanning the entire Mili file.
+
+        Args:
+            file_name (str): The base name of the Mili database.
+            labeltomili ():
+            mili_num (int):
+            processors (int): The number of processors to use if reading in parallel. None means use
+                as many as are available.
+            a_files (List[int]): A list of the A files to read. This can be used to read a limited
+                number of the plot files for an uncombined database. This defaults to None and 
+                can only be used for uncombined databases.
+        """
         if self.__filename:
             self.__error('This mili object is already instantiated. You must create another.')
             return
@@ -1067,12 +1089,13 @@ class Mili:
 
         attfile_re = re.compile(re.escape(file_name) + "[0-9]*A$")
         parallel = list(filter(attfile_re.match,os.listdir(dir_name)))
+
         # remove the 'A' at the end of the filename for recursive parallel read
         parallel = [ rootfile[:-1] for rootfile in parallel ]
         
         if len( parallel ) > 1:
             self.__filename = file_name
-            self.__split_reads(orig, parallel_read, processors)
+            self.__split_reads(orig, parallel_read, processors, a_files)
             return
         else:
             if parallel_read:
@@ -1359,10 +1382,21 @@ class Mili:
         return labels
         
     
-    '''
-    Create processes and read the files
-    '''
-    def __split_reads(self, file_name, parallel_read, processors=None):
+    def __split_reads(self, file_name, parallel_read, processors=None, a_files=None):
+        """Process and read uncombined plot files.
+
+        If parallel_read is set to True the multiple processes are created and the plot files are
+        split between them and read. If parallel_read is set to False, then the plot files are
+        processed and read serially.
+
+        Args:
+            file_name (str): The base file name for the plot database.
+            parallel_read (bool): Flag to turn on/off reading in parallel.
+            processors (int): The number of processors to be used when reading in parallel. Defaults
+                to None, meaning it uses all available processors.
+            a_files (List[int]): List of A file processor suffixes to be read in. This defaults to 
+                None, meaning all A files are processed and read. 
+        """
         # Handle case of multiple state files
         is_first = True
         end_dir = file_name.rfind(os.sep)
@@ -1374,8 +1408,22 @@ class Mili:
         
         attfile_re = re.compile(re.escape(file_name) + "[0-9]*A$")
         parallel = list(filter(attfile_re.match,os.listdir(dir_name)))
+
+        # Only read specified files if requested.
+        if a_files is not None:
+            new_parallel = []
+            for a_file_suffix in a_files:
+                a_file_suffix_re = f"{re.escape(file_name)}[0]*{str(a_file_suffix)}A$"
+                for pfile in parallel:
+                    if re.match(a_file_suffix_re, pfile):
+                        new_parallel.append(pfile)
+            parallel = new_parallel
+
         # strip the A off the end
         parallel = [ f[:-1] for f in parallel ] 
+
+        # Record number of a files
+        self.A_file_count = len(parallel)
         
         # Add directory name before each file
         parallel = [ dir_name + os.sep + p for p in parallel ]
@@ -1518,8 +1566,8 @@ class Mili:
                     material = query[1]
                     conn.send(mili.nodes_of_material(material))
                 elif query[0] == "nodes of elem":
-                    label, class_name = query[1]
-                    conn.send(mili.nodes_of_elem(label, class_name))
+                    label, class_name, raw_data, global_ids = query[1]
+                    conn.send(mili.nodes_of_elem(label, class_name, raw_data, global_ids))
                 elif query[0] == "modify":
                     state_variable, class_name, value, labels, state_numbers, int_points = query[1:]
                     mili.modify_state_variable(state_variable, class_name, value, labels, state_numbers, int_points)
@@ -1545,12 +1593,12 @@ class Mili:
                     nodes = mili.getNodes()
                     conn.send(nodes)
                 else:
-                    sv, class_name, material, label, state_numbers, modify, int_points, raw, answ = query
+                    sv, class_name, material, label, state_numbers, modify, int_points, raw, answ, use_exact_int_point = query
 
                     if state_numbers is None:
                         state_numbers = [] 
 
-                    answer = mili.query(sv, class_name, material, label, state_numbers, modify, int_points, raw, answ)
+                    answer = mili.query(sv, class_name, material, label, state_numbers, modify, int_points, raw, answ, use_exact_int_point)
 
                     if not answer:
                         conn.send("Fail")
@@ -1683,7 +1731,7 @@ class Mili:
                     mili_conns = []
                     for mili_index in milis:
                         mili_conn, i = self.__parent_conns[mili_index]
-                        mili_conn.send([sv, class_name, material, mili_to_labels[mili_index], state_numbers, modify, int_points, True, answ])
+                        mili_conn.send([sv, class_name, material, mili_to_labels[mili_index], state_numbers, modify, int_points, True, answ, use_exact_int_point])
                         mili_conns.append(mili_conn)
                 
                     while failcount < len(milis):
@@ -1696,7 +1744,7 @@ class Mili:
                                     failcount += 1
                 else:
                     for mili_index in milis:
-                        resp = self.__milis[mili_index].query(sv, class_name, material, mili_to_labels[mili_index], state_numbers, modify, int_points, True, answ)
+                        resp = self.__milis[mili_index].query(sv, class_name, material, mili_to_labels[mili_index], state_numbers, modify, int_points, True, answ, use_exact_int_point)
                         # answ is modified in-place, shouldn't need to check/append if something isn't found, should avoid in-place modifications if something isn't found (which is currently happening)
                 if answ is not None and len(answ) == 0:
                     answ = None
@@ -1966,12 +2014,11 @@ class Mili:
                     serial = serial_function(m, data_send)
                     if serial: accumulater = function(set(serial), accumulater)
                 elif message == "nodes of elem":
-                    label, class_name = data_send
-                    val = serial_function(m, label, class_name)
+                    label, class_name, raw_data, global_ids = data_send
+                    val = serial_function(m, label, class_name, raw_data, global_ids)
                     if val: accumulater = val
                 else: 
                     accumulater = function(serial_function(m, data_send), accumulater)
-            
         
         return accumulater
 
@@ -2043,10 +2090,10 @@ class Mili:
     '''
     Find nodes associated with an element number
     '''
-    def nodes_of_elem(self, label, class_name, raw_data=True):
+    def nodes_of_elem(self, label, class_name, raw_data=True, global_ids=False):
         labels = None
         if len(self.__milis) > 1:
-            labels = self.__get_children_info(None, None, "nodes of elem", [label, class_name], Mili.nodes_of_elem)
+            labels = self.__get_children_info(None, None, "nodes of elem", [label, class_name, True, global_ids], Mili.nodes_of_elem)
             if not labels: 
                 return self.__error("Class name '" + str(class_name) + "' or label '" + str(label) + "' not found in datamaste files.")
         else:
@@ -2058,7 +2105,21 @@ class Mili:
             if label not in self.__labels[(sup_class, class_name)]:
                 return self.__error('label ' + str(label) + ' not found')
             mo_id = self.__labels[(sup_class, class_name)][label]
+
+            if class_name not in self.__connectivity:
+                return self.__error('Class name ' + class_name + ' has no connectivity')
             labels = self.__connectivity[class_name][mo_id]
+
+            if labels is not None and global_ids is True:
+                # Convert local ids to globals ids
+                global_labels = []
+                labels_list = list(self.__labels[("M_NODE", "node")].values())
+                keys_list = list(self.__labels[("M_NODE", "node")].keys())
+                for l in labels:
+                    pos = labels_list.index(l)
+                    gid = keys_list[pos]
+                    global_labels.append(gid)
+                labels = global_labels
 
         if raw_data:
             return labels
