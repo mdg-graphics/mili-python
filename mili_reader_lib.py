@@ -1352,7 +1352,7 @@ class Mili:
             with open(self.__error_file, 'a+') as f:
                 f.write(msg + '\n')
             return
-        #print(msg)
+        print(msg)
         return
 
     '''
