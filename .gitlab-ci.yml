@@ -1,18 +1,58 @@
 workflow:
     rules:
-        - if: $CI_MERGE_REQUEST_ID
         - when: always
 
-before_script:
-    - python3 --version
+variables:
+    PYTHON_BIN: "/usr/tce/packages/python/python-3.7.2/bin"
+    VENV_NAME: "venv-mili-python-3.7.2"
+    VENV_INSTALL_ARGS: "--find-links=https://www-lc.llnl.gov/python/wheelhouse --no-cache-dir"
+    COVERAGE_VERSION: "5.5"
+    MINIMUM_COVERAGE: "86"
 
 stages:
-    - Test
+    - test
+    - coverage
 
 run_tests:
-    stage: Test
+    stage: test
     tags:
         - rzgenie
         - shell
     script:
+        # Print out Python3 version for debug
+        - python3 --version
+        # Run testing
         - python3 mili_reader_test.py
+    
+coverage_testing:
+    stage: coverage
+    tags:
+        - rzgenie
+        - shell
+    rules:
+        - if: "$CI_COMMIT_BRANCH == 'master'"
+          when: always # If master branch always install virtual env
+        - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
+          when: always # If merge_request always install virtual env
+        - when: never
+    before_script:
+        # Setup virtual environment
+        - $PYTHON_BIN/virtualenv --system-site-packages $VENV_NAME
+        # Install coverage module 4.0 or higher so we can use --concurrency
+        - $VENV_NAME/bin/pip3 install $VENV_INSTALL_ARGS coverage==$COVERAGE_VERSION
+        # Activate
+        - . ${VENV_NAME}/bin/activate
+    script:
+        - coverage --version
+        - coverage run mili_reader_test.py
+        - coverage combine
+        - coverage xml
+        - coverage report --fail-under=$MINIMUM_COVERAGE
+    artifacts:
+        when: always
+        paths:
+            - coverage.xml
+        reports:
+            cobertura: coverage.xml
+        expire_in: 1 week
+    coverage: '/TOTAL.+?([0-9]+\%)$/'

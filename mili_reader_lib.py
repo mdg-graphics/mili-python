@@ -578,7 +578,7 @@ class Mili:
             mili_conn.send([message])
             mili_conns.append([mili_conn,i])
         
-        while len(ret) < len(mili_conns):
+        while len(list(ret.keys())) < len(mili_conns):
             for mili_conn in mili_conns:
                 mili_conn, i = mili_conn
                 if mili_conn.poll():
@@ -1213,9 +1213,10 @@ class Mili:
         set_names = elem_sets.keys()
         for set_name in set_names:
             temp_sv, temp_subrecords = self.__state_variables[set_name]
-            temp_subrecord = self.__srec_container.subrecs[temp_subrecords[0]]
-            if temp_subrecord.class_name == class_name:
-                return elem_sets[set_name][0]
+            if temp_subrecords != []:
+                temp_subrecord = self.__srec_container.subrecs[temp_subrecords[0]]
+                if temp_subrecord.class_name == class_name:
+                    return elem_sets[set_name][0]
 
         return False
 
@@ -1427,7 +1428,10 @@ class Mili:
         
         # Add directory name before each file
         parallel = [ dir_name + os.sep + p for p in parallel ]
-        
+
+        # Sort in ascending order by processor number.
+        parallel.sort() 
+
         cpus = psutil.cpu_count(logical=False)
         if processors is None:
             # If processors not set, limit to number of cpus
