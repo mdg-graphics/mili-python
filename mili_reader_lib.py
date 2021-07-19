@@ -886,7 +886,8 @@ class Mili:
                 if directory.type_idx == DirectoryType.ELEM_CONNS.value:
                     f.seek(directory.offset_idx)
                     short_name = directory.strings[0]
-                    self.__connectivity[short_name] = {}
+                    if short_name not in self.__connectivity.keys():
+                        self.__connectivity[short_name] = {}
                     superclass, qty_blocks = struct.unpack('2i', f.read(8))
                     elem_blocks = struct.unpack(str(2 * qty_blocks) + 'i', f.read(8 * qty_blocks))
                     for j in range(0, len(elem_blocks), 2):
@@ -903,7 +904,7 @@ class Mili:
                         off = elem_blocks[j * 2] - 1
                         elem_qty = elem_blocks[j * 2 + 1] - elem_blocks[j * 2] + 1
 
-                        mo_id = 1
+                        mo_id = len(self.__connectivity[short_name].keys()) + 1
                         for k in range(index, len(ebuf), word_qty):
                             self.__connectivity[short_name][mo_id] = []
                             mat = ebuf[k + conn_qty]
