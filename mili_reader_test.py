@@ -1243,5 +1243,146 @@ class TestMiliParallelReaderThreadedSetProcessorCount(unittest.TestCase):
         self.assertEqual(answer.state_answers[0].items[0].value['sy'][2], dd)
 
 
+'''
+Testing the Mili Reader when reading in a subset of "A" files.
+'''
+class TestMiliReaderWithSubsetOfAFiles(unittest.TestCase):
+    '''
+    Set up the mili file object
+    '''
+    def setUp(self):
+        file_name = 'parallel/d3samp6.plt'
+        self.mili = reader.Mili()
+        self.mili.read(file_name, parallel_read=True, a_files=[3,4])
+        self.mili.setErrorFile()   
+
+    def tearDown(self):
+        # Ensures that created processes are all killed at end of testing
+        self.mili.closeAllConnections()
+
+    '''
+    Testing invalid inputs
+    '''
+    def test_invalid_inputs(self):
+        tests = [ self.mili.labels_of_material('es_13121'),
+                  self.mili.nodes_of_material('es_13121'),
+                  self.mili.nodes_of_elem('1', 'bsseam'),
+                  self.mili.nodes_of_elem('-1', 'beam'),
+                  self.mili.query(['nodpos[uxxx]'], 'node', labels=4, state_numbers=3),
+                  self.mili.query(['nodposss[ux]'], 'node', labels=4, state_numbers=3),
+                  self.mili.query(['nodpos[ux]'], 'nodels', labels=4, state_numbers=3),
+                  self.mili.query(['nodpos[ux]'], 'node', material='cat', labels=4, state_numbers=3),
+                  self.mili.query(['nodpos[ux]'], 'node', labels=-4, state_numbers=3),
+                  self.mili.query(['nodpos[ux]'], 'node', labels=4, state_numbers=300),
+                  self.mili.query(['nodpos[ux]'], 4, labels=4, state_numbers=300),
+                  self.mili.query([4], 'node', labels=4, state_numbers=300),
+                  self.mili.query(['nodpos[ux]'], 'node', material=9, labels=4, state_numbers=300),
+                  self.mili.query(['nodpos[ux]'], 'node', labels='cat', state_numbers=300),
+                  self.mili.query(['nodpos[ux]'], 'node', labels=4, state_numbers='cat'),
+                  self.mili.query(['nodpos[ux]'], 'node', labels=4, state_numbers=3, modify='cat'),
+                  self.mili.query(['nodposss[ux]'], 'node', labels=4, state_numbers=3, modify=False, int_points='cat'),
+                  self.mili.query(['nodposss[ux]'], 'node', labels=4, state_numbers=3, modify=False, raw_data='cat') ]
+        assert( not any( tests ) )
+
+    """
+    Testing Labels getter
+    """
+    def test_get_labels(self):
+        PROC_3_LABELS = {('M_NODE', 'node'): {12: 1, 13: 2, 14: 3, 15: 4, 49: 5, 50: 6, 51: 7, 52: 8, 53: 9, 54: 10, 55: 11, 56: 12, 65: 13, 66: 14, 69: 15, 70: 16, 73: 17, 74: 18, 77: 19, 78: 20, 81: 21, 82: 22, 85: 23, 86: 24, 89: 25, 90: 26, 93: 27, 94: 28, 97: 29, 98: 30, 101: 31, 102: 32, 105: 33, 106: 34, 109: 35, 110: 36}, ('M_HEX', 'brick'): {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6}, ('M_QUAD', 'shell'): {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6}, ('M_QUAD', 'cseg'): {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 13: 7, 14: 8, 15: 9, 16: 10, 17: 11, 18: 12}, ('M_MESH', 'glob'): {1: 1}, ('M_MAT', 'mat'): {1: 1, 2: 2, 3: 3, 4: 4, 5: 5}} 
+        PROC_4_LABELS = {('M_NODE', 'node'): {3: 1, 4: 2, 5: 3, 6: 4, 7: 5, 12: 6, 13: 7, 16: 8, 21: 9, 22: 10, 25: 11, 29: 12, 30: 13, 31: 14, 32: 15, 33: 16, 34: 17, 37: 18, 38: 19, 39: 20}, ('M_BEAM', 'beam'): {2: 1, 3: 2, 12: 3, 13: 4, 17: 5, 22: 6, 23: 7, 24: 8, 25: 9, 27: 10, 28: 11, 32: 12, 33: 13, 34: 14}, ('M_MESH', 'glob'): {1: 1}, ('M_MAT', 'mat'): {1: 1, 2: 2, 3: 3, 4: 4, 5: 5}}
+
+        labels = self.mili.getLabels()
+
+        self.assertEqual(labels[0], PROC_3_LABELS)
+        self.assertEqual(labels[1], PROC_4_LABELS)
+
+    """
+    Testing the getMaterials() method of the Mili class.
+    """
+    def test_materials_getter(self):
+        materials = self.mili.getMaterials()
+
+        PROC_3_MATERIALS = {2: {'brick': [1, 2, 3, 4, 5, 6]}, 3: {'shell': [1, 2, 3, 4, 5, 6]}, 4: {'cseg': [1, 2, 3, 4, 5, 6]}, 5: {'cseg': [7, 8, 9, 10, 11, 12]}}
+        PROC_4_MATERIALS = {1: {'beam': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]}}
+
+        self.assertEqual(materials[0], PROC_3_MATERIALS)
+        self.assertEqual(materials[1], PROC_4_MATERIALS)
+    
+
+    """
+    Testing the getStateVariables() method of the Mili class.
+    """
+    def test_statevariables_getter(self):
+        state_variables = self.mili.getStateVariables()
+
+        SVAR_PROC_3_CNT = 134
+        SVAR_PROC_4_CNT = 126
+
+        self.assertEqual(len(state_variables[0]), SVAR_PROC_3_CNT)
+        self.assertEqual(len(state_variables[1]), SVAR_PROC_4_CNT)
+
+
+    """
+    Test querying for results that do not exist on processor files 3 or 4
+    """
+    def test_query_invalid_results(self):
+        invalid_queries = [
+            self.mili.query("ax", "node", labels=[111,112,113]),
+            self.mili.query("sx", "brick", labels=[7,8,9]),
+            self.mili.query("sx", "shell", labels=[7,8,9]),
+            self.mili.query("axf", "beam", labels=[1,4,5,6,]),
+            self.mili.nodes_of_elem(7, "brick", False)
+        ]
+        assert( not any(invalid_queries) )
+
+    '''
+    Testing what nodes are associated with a label
+    '''
+    def test_nodes_label(self):
+        answer = self.mili.nodes_of_elem(1, 'brick', False, global_ids=True)
+        arr = [65, 81, 85, 69, 66, 82, 86, 70]
+        self.assertEqual(len(answer.items), 8)
+        for i in range(len(answer.items)):
+           self.assertEqual(answer.items[i].label, arr[i])
+    
+    '''
+    Testing accessing accessing node attributes -> this is a vector component
+    Tests both ways of accessing vector components (using brackets vs not)
+    *Note* this is another case of state variable
+    '''
+    def test_node_attributes(self):
+        answer = self.mili.query(['nodpos[ux]'], 'node', None, [70], [3], None, None, False)
+        self.assertEqual(answer.state_answers[0].items[0].value, 0.4330127537250519)
+        
+        answer = self.mili.query(['ux'], 'node', None, [70], [3], None, None, False)
+        self.assertEqual(answer.state_answers[0].items[0].value, 0.4330127537250519)
+    
+    '''
+    Test querying by material name and number:
+    '''
+    def test_query_material(self):
+        answer = self.mili.query('sx', 'brick', 2, None, [37], raw_data=False)
+        self.assertEqual(len(answer.state_answers[0].items), 6)
+        
+        answer = self.mili.query('sx', 'brick', 'es_12', None, [37], raw_data=False)
+        self.assertEqual(len(answer.state_answers[0].items), 6)
+
+    '''
+    Test accessing a vector array
+    '''
+    def test_state_variable_vector_array(self):
+        answer = self.mili.query('stress', 'beam', labels=[12], state_numbers=[70], int_points=[2], raw_data=False)
+        d = {'sx': {2: 395.00811767578125}, 'sy': {2: 118.7711410522461}, 'sz': {2: 6088.36376953125}, 'sxy': {2: 216.87445068359375}, 'syz': {2: 1735.9781494140625}, 'szx': {2: 3308.8525390625}}
+        self.assertEqual(answer.state_answers[0].items[0].value, d)
+
+    '''
+    Test accessing a vector array component
+    '''
+    def test_state_variable_vector_array_component(self):
+        answer = self.mili.query('stress[sy]', 'beam', None, [12], [70], False, [2], False)
+        d = {'sy': {2: 118.7711410522461}}
+        self.assertEqual(answer.state_answers[0].items[0].value, d)
+
+# Run the testing
 if __name__ == '__main__':
     unittest.main()
