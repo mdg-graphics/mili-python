@@ -25,6 +25,8 @@ Copyright (c) 2016, Lawrence Livermore National Security, LLC.
 
 
 """
+from cProfile import label
+from _collections import OrderedDict
 '''
 This is the 'meta' information for a statemap, but not the statemap itself.
 '''
@@ -37,12 +39,12 @@ import time
 import re
 import atexit
 import pdb
+from mili_combiner_optparser import parseParameters, gather_A_files
 
 from enum import Enum
 import psutil
 
 import multiprocessing as mp
-
 
 class StateMap:
     def __init__(self, file_number, file_offset, time, state_map_id):
@@ -64,6 +66,7 @@ class Directory:
         self.length_idx = length_idx
         self.string_offset_idx = string_offset_idx
         self.strings = []
+    
     def addStrings( self, strings ):
         assert( len(strings) == self.string_qty_idx )
         self.strings = strings
@@ -426,7 +429,102 @@ class Search:
         if mili_class_name not in self.__table[variable_name].keys():
             self.__table[variable_name][mili_class_name] = []
         self.__table[variable_name][mili_class_name].append(subrecord)
-                    
+
+class MiliCombiner:
+    def __init__(self, base_name, parameters):
+        
+        print(parameters)
+        self.file_name = str()
+        self.__header = None
+        self.__outputName = parameters["output_file"]
+        self.__complete_path = parameters["input_dir"]+os.sep+parameters["input_file"]
+        mili = Mili()
+        if(mili == None):
+            return None
+        
+        mili.read(self.__complete_path)
+        
+        #Read header and write the information.  It is the same for all processors
+        self.__header = mili.getHeader()
+        mili_taur = struct.unpack('4s', self.__header[:4])[0].decode('ascii')
+        assert(mili_taur == 'mili' or mili_taur == 'taur')
+        
+        self.__header_version, self.__directory_version, self.__endian_flag, self.__precision_flag, self.__state_file_suffix_length, self.__partition_flag = \
+            struct.unpack('6b', self.__header[4:10])
+
+        if self.__endian_flag == 1:
+            self.__tag = '>'
+        else:
+            self.__tag = '<'
+
+        #Get all the processor's timesteps      
+        self.timestep_maps = mili.getStateMaps()
+        if mili.getProcessorCount() != len(self.timestep_maps):
+            print("Number of processors and state maps do not match")
+            return None
+        
+        self.max_state = int()
+        
+        #Do a quick run over the time steps and only do the lowest number of steps available
+        for state in range(0,len(self.timestep_maps)):
+            if state == 0:
+                self.max_state = len(self.timestep_maps[state])
+            else:
+                if self.max_state > len(self.timestep_maps[state]):
+                    self.max_state = len(self.timestep_maps[state])
+        
+        params = mili.getParams()
+        
+        for param in params:
+            print(type(param))
+            for key in param.keys():
+                print(key, param[key])
+            
+        
+        
+        self.incoming_directories = mili.getDirectories()
+        
+        self.master_index = [0]*4
+        labels = mili.getLabels()
+        
+        
+        self.__label_mapping, self.__global_ident_mapping = self.__createGlobalMapping(labels)
+        print(self.__label_mapping)
+        print(list(self.__label_mapping['shell']['map'].keys()))
+        print(list(self.__label_mapping['shell']['map'].values()))
+        """for proc in range(0,len(labels)):
+            print('processor:', proc)
+            print(labels[proc])
+            print(self.__global_ident_mapping[proc])
+            print()
+        """
+        with open(self.__outputName+"A", 'wb') as f:
+            f.write(self.__header)
+            f.close()
+        
+        del(mili)
+        
+    def __createGlobalMapping(self,labels):
+        global_ident_map = OrderedDict()
+        labels_to_global= OrderedDict()
+        for proc  in range(0,len(labels)):
+            if proc not in global_ident_map.keys():
+                global_ident_map[proc] = {}
+            for key in labels[proc].keys():
+                if key not in labels_to_global.keys():
+                    labels_to_global[key]={'current_size':0,'map':{}}
+                if key not in global_ident_map[proc].keys():
+                    global_ident_map[proc][key] = {}
+                for label in labels[proc][key].keys():
+                    if label not in labels_to_global[key]['map'].keys():
+                        labels_to_global[key]['current_size'] = labels_to_global[key]['current_size']+1
+                        global_ident_map[proc][key][labels[proc][key][label]] = labels_to_global[key]['current_size']
+                        labels_to_global[key]['map'][label] = labels_to_global[key]['current_size']
+                    else:
+                        global_ident_map[proc][key][labels[proc][key][label]] = labels_to_global[key]['map'][label]
+                        
+        return labels_to_global, global_ident_map    
+                        
 class Mili:
     def __init__(self, read_file=None, parallel_read=False, processors=None, a_files=None):
         """Mili Class.
@@ -480,7 +578,7 @@ class Mili:
         self.__state_map_filename = None
         self.__error_file = None
         self.__parallel_mode = parallel_read
-
+        self.__header = None
         # Number of A files. Defaults to 1. If there are multiple A files, then this will be updates by __split_reads
         self.A_file_count = 1 
 
@@ -522,7 +620,9 @@ class Mili:
         if self.__parallel_mode: return self.__getHelper("get state maps")
         if len(self.__milis) > 1: return [m.getStateMaps() for m in self.__milis]
         return self.__state_maps
-
+    
+    def getProcessorCount(self):
+        return self.A_file_count
     '''
     Getter for directories
     '''
@@ -562,7 +662,13 @@ class Mili:
         if self.__parallel_mode: return self.__getHelper("get nodes")
         if len(self.__milis) > 1: return [m.getNodes() for m in self.__milis]
         return self.__nodes
-    
+    '''
+    Getter for the header info.  Only need from the zero processor
+    '''
+    def getHeader(self):
+        if self.__parallel_mode: return self.__getHelper("get_header")
+        if len(self.__milis) >1: return self.__milis[0].getHeader()
+        return self.__header
     '''
     Get error file
     '''
@@ -650,7 +756,7 @@ class Mili:
         
                 if type_to_str[DataType(param_type).name] == 's':
                     if (sys.version_info > (3, 0)):
-                        self.__params[name] = [str(struct.unpack(self.__tag + str(int(directory.length_idx / type_value)) + type_rep, byte_array)[0])[2:].split('\\x00'), directory]
+                        self.__params[name] = [str(struct.unpack(self.__tag + str(int(directory.length_idx / type_value)) + type_rep, byte_array)[0])[2:].split('\\x00')[0], directory]
                     else:
                         self.__params[name] = [struct.unpack(self.__tag + str(int(directory.length_idx / type_value)) + type_rep, byte_array)[0].split(b'\x00')[0], directory]                
                 else:
@@ -667,13 +773,13 @@ class Mili:
                     ints = struct.unpack(self.__tag + str(int(directory.length_idx / 4)) + 'i', byte_array)
                     first, last, node_labels = ints[0], ints[1], ints[2:]
         
-                    if ('M_NODE', 'node') not in self.__labels:
-                        self.__labels[('M_NODE', 'node')] = {}
+                    if 'node' not in self.__labels:
+                        self.__labels['node'] = {}
 
                     for j in range (first - 1, last):
-                        self.__labels[('M_NODE', 'node')][node_labels[j]] = j + 1
-                        self.__labeltomili[('M_NODE', 'node')][node_labels[j]].append(self.__mili_num)
-
+                        self.__labels['node'][node_labels[j]] = j + 1
+                        self.__labeltomili['node'][node_labels[j]].append(self.__mili_num)
+                    
 
                 if 'Element Label' in name:
                     f.seek(directory.offset_idx)
@@ -690,12 +796,12 @@ class Mili:
                     clas = name[class_idx : class_end_idx]
 
                     if (sup_class, clas) not in self.__labels:
-                        self.__labels[(sup_class, clas)] = {}
+                        self.__labels[clas] = {}
 
                     for j in range(len(ints)):
                         if 'ElemIds' in name:
-                            self.__labels[(sup_class, clas)][self.__label_keys[j]] = ints[j]
-                            self.__labeltomili[(sup_class, clas)][self.__label_keys[j]].append(self.__mili_num)
+                            self.__labels[clas][self.__label_keys[j]] = ints[j]
+                            self.__labeltomili[clas][self.__label_keys[j]].append(self.__mili_num)
                         else:
                             self.__label_keys.append(ints[j])
 
@@ -863,10 +969,10 @@ class Mili:
                     self.__mesh_object_class_datas[short_name].add_block(start, stop)
                     superclass = Superclass(superclass).name
                     if (superclass, short_name) not in self.__labels:
-                        self.__labels[(superclass, short_name)] = {}
+                        self.__labels[short_name] = {}
                     for label in range(start, stop + 1):
-                        self.__labels[(superclass, short_name)][label] = label
-                        self.__labeltomili[(superclass, short_name)][label].append(self.__mili_num)
+                        self.__labels[short_name][label] = label
+                        self.__labeltomili[short_name][label].append(self.__mili_num)
 
                 if directory.type_idx == DirectoryType.NODES.value:
                     f.seek(directory.offset_idx)
@@ -1123,11 +1229,11 @@ class Mili:
                 self.__mili_num = mili_num
             
             ### Read Header ###
-            header = f.read(16)
-            mili_taur = struct.unpack('4s', header[:4])[0].decode('ascii')
+            self.__header = f.read(16)
+            mili_taur = struct.unpack('4s', self.__header[:4])[0].decode('ascii')
             assert(mili_taur == 'mili' or mili_taur == 'taur')
             self.__header_version, self.__directory_version, self.__endian_flag, self.__precision_flag, self.__state_file_suffix_length, self.__partition_flag = \
-               struct.unpack('6b', header[4:10])
+               struct.unpack('6b', self.__header[4:10])
 
             if self.__endian_flag == 1:
                 self.__tag = '>'
@@ -1296,7 +1402,7 @@ class Mili:
             return ret
         sup_class = self.__mesh_object_class_datas[class_name].superclass
         sup_class = Superclass(sup_class).name
-        labels = self.__labels[(sup_class, class_name)]
+        labels = self.__labels[class_name]
 
         for elem in elems:
             id, class_name_elem = elem
@@ -1597,6 +1703,9 @@ class Mili:
                 elif query[0] == "get nodes":
                     nodes = mili.getNodes()
                     conn.send(nodes)
+                elif query[0] == "get header":
+                    header = mili.__header
+                    conn.send(header)
                 else:
                     sv, class_name, material, label, state_numbers, modify, int_points, raw, answ, use_exact_int_point = query
 
@@ -1673,15 +1782,18 @@ class Mili:
 
             if not labels or not len(labels):
                 return self.__error('There are no elements from class ' + str(class_name) + ' of material ' + str(material))
+        
         if labels and type(labels) is not list:
             return self.__error('labels must of a list of ints or an int')
 
         if class_name not in self.__mesh_object_class_datas:
             return self.__error('invalid class name')
+        
         if not labels and not self.__parallel_mode and not len(self.__milis):
             sup_class = self.__mesh_object_class_datas[class_name].superclass
             sup_class = Superclass(sup_class).name
-            labels = list(self.__labels[(sup_class, class_name)].keys())
+            labels = list(self.__labels[class_name].keys())
+        
         if not labels and not self.__parallel_mode and len(self.__milis):
             sup_class = self.__mesh_object_class_datas[class_name].superclass
             sup_class = Superclass(sup_class).name
@@ -1706,7 +1818,6 @@ class Mili:
         selected_int_points = False
         if int_points:
             selected_int_points = [ip for ip in int_points]
-        
         # Deal with parallel Mili file case
         if len(self.__milis):
             answ = defaultdict(dict)
@@ -1726,7 +1837,7 @@ class Mili:
                 mili_to_labels = defaultdict(list)
                 if labels != None:
                     for label in labels:
-                        mili = self.__labeltomili[(sup_class, class_name)][label]
+                        mili = self.__labeltomili[class_name][label]
                         for m in mili:
                             mili_to_labels[m].append(label)
                             milis.add(m)
@@ -1805,7 +1916,7 @@ class Mili:
             sup_class = Superclass(sup_class).name
 
             # Determine the mo_ids we are interested in for these subrecords
-            labels_we_have = list( set(labels) & set(self.__labels[(sup_class, class_name)]) )
+            labels_we_have = list( set(labels) & set(self.__labels[class_name]) )
             
             if len(labels_we_have) == 0:
                 return None
@@ -1830,7 +1941,7 @@ class Mili:
             indices = {}
             srec_label_indexes = {} # { subrecord name --> { label : indexes } }
 
-            sup_class_labels = self.__labels[(sup_class, class_name)]
+            sup_class_labels = self.__labels[class_name]
             # For each subrecord, determine which elements (labels) appear in that subrecord
             # and create a dictionary entry for each subrecord that contains the labels in that
             # subrecord and the indexes at which the data for that label appears in the subrecord
@@ -2107,9 +2218,9 @@ class Mili:
             sup_class = self.__mesh_object_class_datas[class_name].superclass
             sup_class = Superclass(sup_class).name
 
-            if label not in self.__labels[(sup_class, class_name)]:
+            if label not in self.__labels[class_name]:
                 return self.__error('label ' + str(label) + ' not found')
-            mo_id = self.__labels[(sup_class, class_name)][label]
+            mo_id = self.__labels[ class_name][label]
 
             if class_name not in self.__connectivity:
                 return self.__error('Class name ' + class_name + ' has no connectivity')
@@ -2118,8 +2229,8 @@ class Mili:
             if labels is not None and global_ids is True:
                 # Convert local ids to globals ids
                 global_labels = []
-                labels_list = list(self.__labels[("M_NODE", "node")].values())
-                keys_list = list(self.__labels[("M_NODE", "node")].keys())
+                labels_list = list(self.__labels["node"].values())
+                keys_list = list(self.__labels["node"].keys())
                 for l in labels:
                     pos = labels_list.index(l)
                     gid = keys_list[pos]
@@ -2283,15 +2394,28 @@ def main():
                        res=None,
                        use_exact_int_point=False):
     """
-    #f = 'parallel/d3samp6.plt'
+    if len(sys.argv) > 1:
+        
+        params = parseParameters(sys.argv[1:]) 
+        if params is None:
+            sys.exit(1)
+        if(params["combine"]):
+            combiner = MiliCombiner(params["input_file"],params)
+        else:
+            f = 'parallel/d3samp6.plt'
+            mili = Mili()
+            mili.read(f)
+            answer = mili.query(['nodpos'], class_name='node', material=None, labels=[1])
+            #print(answer)
+        
+    f = 'parallel/d3samp6.plt'
     #f='/p/lustre1/depiero/2020_08_19_073746_4370645/'
-    f= '/usr/workspace/wsrzd/jdurren/mili-python/chandra/jethe_01_run.dyn.plt'
     #f = "nickolai/ingrido_f.dyna.plt"
-    mili = Mili()
+    #mili = Mili()
     #mili.read(f, parallel_read=True)
     #mili.read(f, parallel_read=True)
     
-    mili.read(f)
+    #mili.read(f)
     #mili.print_search()
     #result = mili.search("node", "pen27s", 169)
     #print (result.name)
@@ -2300,14 +2424,14 @@ def main():
     #mat_id ='2'
     #label = 5
     
-    answer = mili.query(['nodpos'], class_name='node', material=None, labels=[1])
+    #answer = mili.query(['nodpos'], class_name='node', material=None, labels=[1])
     #answer = mili.query('stress[sy]', 'brick', None, [5], [70], False, [2], False)
     #answer = mili.query('stress[sy]', 'beam', None, [5], [70], False, [2], False)
     #answer = mili.query(['matcgx'], 'mat', None, [1,2], [4], raw_data=False)
     #print (answer)   
     #print(mili.query('stress[eps]', 'beam',None, [5],None,raw_data=False))
     
-    print(answer)
+    #print(answer)
     # mili.setErrorFile()
         
 if __name__ == '__main__':
