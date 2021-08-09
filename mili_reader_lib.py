@@ -25,6 +25,8 @@ Copyright (c) 2016, Lawrence Livermore National Security, LLC.
 
 
 """
+from cProfile import label
+from _collections import OrderedDict
 '''
 This is the 'meta' information for a statemap, but not the statemap itself.
 '''
@@ -446,6 +448,7 @@ class MiliCombiner:
         self.__header = mili.getHeader()
         mili_taur = struct.unpack('4s', self.__header[:4])[0].decode('ascii')
         assert(mili_taur == 'mili' or mili_taur == 'taur')
+        
         self.__header_version, self.__directory_version, self.__endian_flag, self.__precision_flag, self.__state_file_suffix_length, self.__partition_flag = \
             struct.unpack('6b', self.__header[4:10])
 
@@ -454,26 +457,73 @@ class MiliCombiner:
         else:
             self.__tag = '<'
 
-            
-        with open(self.__outputName+"A", 'wb') as f:
-            f.write(self.__header)
-            f.close()
+        #Get all the processor's timesteps      
+        self.timestep_maps = mili.getStateMaps()
+        if mili.getProcessorCount() != len(self.timestep_maps):
+            print("Number of processors and state maps do not match")
+            return None
         
-        self.timestep_maps = mili.getStateMaps()[0]
+        self.max_state = int()
+        
+        #Do a quick run over the time steps and only do the lowest number of steps available
+        for state in range(0,len(self.timestep_maps)):
+            if state == 0:
+                self.max_state = len(self.timestep_maps[state])
+            else:
+                if self.max_state > len(self.timestep_maps[state]):
+                    self.max_state = len(self.timestep_maps[state])
+        
+        params = mili.getParams()
+        
+        for param in params:
+            print(type(param))
+            for key in param.keys():
+                print(key, param[key])
+            
+        
         
         self.incoming_directories = mili.getDirectories()
         
         self.master_index = [0]*4
         labels = mili.getLabels()
         
-        for i in range(0,len(labels)):
-            print(labels[i])
-                       
+        
+        self.__label_mapping, self.__global_ident_mapping = self.__createGlobalMapping(labels)
+        print(self.__label_mapping)
+        print(list(self.__label_mapping['shell']['map'].keys()))
+        print(list(self.__label_mapping['shell']['map'].values()))
+        """for proc in range(0,len(labels)):
+            print('processor:', proc)
+            print(labels[proc])
+            print(self.__global_ident_mapping[proc])
+            print()
+        """
+        with open(self.__outputName+"A", 'wb') as f:
+            f.write(self.__header)
+            f.close()
+        
         del(mili)
         
     def __createGlobalMapping(self,labels):
-        print(labels)
-            
+        global_ident_map = OrderedDict()
+        labels_to_global= OrderedDict()
+        for proc  in range(0,len(labels)):
+            if proc not in global_ident_map.keys():
+                global_ident_map[proc] = {}
+            for key in labels[proc].keys():
+                if key not in labels_to_global.keys():
+                    labels_to_global[key]={'current_size':0,'map':{}}
+                if key not in global_ident_map[proc].keys():
+                    global_ident_map[proc][key] = {}
+                for label in labels[proc][key].keys():
+                    if label not in labels_to_global[key]['map'].keys():
+                        labels_to_global[key]['current_size'] = labels_to_global[key]['current_size']+1
+                        global_ident_map[proc][key][labels[proc][key][label]] = labels_to_global[key]['current_size']
+                        labels_to_global[key]['map'][label] = labels_to_global[key]['current_size']
+                    else:
+                        global_ident_map[proc][key][labels[proc][key][label]] = labels_to_global[key]['map'][label]
+                        
+        return labels_to_global, global_ident_map    
                         
 class Mili:
     def __init__(self, read_file=None, parallel_read=False, processors=None, a_files=None):
@@ -570,7 +620,9 @@ class Mili:
         if self.__parallel_mode: return self.__getHelper("get state maps")
         if len(self.__milis) > 1: return [m.getStateMaps() for m in self.__milis]
         return self.__state_maps
-
+    
+    def getProcessorCount(self):
+        return self.A_file_count
     '''
     Getter for directories
     '''
@@ -704,7 +756,7 @@ class Mili:
         
                 if type_to_str[DataType(param_type).name] == 's':
                     if (sys.version_info > (3, 0)):
-                        self.__params[name] = [str(struct.unpack(self.__tag + str(int(directory.length_idx / type_value)) + type_rep, byte_array)[0])[2:].split('\\x00'), directory]
+                        self.__params[name] = [str(struct.unpack(self.__tag + str(int(directory.length_idx / type_value)) + type_rep, byte_array)[0])[2:].split('\\x00')[0], directory]
                     else:
                         self.__params[name] = [struct.unpack(self.__tag + str(int(directory.length_idx / type_value)) + type_rep, byte_array)[0].split(b'\x00')[0], directory]                
                 else:
@@ -721,13 +773,13 @@ class Mili:
                     ints = struct.unpack(self.__tag + str(int(directory.length_idx / 4)) + 'i', byte_array)
                     first, last, node_labels = ints[0], ints[1], ints[2:]
         
-                    if ('M_NODE', 'node') not in self.__labels:
+                    if 'node' not in self.__labels:
                         self.__labels['node'] = {}
 
                     for j in range (first - 1, last):
                         self.__labels['node'][node_labels[j]] = j + 1
                         self.__labeltomili['node'][node_labels[j]].append(self.__mili_num)
-
+                    
 
                 if 'Element Label' in name:
                     f.seek(directory.offset_idx)
@@ -2349,7 +2401,7 @@ def main():
             mili = Mili()
             mili.read(f)
             answer = mili.query(['nodpos'], class_name='node', material=None, labels=[1])
-            print(answer)
+            #print(answer)
         
     f = 'parallel/d3samp6.plt'
     #f='/p/lustre1/depiero/2020_08_19_073746_4370645/'
