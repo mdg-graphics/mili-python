@@ -3,7 +3,7 @@ import sys
 import os
 
 
-parameters = ["-o","-start","-stop","-append","-proc","-procs","-debug"]
+parameters = ["-o","-c","-start","-stop","-append","-proc","-procs","-debug"]
 
 def notParameter(p):
     return (not p in parameters)
@@ -79,6 +79,7 @@ def parseParameters(params):
     start_stop = False
     append = False
     append_arg = None
+    combine = False
 
     length = len(params)
     i = 0
@@ -103,6 +104,9 @@ def parseParameters(params):
                 usage("-i flag given, but no input file specified.")
                 return None
 
+        elif parameter == "-c":
+            combine = True
+            i = i+1
         elif parameter == "-o":
             if i+1 < length and notParameter(params[i+1]):
                 output_file_name = params[i+1]
@@ -213,7 +217,8 @@ def parseParameters(params):
         "stop_state"  : stop_state,
         "append"      : append,
         "processors"  : procs,
-        "debug"       : debug
+        "debug"       : debug,
+        "combine"     : combine
     }
 
     return params
