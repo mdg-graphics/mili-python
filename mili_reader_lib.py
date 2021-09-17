@@ -1214,7 +1214,8 @@ class Mili:
 
             state_files = list(filter(sfile_re.match,os.listdir(dir_name)))
             state_files = [ dir_name + os.sep + fname for fname in state_files ]
-            state_files.sort()
+            file_name_key = dir_name + os.sep + file_name
+            state_files.sort(key=lambda x: int(x[len(file_name_key):]))
 
             file_name = dir_name + os.sep + file_name
             
