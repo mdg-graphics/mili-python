@@ -1,14 +1,15 @@
 """
-Copyright (c) 2016-2021, Lawrence Livermore National Security, LLC.
+Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
  Produced at the Lawrence Livermore National Laboratory. Written by 
  William Tobin (tobin6@llnl.hov) and Kevin Durrenberger (durrenberger1@llnl.gov). 
  CODE-OCEC-16-056.
  All rights reserved.
 
- This file is part of Mili. For details, see #TODO: <URL describing code and how to download source>.
+ This file is part of Mili. For details, see 
+ https://rzlc.llnl.gov/gitlab/mdg/mili/mili-python/. For read access to this repo
+ please contact the authors listed above.
 
- Please also read this link-- Our Notice and GNU Lesser General
- Public License.
+ Our Notice and GNU Lesser General Public License.
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License (as published by

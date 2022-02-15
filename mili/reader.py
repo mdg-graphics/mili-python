@@ -1,5 +1,5 @@
 """
-Copyright (c) 2016-2021, Lawrence Livermore National Security, LLC.
+Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
  Produced at the Lawrence Livermore National Laboratory. Written by 
  William Tobin (tobin6@llnl.hov) and Kevin Durrenberger (durrenberger1@llnl.gov). 
  CODE-OCEC-16-056.
@@ -23,14 +23,7 @@ Copyright (c) 2016-2021, Lawrence Livermore National Security, LLC.
  You should have received a copy of the GNU Lesser General Public License
  along with this program; if not, write to the Free Software Foundation,
  Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-
- Get started:
-  db = reader.open_database( 'base_filename', suppress_parallel = True )
-  nodpos_ux = db.query( 'nodpos[ux]', 'node' )
-  # modify nodpos_ux
-  nodpos_ux = db.query( 'nodpos[ux]', 'node', write_data = nodpos_ux )
 """
-
 
 __version__ = (0,2,0)
 __suppress_parallel__ = False

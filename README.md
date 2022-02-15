@@ -87,3 +87,8 @@
   **Note:** in parallel, the result format has an additonal top-level list. This is not currently accounted for in write-mode. A user must currently produce a `write_data` argument that contains the union of the set of data to be written to the parallel database. Thus if some data was queried from rank 0 databases and some from rank 1, the results dictionaries for the first two top-level results in the list must be merged appropriately to allow the opertional to succeed. This is cumbersome and not reccomended. Opening individual parallel databases in serial mode is supported, and may present a cleaner solution until development accomodates this use-case.
 
   **Note:** minimal enforcement/checking of the `write_data` structure is currently done and malformed `write_data` *could* possibly (unlikely) cause database corruption, use at your own discretion. Create backups, test on smaller databases first, etc. A python expection is the most likely outcome here, but caution is best.
+
+---
+##### NOTES:
+
+  - Mixed-data subrecords (subrecords containing more than 1 datatype (e.g. mixed double/float, int/double, etc)) are functional but have received less testing and performance evaluation, so some performance degredation is expected when querying variables from these subrecords.
