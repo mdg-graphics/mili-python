@@ -2,7 +2,6 @@
 [![pipeline status](https://rzlc.llnl.gov/gitlab/mili/mili-python/badges/master/pipeline.svg)](https://rzlc.llnl.gov/gitlab/mili/mili-python/-/commits/master)
 [![coverage report](https://rzlc.llnl.gov/gitlab/mili/mili-python/badges/master/coverage.svg)](https://rzlc.llnl.gov/gitlab/mili/mili-python/-/commits/master)
 
-
 ---
 ##### Installation:
 
@@ -24,7 +23,7 @@
 
   - Install the mili python package into the local venv:
 
-  `pip install --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse --find-links=/collab/usr/gapps/mdg/bin/mili/ mili`
+  `pip install --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse --find-links=/collab/usr/gapps/mdg/wheels/ mili`
 
   **Note:** Using `--find-links=<url>` will pull dependencies from the LC python wheelhouse, which should contain sufficient requirements and should be available on OCF and SCF
 
