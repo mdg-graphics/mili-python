@@ -29,7 +29,7 @@ Copyright (c) 2016-2021, Lawrence Livermore National Security, LLC.
 """
 import os
 import unittest
-from mili import reader
+from src.mili import reader
 import numpy as np
 
 dir_path = os.path.dirname(os.path.realpath(__file__))

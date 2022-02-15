@@ -10,9 +10,6 @@ with open('pyproject.toml', 'r') as fh:
   requirements = toml.loads(fh.read())
 
 prod = requirements['dependencies']
-packages = find_packages()
-if 'tests' in packages:
-  packages.remove('tests')
 
 setup(
   name="mili",
@@ -21,8 +18,8 @@ setup(
   long_description=long_description,
   author="William R Tobin, Kevin Durrenberger",
   author_email="tobin6@llnl.gov, durrenberger1@llnl.gov",
-  packages = packages,
-  #scripts=["scripts/mili-query.py"],
+  packages=find_packages('src',exclude=['tests']),
+  package_dir={'': 'src'},
   install_requires=[x + prod[x] if prod[x] != "*" else x for x in prod],
   python_requires=requirements['project']['requires-python']
 )

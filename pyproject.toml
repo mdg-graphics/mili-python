@@ -1,6 +1,5 @@
 [project]
   name = "mili"
-  version = "0.2.0"
   description = "modules for interacting with mili database files"
   authors = [
     "William R Tobin <tobin6@llnl.gov>",
@@ -8,6 +7,7 @@
   readme = "README.md"
   requires-python = ">3.8"
   license = "LGPL-2.1-only"
+  dynamic = [ "version" ]
 
 [dependencies]
   pathos = ""
