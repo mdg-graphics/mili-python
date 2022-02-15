@@ -10,12 +10,8 @@
 
 [dependencies]
   pathos = ""
-  clize = ""
   numpy = ">1.20.0"
   coverage = ">= 4.0.0"
-
-[scripts]
-  mili_query = "mili-query:main"
 
 [build-system]
   requires = ["setuptools", "wheel", "toml"]

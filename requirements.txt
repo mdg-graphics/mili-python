@@ -1,5 +1,5 @@
 pathos
-clize
+# clize
 numpy >= 1.20.0
 toml
 coverage >= 4.0.0

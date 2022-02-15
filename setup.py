@@ -19,7 +19,7 @@ setup(
   author="William R Tobin, Kevin Durrenberger",
   author_email="tobin6@llnl.gov, durrenberger1@llnl.gov",
   packages=find_packages(),
-  scripts=["scripts/mili-query.py"],
+  #scripts=["scripts/mili-query.py"],
   install_requires=[x + prod[x] if prod[x] != "*" else x for x in prod],
   python_requires=requirements['project']['requires-python']
 )

@@ -5,10 +5,11 @@ Copyright (c) 2016-2021, Lawrence Livermore National Security, LLC.
  CODE-OCEC-16-056.
  All rights reserved.
 
- This file is part of Mili. For details, see #TODO: <URL describing code and how to download source>.
+ This file is part of Mili. For details, see 
+ https://rzlc.llnl.gov/gitlab/mdg/mili/mili-python/. For read access to this repo
+ please contact the authors listed above.
 
- Please also read this link-- Our Notice and GNU Lesser General
- Public License.
+ Our Notice and GNU Lesser General Public License.
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License (as published by
@@ -22,11 +23,18 @@ Copyright (c) 2016-2021, Lawrence Livermore National Security, LLC.
  You should have received a copy of the GNU Lesser General Public License
  along with this program; if not, write to the Free Software Foundation,
  Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+
+ Get started:
+  db = reader.open_database( 'base_filename', suppress_parallel = True )
+  nodpos_ux = db.query( 'nodpos[ux]', 'node' )
+  # modify nodpos_ux
+  nodpos_ux = db.query( 'nodpos[ux]', 'node', write_data = nodpos_ux )
 """
+
 
 __version__ = (0,2,0)
 __suppress_parallel__ = False
-__profiling__ = None #"memory"
+__profiling__ = None
 
 # TODO : when we read raw data into numpy buffers, modify the dtype to account for endianness: https://numpy.org/doc/stable/reference/generated/numpy.frombuffer.html
 
@@ -53,7 +61,7 @@ if sys.version_info < (3, 8):
 if tuple( int(vnum) for vnum in np.__version__.split('.') ) < (1,20,0):
   raise ImportError(f"This module requires numpy version > 1.20.0")
 
-if __profiling__ == "memory":
+if False:
   from memory_profiler import profile
 else:
   def profile(func):
@@ -513,11 +521,11 @@ class MiliDatabase:
 
     : param svar_names : short names for state variables being queried
     : param class_sname : mesh class name being queried
-    : param material : sname or material number to select labels from, optional
-    : param labels : labels to query data about, filtered by material if material if material is supplied
-    : param state_numbers: state numbers from which to query data
-    : param ips : integration points (really just indices into svars that have array aggregation) to specifically query
-    : param write_data : the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format, 
+    : param material : optional sname or material number to select labels from
+    : param labels : optional labels to query data about, filtered by material if material if material is supplied, default is all
+    : param state_numbers: optional state numbers from which to query data, default is all
+    : param ips : optional integration points (really just indices into svars that have array aggregation) to specifically query, default is all available
+    : param write_data : optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format, 
                    then modify the values desired, then query again with the modified result in this param
     '''
 
@@ -685,9 +693,13 @@ class MiliDatabase:
 def open_database( base_filename : os.PathLike, procs = [], suppress_parallel = __suppress_parallel__, experimental = False ):
   """
   Args: 
-   base_file (os.PathLike):
+   base_file (os.PathLike): the base filename of the mili database (e.g. for 'pltA', just 'plt', for parallel 
+                            databases like 'dblplt00A', also exclude the rank-digits, giving 'dblplt')
    procs (Optional[List[int]]) : optionally a list of process-files to open in parallel, default is all
-   suppress_parallel (Optional[Bool]) : optionally return a serial database reader object if possible
+   suppress_parallel (Optional[Bool]) : optionally return a serial database reader object if possible (for serial databases).
+                                        Note: if the database is parallel, suppress_parallel==True will return a reader that will
+                                        query each processes database files in series.
+   experimental (Optional[Bool]) : optional developer-only argument to try experimental parallel features
   """
   # ensure dir_name is the containing dir and base_filename is only the file name
   dir_name = os.path.dirname( base_filename )
