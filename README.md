@@ -21,9 +21,9 @@
   - Install the mili python package into the local venv:
   `pip install --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse /collab/usr/gapps/mdg/bin/mili/`
 
-  **Note:** Using `--find-links=<url>` will pull dependencies from the LC python wheelhouse, which should include everything we need (excepting clize IIRC) and should be available on OCF and SCF
+  **Note:** Using `--find-links=<url>` will pull dependencies from the LC python wheelhouse, which should contain sufficient requirements and should be available on OCF and SCF
 
-  This should install mili in the python venv.
+  This should install `mili` in the python venv.
 
 ---
 ##### Getting started:
