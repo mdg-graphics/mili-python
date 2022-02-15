@@ -7,19 +7,24 @@
 ##### Installation:
 
   - Make sure you're using python > 3.8:
-  ```module load python/3.8.2```
+
+  `module load python/3.8.2`
 
   - Create a python virtual environment to install packages into locally:
-  ```python -m venv <venv_name>```
+
+  `python -m venv <venv_name>`
 
   - Activate the environment:
-  ```source <venv_name>/bin/activate```
+
+  `source <venv_name>/bin/activate`
 
   - Upgrade pip (numpy > 1.20.0 will fail to build with the base RZ pip):
-  ```pip install --upgrade pip```
+
+  `pip install --upgrade pip`
 
   - Install the mili python package into the local venv:
-  ```pip install --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse /collab/usr/gapps/mdg/bin/mili/```
+  
+  `pip install --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse /collab/usr/gapps/mdg/bin/mili/`
 
   **Note:** Using `--find-links=<url>` will pull dependencies from the LC python wheelhouse, which should contain sufficient requirements and should be available on OCF and SCF
 
