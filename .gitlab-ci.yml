@@ -1,53 +1,49 @@
 workflow:
-    rules:
-        - when: always
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "web"
+      when: always
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TITLE =~ /^(\[Draft\]|\(Draft\)|Draft:)/
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: always
+    - when: never
 
 variables:
-    PYTHON_BIN: "/usr/tce/packages/python/python-3.7.2/bin"
-    VENV_NAME: "venv-mili-python-3.7.2"
-    VENV_INSTALL_ARGS: "--find-links=https://www-lc.llnl.gov/python/wheelhouse --no-cache-dir"
-    COVERAGE_VERSION: "5.5"
+    SYS_PYTHON_BIN: "/usr/tce/packages/python/python-3.8.2/bin/python3"
+    PIP_ARGS: "--no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse"
+    VENV_NAME: "venv-mili-python-3.8.2"
     MINIMUM_COVERAGE: "86"
 
 stages:
     - test
-    - coverage
+    - deploy
 
-run_tests:
+before_script:
+    - python3 --version
+    - ${SYS_PYTHON_BIN} -m venv ${VENV_NAME}
+    - source ${VENV_NAME}/bin/activate
+    - pip3 install --upgrade pip # need newer pip to build numpy on rz
+    - pip3 install ${PIP_ARGS} -e .
+
+unit_tests:
     stage: test
     tags:
         - rzgenie
         - shell
     script:
-        # Print out Python3 version for debug
-        - python3 --version
-        # Run testing
-        - python3 mili_reader_test.py
-    
-coverage_testing:
-    stage: coverage
+        - python3 -m unittest tests.reader_test
+
+coverage:
+    stage: test
     tags:
         - rzgenie
         - shell
-    rules:
-        - if: "$CI_COMMIT_BRANCH == 'master'"
-          when: always # If master branch always install virtual env
-        - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
-          when: always # If merge_request always install virtual env
-        - when: never
-    before_script:
-        # Setup virtual environment
-        - $PYTHON_BIN/virtualenv --system-site-packages $VENV_NAME
-        # Install coverage module 4.0 or higher so we can use --concurrency
-        - $VENV_NAME/bin/pip3 install $VENV_INSTALL_ARGS coverage==$COVERAGE_VERSION
-        # Activate
-        - . ${VENV_NAME}/bin/activate
     script:
-        - coverage --version
-        - coverage run mili_reader_test.py
-        - coverage combine
-        - coverage xml
-        - coverage report --fail-under=$MINIMUM_COVERAGE
+        - python3 -m coverage --version
+        - python3 -m coverage run -m unittest tests.reader_test
+        - python3 -m coverage combine
+        - python3 -m coverage xml
+        - python3 -m coverage report --fail-under=$MINIMUM_COVERAGE
     artifacts:
         when: always
         paths:
@@ -56,3 +52,26 @@ coverage_testing:
             cobertura: coverage.xml
         expire_in: 1 week
     coverage: '/TOTAL.+?([0-9]+\%)$/'
+
+stage-release:
+    stage: deploy
+    tags:
+        - rzgenie
+        - shell
+    script:
+        - pip3 install ${PIP_ARGS} .
+        - pip3 wheel . -w wheels
+
+# TODO(wrt): make this actually deploy
+# deploy-release: 
+#     stage: deploy
+#     tags:
+#         - rzgenie
+#         - shell
+#     script:
+#         - pip3 install ${PIP_ARGS} .
+#         - pip3 wheel . -w wheels
+#     rules:
+#         - if: '$CI_COMMIT_REF_NAME == "master"'
+#         - when: manual
+

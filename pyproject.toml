@@ -1,0 +1,22 @@
+[project]
+  name = "mili"
+  version = "0.2.0"
+  description = "modules for interacting with mili database files"
+  authors = [
+    "William R Tobin <tobin6@llnl.gov>",
+    "Kevin Durrenberger <durrenberger1@llnl.gov>" ]
+  readme = "README.md"
+  requires-python = ">3.8"
+
+[dependencies]
+  pathos = ""
+  clize = ""
+  numpy = ">1.20.0"
+  coverage = ">= 4.0.0"
+
+[scripts]
+  mili_query = "mili-query:main"
+
+[build-system]
+  requires = ["setuptools", "wheel", "toml"]
+  build-backend = "setuptools.build_meta"
