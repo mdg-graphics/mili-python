@@ -4,7 +4,7 @@
 
 
 ---
-#####Installation:
+##### Installation:
 
   - Make sure you're using python > 3.8:
   `module load python/3.8.2`
@@ -26,7 +26,7 @@
   This should install mili in the python venv.
 
 ---
-#####Getting started:
+##### Getting started:
 
   The reader module has docstrings, so to get started try:
   ```
@@ -73,7 +73,7 @@
   **Note**: if you only need data for a single node or for single state, format the query so only that data is returned rather than querying large amounts of data and indexing into it as above.
 
 ---
-#####Modifying databases:
+##### Modifying databases:
 
   ```
   db = reader.open_database( 'base_filename', suppress_parallel = True )
