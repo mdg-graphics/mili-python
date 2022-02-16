@@ -5,7 +5,7 @@
     "William R Tobin <tobin6@llnl.gov>",
     "Kevin Durrenberger <durrenberger1@llnl.gov>" ]
   readme = "README.md"
-  requires-python = ">3.8"
+  requires-python = ">3.7"
   license = "LGPL-2.1-only"
   dynamic = [ "version" ]
 

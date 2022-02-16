@@ -9,9 +9,9 @@ workflow:
     - when: never
 
 variables:
-    SYS_PYTHON_BIN: "/usr/tce/packages/python/python-3.8.2/bin/python3"
+    SYS_PYTHON_BIN: "/usr/tce/packages/python/python-3.7.2/bin/python3"
     PIP_ARGS: "--no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse"
-    VENV_NAME: "venv-mili-python-3.8.2"
+    VENV_NAME: "venv-mili-python-3.7.2"
     MINIMUM_COVERAGE: "86"
 
 stages:

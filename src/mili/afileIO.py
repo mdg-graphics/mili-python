@@ -89,8 +89,10 @@ class AFileParser:
          key callback. '''
     data = f.read( num_items * item_bytes )
     byte_data = io.BytesIO( data )
-    while item_data := byte_data.read( item_bytes ):
+    item_data = byte_data.read( item_bytes )
+    while item_data:
       self.__callback( key, item_data )
+      item_data = byte_data.read( item_bytes )
 
   def register( self, key : Union[Section,Directory.Type], cback : Callable[[bytearray],None]) -> None:
     self.__callbacks[key].append(cback)

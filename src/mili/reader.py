@@ -48,8 +48,8 @@ from mili.datatypes import *
 from mili.afileIO import *
 from mili.parallel import *
 
-if sys.version_info < (3, 8):
-  raise ImportError(f"This module requires python version > 3.8!")
+if sys.version_info < (3, 7):
+  raise ImportError(f"This module requires python version > 3.7!")
 if tuple( int(vnum) for vnum in np.__version__.split('.') ) < (1,20,0):
   raise ImportError(f"This module requires numpy version > 1.20.0")
 
@@ -311,7 +311,7 @@ class MiliDatabase:
       if superclass != Superclass.M_MESH:
         # TODO: these are NUM blocks, not label blocks, so we need to store the labels and map from label to num and operate on num internaly instead of mapping conn to labels
         #       has the above been resolved?
-        
+
         srec.ordinal_blocks = np.array( idata[ int_pos : int_pos + (2 * ord_blk_cnt) ], dtype = np.int32 )
         srec.ordinal_blocks[1::2] = srec.ordinal_blocks[1::2] + 1 # add 1 to each STOP to allow inclusive bining during queries
         srec.ordinal_counts = np.concatenate( ( [0], np.diff( srec.ordinal_blocks.reshape(-1,2), axis=1 ).flatten( ) ) ) # sum stop - start + 1 over all blocks
@@ -697,9 +697,11 @@ def open_database( base_filename : os.PathLike, procs = [], suppress_parallel = 
   afiles = list(filter(afile_re.match,os.listdir(dir_name)))
   afiles.sort()
 
-  proc_from_file = lambda fn : int( proc ) if (proc := afile_re.match(fn).group(1)) != '' else None
-  # determine which attribute files to remove ( if any )
-  procs_we_have = [ int( proc ) for afile in afiles if ( proc := afile_re.match(afile).group(1) ) != '' ]
+  def proc_from_file( fn ):
+    proc = afile_re.match(fn).group(1)
+    return int( proc ) if proc != '' else None
+  procs_we_have = list( proc_from_file(afile) for afile in afiles )
+  procs_we_have = list( filter( lambda val : val != None, procs_we_have ) )
   procs = [ int(proc) for proc in procs ]
   procs = procs_we_have if len(procs) == 0 else procs
   procs_to_drop = list( set(procs_we_have) - set(procs) )
