@@ -23,7 +23,7 @@
 
   - Install the mili python package into the local venv:
 
-  `pip install --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse --find-links=/collab/usr/gapps/mdg/wheels/ mili`
+  `pip install --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse --find-links=/collab/usr/gapps/mdg/python/wheels/ mili`
 
   **Note:** Using `--find-links=<url>` will pull dependencies from the LC python wheelhouse, which should contain sufficient requirements and should be available on OCF and SCF
 
