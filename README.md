@@ -44,6 +44,7 @@
   from mili import reader
   help(reader)
   help(reader.open_database)
+  help(reader.MiliDatabase)
   help(reader.MiliDatabase.query)
   ```
   **Note:** the result of `open_database` isn't always a `MiliDatabase` object, but all objects returned by `open_database` have the same interface as `MiliDatabase` (parallel operation uses various wrapper classes to dispatch read/write operations in parallel).
@@ -74,7 +75,7 @@
 
   **Note:** often only a single `<srec>` will be returned, but since mili allows multiple subrecords to contain the same state variables, we return all which match the given query criteria.
 
-  The data array is indexed with tuples of the form `(state_index, label_index, scalar)`. To be clear the `state_index` and `label_index` are the indices of the state and label in the list of states and list of labels passed to query function call, which is why these are also returned in the 'layout' data since those query arguments are optional. Thus to find the indices for state `T` and node label `N`, we need to:
+  The data array is indexed with tuples of the form `(state_index, label_index, scalar_index)`. To be clear the `state_index` and `label_index` are the indices of the state and label in the list of states and list of labels passed to query function call, which is why these are also returned in the 'layout' data since those query arguments are optional. Thus to find the indices for state `T` and node label `N`, we need to:
   ```
   sidx = np.where(T == result['nodpos[ux]']['layout']['state'])
   nidx = np.where(N == result['noppos[ux]']['layout'][<srec>])
