@@ -27,7 +27,6 @@ Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
 
 __version__ = (0,2,0)
 __suppress_parallel__ = False
-__profiling__ = None
 
 # TODO : when we read raw data into numpy buffers, modify the dtype to account for endianness: https://numpy.org/doc/stable/reference/generated/numpy.frombuffer.html
 
@@ -54,18 +53,11 @@ if sys.version_info < (3, 8):
 if tuple( int(vnum) for vnum in np.__version__.split('.') ) < (1,20,0):
   raise ImportError(f"This module requires numpy version > 1.20.0")
 
-if False:
-  from memory_profiler import profile
-else:
-  def profile(func):
-    return func
-
 def np_empty(dtype):
   return np.empty([0],dtype=dtype)
 
 class MiliDatabase:
 
-  @profile
   def __init__( self, att_file : BinaryIO, sfile_base : os.PathLike, dir_name : os.PathLike):
     """
     A Mili database querying object, able to parse a single A-file and query state information
@@ -128,7 +120,6 @@ class MiliDatabase:
   def material_classes(self, mat):
     return self.__elems_of_mat.get(mat,{}).keys()
 
-  @profile
   def __parse_att_file( self, att_file : BinaryIO ):
     """ 
     Parse the provided AFile and setup all internal data structures to allow 
@@ -498,7 +489,6 @@ class MiliDatabase:
 
     return svar_names, class_sname, material, labels, states, ips, write_data
 
-  @profile
   def query( self,
              svar_names : Union[List[str],str],
              class_sname : str,
@@ -643,7 +633,6 @@ class MiliDatabase:
 
       # initialize the results structure for this queried name
       for srec in srecs_to_query:
-        # TODO: this assumes one dtype over the srec, need to account for multiple dtypes
         res_shape = [ len(states), *srecs_ordinal_indices[srec.name].shape ]
         res[queried_name]['data'][srec.name] = np.empty( res_shape, dtype = np.float32 )
 
@@ -682,7 +671,6 @@ class MiliDatabase:
 
     return res
 
-@profile
 def open_database( base_filename : os.PathLike, procs = [], suppress_parallel = __suppress_parallel__, experimental = False ):
   """
   Args: 

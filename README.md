@@ -29,6 +29,13 @@
 
   This should install `mili` in the python venv.
 
+  If you want to install the packages into your ~/.local/ python cache so the module is usable with the system python install, try instead not creating and activating a virtual environment and instead (untested and may not work):
+  ``` 
+  module load python/3.8.2
+  python -m pip install --upgrade pip --user
+  python -m pip install --user --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse --find-links=/collab/usr/gapps/mdg/wheels/ mili
+  ```
+
 ---
 ##### Getting started:
 
