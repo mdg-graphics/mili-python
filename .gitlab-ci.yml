@@ -13,6 +13,7 @@ variables:
     PIP_ARGS: "--no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse"
     VENV_NAME: "venv-mili-python-3.7.2"
     MINIMUM_COVERAGE: "86"
+    INSTALL_ROOT: "/collab/usr/gapps/mdg/python/"
 
 stages:
     - test
@@ -60,8 +61,8 @@ stage-release:
         - rzgenie
         - shell
     script:
-        - pip3 install ${PIP_ARGS} .
-        - pip3 wheel . -w wheels
+        - pip3 install --upgrade build
+        - python3 -m build
 
 # TODO(wrt): make this actually deploy
 # deploy-release: 
@@ -70,8 +71,9 @@ stage-release:
 #         - rzgenie
 #         - shell
 #     script:
-#         - pip3 install ${PIP_ARGS} .
-#         - pip3 wheel . -w wheels
+#         - python3 -m build
+#         - 
+#         - cp -n dist/* ${INSTALL_ROOT}/wheels/
 #     rules:
 #         - if: '$CI_COMMIT_REF_NAME == "master"'
 #         - when: manual

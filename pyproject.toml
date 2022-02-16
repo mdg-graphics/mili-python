@@ -15,5 +15,5 @@
   coverage = ">= 4.0.0"
 
 [build-system]
-  requires = ["setuptools", "wheel", "toml"]
+  requires = ["setuptools", "wheel", "toml", "GitPython"]
   build-backend = "setuptools.build_meta"

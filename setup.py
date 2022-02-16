@@ -1,7 +1,10 @@
 #!/usr/bin/env python
-
-from setuptools import setup, find_packages
+import os
+import re
 import toml
+
+from git import Repo 
+from setuptools import setup, find_packages
 
 with open('README.md', 'r') as fh:
   long_description = fh.read()
@@ -11,9 +14,18 @@ with open('pyproject.toml', 'r') as fh:
 
 prod = requirements['dependencies']
 
+repo = Repo(os.getcwd())
+tags = sorted(repo.tags, key=lambda t: t.commit.committed_datetime)
+latest_tag = str(tags[-1])
+version_match = re.search(r'v*(\d\.\d\.\d)',latest_tag)
+if version_match:
+  version = version_match.group(1)
+else:
+  version = "indev"
+
 setup(
   name="mili",
-  version="0.2.0",
+  version=version,
   description="modules for interacting with mili database files",
   long_description=long_description,
   author="William R Tobin, Kevin Durrenberger",
