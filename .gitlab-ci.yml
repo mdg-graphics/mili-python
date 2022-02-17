@@ -71,10 +71,14 @@ stage-release:
 #         - rzgenie
 #         - shell
 #     script:
+#         - version=$(cat src/mili/__init__.py | grep 'version' | grep -Eo "[[:digit:]]+,[[:digit:]]+,[[:digit:]]+" | tr , . )
+#         - git tag -a v${version} -m "version $version"
+#         - git push origin v$version
+#         - pip3 install --upgrade build
 #         - python3 -m build
-#         - 
 #         - cp -n dist/* ${INSTALL_ROOT}/wheels/
+#         - git clone ssh://git@rzgitlab.llnl.gov:7999/mdg/mili/mili-python.git ${INSTALL_ROOT}/${version}
 #     rules:
-#         - if: '$CI_COMMIT_REF_NAME == "master"'
-#         - when: manual
+#         - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+#           when: manual
 

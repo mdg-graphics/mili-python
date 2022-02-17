@@ -25,9 +25,6 @@ Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
  Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 """
 
-__version__ = (0,2,0)
-__suppress_parallel__ = False
-
 # TODO : when we read raw data into numpy buffers, modify the dtype to account for endianness: https://numpy.org/doc/stable/reference/generated/numpy.frombuffer.html
 
 import copy
@@ -49,9 +46,11 @@ from mili.afileIO import *
 from mili.parallel import *
 
 if sys.version_info < (3, 7):
-  raise ImportError(f"This module requires python version > 3.7!")
+  raise ImportError(f"This module requires python version >= 3.7!")
 if tuple( int(vnum) for vnum in np.__version__.split('.') ) < (1,20,0):
   raise ImportError(f"This module requires numpy version > 1.20.0")
+
+__suppress_parallel__ = False
 
 def np_empty(dtype):
   return np.empty([0],dtype=dtype)
