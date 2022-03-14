@@ -1,11 +1,11 @@
 """
 Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
- Produced at the Lawrence Livermore National Laboratory. Written by 
- William Tobin (tobin6@llnl.hov) and Kevin Durrenberger (durrenberger1@llnl.gov). 
+ Produced at the Lawrence Livermore National Laboratory. Written by
+ William Tobin (tobin6@llnl.hov) and Kevin Durrenberger (durrenberger1@llnl.gov).
  CODE-OCEC-16-056.
  All rights reserved.
 
- This file is part of Mili. For details, see 
+ This file is part of Mili. For details, see
  https://rzlc.llnl.gov/gitlab/mdg/mili/mili-python/. For read access to this repo
  please contact the authors listed above.
 
@@ -33,14 +33,12 @@ from multiprocessing import Process
 
 from typing import *
 
-from mili.reader import __suppress_parallel__
-
 # TODO: probably just create a wrapper/dispatch superclass, and implement loop/pool/client-server versions instead of loop/pool in one and client/server in another
 
 class LoopWrapper:
   def __init__( self,
                 cls_obj : Type,
-                proc_pargs : List[List[Any]] = [], 
+                proc_pargs : List[List[Any]] = [],
                 proc_kwargs : List[Mapping[Any,Any]] = [] ):
     objs = [ cls_obj( *pargs, **kwargs ) for pargs, kwargs in zip(proc_pargs, proc_kwargs) ]
 
@@ -70,7 +68,7 @@ class PoolWrapper:
     num_pargs = len(proc_pargs)
     num_kwargs = len(proc_kwargs)
     if num_pargs > 0 and num_kwargs == 0:
-      proc_kwargs = [ {} ] * num_pargs 
+      proc_kwargs = [ {} ] * num_pargs
     elif num_kwargs > 0 and num_pargs == 0:
       proc_pargs = [] * num_kwargs
     elif num_kwargs != num_pargs:
@@ -134,7 +132,7 @@ class ServerWrapper:
     num_pargs = len(proc_pargs)
     num_kwargs = len(proc_kwargs)
     if num_pargs > 0 and num_kwargs == 0:
-      proc_kwargs = [ {} ] * num_pargs 
+      proc_kwargs = [ {} ] * num_pargs
     elif num_kwargs > 0 and num_pargs == 0:
       proc_pargs = [] * num_kwargs
     elif num_kwargs != num_pargs:

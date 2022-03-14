@@ -1,11 +1,11 @@
 """
 Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
- Produced at the Lawrence Livermore National Laboratory. Written by 
- William Tobin (tobin6@llnl.hov) and Kevin Durrenberger (durrenberger1@llnl.gov). 
+ Produced at the Lawrence Livermore National Laboratory. Written by
+ William Tobin (tobin6@llnl.hov) and Kevin Durrenberger (durrenberger1@llnl.gov).
  CODE-OCEC-16-056.
  All rights reserved.
 
- This file is part of Mili. For details, see 
+ This file is part of Mili. For details, see
  https://rzlc.llnl.gov/gitlab/mdg/mili/mili-python/. For read access to this repo
  please contact the authors listed above.
 
@@ -50,8 +50,6 @@ if sys.version_info < (3, 7):
 if tuple( int(vnum) for vnum in np.__version__.split('.') ) < (1,20,0):
   raise ImportError(f"This module requires numpy version > 1.20.0")
 
-__suppress_parallel__ = False
-
 def np_empty(dtype):
   return np.empty([0],dtype=dtype)
 
@@ -73,7 +71,7 @@ class MiliDatabase:
     self.__svars : Mapping[ str, StateVariable ] = {}
     self.__srecs : List[ Subrecord ] = []
 
-    # indexing / index discovery 
+    # indexing / index discovery
     self.__labels = defaultdict(lambda : defaultdict( lambda : np_empty(np.int64)) )
     self.__mats = defaultdict(list)
     self.__int_points = defaultdict(lambda : defaultdict( list ) )
@@ -96,16 +94,32 @@ class MiliDatabase:
         self.__parse_att_file( f )
     else:
       self.__parse_att_file( att_file )
-    sfile_re = re.escape(sfile_base) + f"(\d{{{self.__sfile_suf_len},}})$"
-    self.__state_files = list(filter(re.compile(sfile_re).match,os.listdir(dir_name)))
-    self.__state_files.sort()
-    self.__state_files = [ os.path.join(dir_name,sfile) for sfile in self.__state_files ]
+    sfile_re = re.compile(re.escape(sfile_base) + f"(\d{{{self.__sfile_suf_len},}})$")
+
+    # load and sort the state files numerically (NOT alphabetically)
+    self.__state_files = list(map(sfile_re.match,os.listdir(dir_name)))
+    self.__state_files = list(filter(lambda match: match != None,self.__state_files))
+    self.__state_files = list(sorted(self.__state_files, key = lambda match: int(match.group(1))))
+    self.__state_files = [ os.path.join(dir_name,match.group(0)) for match in self.__state_files ]
 
   def nodes(self):
     return self.__nodes
 
   def state_maps(self):
     return self.__smaps
+
+  def times( self, states : Optional[Union[List[int],int]] = None ):
+    if type(states) is int:
+      states = np.array( [ states ], dtype = np.int32 )
+    elif iterable( states ) and not type( states ) == str:
+      states = np.array( states, dtype = np.int32 )
+    if states != None and not isinstance( states, np.ndarray ) :
+      raise TypeError( f"'states' must be None, an integer, or a list of integers" )
+    if states is None:
+      result = np.array( [ smap.time for smap in self.__smaps ] )
+    else:
+      result = np.array( [ self.__smaps[state].time for state in states ] )
+    return result
 
   def state_variables(self):
     return self.__svars
@@ -120,8 +134,8 @@ class MiliDatabase:
     return self.__elems_of_mat.get(mat,{}).keys()
 
   def __parse_att_file( self, att_file : BinaryIO ):
-    """ 
-    Parse the provided AFile and setup all internal data structures to allow 
+    """
+    Parse the provided AFile and setup all internal data structures to allow
       querying the described database.
     Parameters:
       att_file (BinaryIO) : a BinaryIO stream containing the data of an A-file describing the mili database layout
@@ -130,7 +144,7 @@ class MiliDatabase:
     parser.register( AFileParser.Section.HEADER, self.__parse_header )
     parser.register( AFileParser.Section.STATE_MAP, self.__parse_smap )
 
-    # read order is important as some later phases depend on 
+    # read order is important as some later phases depend on
     #   data from earlier phases
     dir_callbacks = { Directory.Type.MILI_PARAM : self.__parse_param,
                       Directory.Type.TI_PARAM : self.__parse_ti_param,
@@ -161,7 +175,7 @@ class MiliDatabase:
       self.__nodes = np.empty( [0,self.__mesh_dim], dtype = np.float32 )
     # TODO: parse other params (mostly strings) correctly
     # else:
-    #   self.__params[sname] = 
+    #   self.__params[sname] =
 
   def __parse_ti_param( self, ti_param_data : bytes, directory : Directory ):
     sname = directory.strings[0]
@@ -193,7 +207,7 @@ class MiliDatabase:
     int_iter = int_data.__iter__()
     str_iter = svar_strs.__iter__()
 
-    # TODO: still don't like this, mostly due to the looping mechanism, 
+    # TODO: still don't like this, mostly due to the looping mechanism,
     #       but since we don't know a-priori how many bytes and the layout of
     #       each top-level svar, we have to iteratively discover as we parse
     while True:
@@ -230,7 +244,7 @@ class MiliDatabase:
           stress = self.__svars.get('stress')
           stress_comps = [ svar.name for svar in stress.svars ] if stress is not None else []
           strain = self.__svars.get('strain')
-          strain_comps = [ svar.name for svar in strain.svars ] if strain is not None else [] 
+          strain_comps = [ svar.name for svar in strain.svars ] if strain is not None else []
 
           if len( list(set(svar_comp_names) & set(stress_comps)) ) == 6:
             if 'stress' not in self.__int_points.keys():
@@ -509,7 +523,7 @@ class MiliDatabase:
     : param labels : optional labels to query data about, filtered by material if material if material is supplied, default is all
     : param state_numbers: optional state numbers from which to query data, default is all
     : param ips : optional integration points (really just indices into svars that have array aggregation) to specifically query, default is all available
-    : param write_data : optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format, 
+    : param write_data : optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
                    then modify the values desired, then query again with the modified result in this param
     '''
 
@@ -672,10 +686,10 @@ class MiliDatabase:
 
     return res
 
-def open_database( base_filename : os.PathLike, procs = [], suppress_parallel = __suppress_parallel__, experimental = False ):
+def open_database( base_filename : os.PathLike, procs = [], suppress_parallel = False, experimental = False ):
   """
-  Args: 
-   base_file (os.PathLike): the base filename of the mili database (e.g. for 'pltA', just 'plt', for parallel 
+  Args:
+   base_file (os.PathLike): the base filename of the mili database (e.g. for 'pltA', just 'plt', for parallel
                             databases like 'dblplt00A', also exclude the rank-digits, giving 'dblplt')
    procs (Optional[List[int]]) : optionally a list of process-files to open in parallel, default is all
    suppress_parallel (Optional[Bool]) : optionally return a serial database reader object if possible (for serial databases).
@@ -691,23 +705,7 @@ def open_database( base_filename : os.PathLike, procs = [], suppress_parallel = 
     raise ValueError( f"Cannot locate mili file directory {dir_name}.")
 
   base_filename = os.path.basename( base_filename )
-
-  afile_re = re.compile( re.escape(base_filename) + f"(\d*)A$" )
-  afiles = list(filter(afile_re.match,os.listdir(dir_name)))
-  afiles.sort()
-
-  def proc_from_file( fn ):
-    proc = afile_re.match(fn).group(1)
-    return int( proc ) if proc != '' else None
-  procs_we_have = list( proc_from_file(afile) for afile in afiles )
-  procs_we_have = list( filter( lambda val : val != None, procs_we_have ) )
-  procs = [ int(proc) for proc in procs ]
-  procs = procs_we_have if len(procs) == 0 else procs
-  procs_to_drop = list( set(procs_we_have) - set(procs) )
-  afiles = [ afile for afile in afiles if proc_from_file(afile) not in procs_to_drop ]
-
-  if len(afiles) == 0:
-    raise ValueError(f"No attribute files for procs {procs} with base name '{base_filename}' discovered in {dir_name}!")
+  afiles, afile_re = afiles_by_base( dir_name, base_filename, procs )
 
   sfiles = [ base_filename + afile_re.match(afile).group(1) for afile in afiles ]
   dir_names = [ dir_name ] * len(sfiles)
@@ -721,6 +719,6 @@ def open_database( base_filename : os.PathLike, procs = [], suppress_parallel = 
   else:
     if experimental:
       mili_database = ServerWrapper( MiliDatabase, proc_pargs )
-    else: 
+    else:
       mili_database = PoolWrapper( MiliDatabase, proc_pargs )
   return mili_database

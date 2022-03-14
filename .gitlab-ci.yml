@@ -20,6 +20,7 @@ stages:
     - deploy
 
 before_script:
+    - freturn() { return "$1" ; }
     - module load python/3.7.2
     - python3 --version
     - ${SYS_PYTHON_BIN} -m venv ${VENV_NAME}
@@ -33,6 +34,7 @@ unit_tests:
         - rzgenie
         - shell
     script:
+        - cd src
         - python3 -m unittest tests.reader_test
 
 coverage:
@@ -41,17 +43,19 @@ coverage:
         - rzgenie
         - shell
     script:
+        - cd src
         - python3 -m coverage --version
         - python3 -m coverage run -m unittest tests.reader_test
-        - python3 -m coverage combine
+        # avoid failure if there are not multiple reports
+        - python3 -m coverage combine || freturn 0
         - python3 -m coverage xml
         - python3 -m coverage report --fail-under=$MINIMUM_COVERAGE
     artifacts:
         when: always
         paths:
-            - coverage.xml
+            - src/coverage.xml
         reports:
-            cobertura: coverage.xml
+            cobertura: src/coverage.xml
         expire_in: 1 week
     coverage: '/TOTAL.+?([0-9]+\%)$/'
 
@@ -65,7 +69,7 @@ stage-release:
         - python3 -m build
 
 # TODO(wrt): make this actually deploy
-# deploy-release: 
+# deploy-release:
 #     stage: deploy
 #     tags:
 #         - rzgenie
@@ -73,11 +77,10 @@ stage-release:
 #     script:
 #         - version=$(cat src/mili/__init__.py | grep 'version' | grep -Eo "[[:digit:]]+,[[:digit:]]+,[[:digit:]]+" | tr , . )
 #         - git tag -a v${version} -m "version $version"
-#         - git push origin v$version
+#         - git push origin v${version}
 #         - pip3 install --upgrade build
 #         - python3 -m build
 #         - cp -n dist/* ${INSTALL_ROOT}/wheels/
-#         - git clone ssh://git@rzgitlab.llnl.gov:7999/mdg/mili/mili-python.git ${INSTALL_ROOT}/${version}
 #     rules:
 #         - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 #           when: manual

@@ -1,11 +1,11 @@
 """
 Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
- Produced at the Lawrence Livermore National Laboratory. Written by 
- William Tobin (tobin6@llnl.hov) and Kevin Durrenberger (durrenberger1@llnl.gov). 
+ Produced at the Lawrence Livermore National Laboratory. Written by
+ William Tobin (tobin6@llnl.hov) and Kevin Durrenberger (durrenberger1@llnl.gov).
  CODE-OCEC-16-056.
  All rights reserved.
 
- This file is part of Mili. For details, see 
+ This file is part of Mili. For details, see
  https://rzlc.llnl.gov/gitlab/mdg/mili/mili-python/. For read access to this repo
  please contact the authors listed above.
 
@@ -26,16 +26,42 @@ Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
 """
 
 from collections import defaultdict
+from email import header
 from enum import Enum
 import io
+import logging
 import os
-import struct 
+import re
+import struct
 from typing import *
 import typing
 if hasattr( typing, 'io' ):
   from typing.io import * # type: ignore
 
 from mili.datatypes import *
+
+def afiles_by_base( dir_name, base_filename, proc_whitelist = [] ):
+  afile_re = re.compile( re.escape(base_filename) + f"(\d*)A$" )
+  afiles = list(filter(afile_re.match,os.listdir(dir_name)))
+  afiles.sort()
+
+  def proc_from_file( fn ):
+    proc = afile_re.match(fn).group(1)
+    return int( proc ) if proc != '' else None
+  procs_we_have = list( proc_from_file(afile) for afile in afiles )
+  procs_we_have = list( filter( lambda val : val != None, procs_we_have ) )
+  proc_whitelist = [ int(proc) for proc in proc_whitelist ]
+  proc_whitelist = procs_we_have if len(proc_whitelist) == 0 else proc_whitelist
+  # drop unspecified proc A-files from the set of A-files we have
+  to_drop = list( set(procs_we_have) - set(proc_whitelist) )
+  afiles = [ afile for afile in afiles if proc_from_file(afile) not in to_drop ]
+
+  if len(afiles) == 0:
+    raise ValueError(f"No attribute files for procs {proc_whitelist} with base name '{base_filename}' discovered in {dir_name}!")
+  return afiles, afile_re
+
+class MiliAParseError(Exception):
+  pass
 
 # Callback keys: AFileParser.Section values and Directory.Type values
 class AFileParser:
@@ -85,7 +111,7 @@ class AFileParser:
     return key in self.__callbacks.keys()
 
   def __read_successive( self, f : BinaryIO, key : Union[Section,Directory.Type], num_items : int, item_bytes : int ) -> None:
-    ''' Read a buffer of num_items * item_bytes and iterate over it in item_bytes slices, calling the 
+    ''' Read a buffer of num_items * item_bytes and iterate over it in item_bytes slices, calling the
          key callback. '''
     data = f.read( num_items * item_bytes )
     byte_data = io.BytesIO( data )
@@ -126,3 +152,36 @@ class AFileParser:
         if self.__have_callback( dd.dir_type ):
           f.seek( dd.offset )
           self.__callback( dd.dir_type, f.read( dd.length ), dd )
+
+class AFileVerifier(AFileParser):
+  def __init__(self):
+    # call super first so its callbacks are processed first...
+    #   ... this might cause failure modes that aren't logged unless we add logging to the super
+    super(AFileParser,self).__init__()
+    self.register( AFileParser.SECTION.HEADER, self.verify_header )
+    self.register( AFileParser.SECTION.HEADER, self.verify_footer )
+
+  def verify( name, value, valid = lambda x : True ):
+    logging.info(f"{name} parsed as: {value}")
+    if not valid(value):
+      raise MiliAParseError( f"{name} '{value}' not in {valid}")
+    return value
+
+  def verify_header( self, header_data : bytes ):
+    if( len(header_data) != 16 ):
+      raise MiliAParseError( "header data is not 16 bytes in length... somehow?")
+    self.verify( 'file format', str(header_data[0:3]), lambda x : x in ['mili', 'taur'] )
+    self.verify( 'header version', int(header_data[4]) )
+    self.verify( 'directory version', int(header_data[5]), lambda x : x in [1,2] )
+    logging.info(f"denoting use of fstring format specifier: '{self.__dir_dtype}'")
+    endian_flag = self.verify( 'endian flag', int(header[6]), lambda x : x in [1,2] )
+    # endian_flag can only be [1,2] to get here without exception so the if/else is fine
+    logging.info(f"denoting {'big' if endian_flag == 1 else 'little'}-endian data")
+    precision_flag = self.verify( 'precision flag', int(header[7]), lambda x : x in [1,2] )
+    logging.info(f"denoting {'single' if precision_flag == 1 else 'double'}-precision data")
+    self.verify( 'state-file suffix length', int(header_data[8]) )
+    self.verify( 'partition sheme', int(header_data[9]) )
+    return
+
+  def verify_footer( self, footer_data : bytes ):
+    pass
