@@ -5,7 +5,18 @@
       "name": "mili reader",
       "type": "python",
       "request": "launch",
-      "program": "mili/reader.py",
+      "program": "src/mili/reader.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "reader test",
+      "type": "python",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/src",
+      "program": "tests/reader_test.py",
+      "args": [
+        "SerialMutliStateFile.test_state_variable_vector_array_component"
+      ],
       "console": "integratedTerminal"
     }
   ]

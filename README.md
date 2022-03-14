@@ -104,3 +104,9 @@
 ##### NOTES:
 
   - Mixed-data subrecords (subrecords containing more than 1 datatype (e.g. mixed double/float, int/double, etc)) are functional but have received less testing and performance evaluation, so some performance degredation is expected when querying variables from these subrecords.
+
+
+--- 
+##### Development Notes:
+  
+  
