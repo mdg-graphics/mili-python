@@ -1,13 +1,12 @@
 [project]
   name = "mili"
   description = "modules for interacting with mili database files"
-  authors = [
-    "William R Tobin <tobin6@llnl.gov>",
-    "Kevin Durrenberger <durrenberger1@llnl.gov>" ]
+  authors = [ { name = "William R Tobin", email = "tobin6@llnl.gov" },
+              { name = "Kevin Durrenberger", email = "durrenberger1@llnl.gov" } ]
   readme = "README.md"
   requires-python = ">3.7"
-  license = "LGPL-2.1-only"
-  dynamic = [ "version" ]
+  license = { text = "LGPL-2.1-only" }
+  dynamic = [ "dependencies", "version" ]
 
 [dependencies]
   pathos = ""

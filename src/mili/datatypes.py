@@ -39,20 +39,20 @@ import warnings
 from typing import *
 
 class MiliType(Enum):
-  M_STRING = 0
-  M_FLOAT = 1
-  M_FLOAT4 = 2
-  M_FLOAT8 = 3
-  M_INT = 4
-  M_INT4 = 5
-  M_INT8 = 6
-  M_INVALID = 7
+  M_INVALID = 0
+  M_STRING = 1
+  M_FLOAT = 2
+  M_FLOAT4 = 3
+  M_FLOAT8 = 4
+  M_INT = 5
+  M_INT4 = 6
+  M_INT8 = 7
   def byte_size(self):
-    return [ 1, 4, 4, 8, 4, 4, 8, -1 ][self.value]
+    return [ -1, 1, 4, 4, 8, 4, 4, 8 ][self.value]
   def numpy_dtype(self):
-    return [ object, np.float32, np.float32, np.float64, np.int32, np.int32, np.int64, None ][self.value]
+    return [ None, object, np.float32, np.float32, np.float64, np.int32, np.int32, np.int64 ][self.value]
   def repr(self):
-    return 'sffdiiq '[self.value]
+    return 'sffdiiq '[self.value-1]
 
 class Superclass(Enum):
   ''' The superclass denotes what mesh class an object belongs to. '''
