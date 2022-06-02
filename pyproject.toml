@@ -11,8 +11,9 @@
 
 [dependencies]
   pathos = ""
-  numpy = ">1.20.0"
+  numpy = ">1.20.0, < 1.22"
   coverage = ">= 4.0.0"
+  dill = "== 0.3.4"
 
 [build-system]
   requires = ["setuptools", "wheel", "toml", "GitPython"]
