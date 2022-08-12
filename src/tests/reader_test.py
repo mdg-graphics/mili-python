@@ -34,6 +34,21 @@ import numpy as np
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
+class NonsequentialMOBlocks(unittest.TestCase):
+    def __init__(self, *args, **kwargs):
+        super(NonsequentialMOBlocks, self).__init__(*args,**kwargs)
+        self.file_name = os.path.join(dir_path,'data','parallel','basic1','basic1.plt')
+
+    def test_serial( self ):
+        mili = reader.open_database( self.file_name, procs = [7], suppress_parallel = True )
+        result = mili.query( 'sx', 'brick', labels = [228], states = [10])
+        self.assertAlmostEqual(result['sx']['data']['7hex_mmsvn_rec'][0][0][0],20.355846, places = 6 )
+
+    def test_parallel( self ):
+        mili = reader.open_database( self.file_name )
+        result = mili.query( 'sx', 'brick', labels = [228], states = [10] )
+        self.assertAlmostEqual(result[7]['sx']['data']['7hex_mmsvn_rec'][0][0][0],20.355846, places = 6 )
+
 '''
 These are tests to assert the correctness of the Mili Reader
 These tests use d3samp6.plt
@@ -596,7 +611,7 @@ class SerialMutliStateFile(SerialSingleStateFile):
 Testing the parallel Mili file version
 '''
 class ParallelSingleStateFile(unittest.TestCase):
-    file_name = file_name = os.path.join(dir_path,'data','parallel','d3samp6.plt')
+    file_name = file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
     '''
     Set up the mili file object
     '''

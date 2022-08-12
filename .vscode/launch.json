@@ -1,6 +1,7 @@
 {
   "version": "0.2.0",
   "configurations": [
+
     {
       "name": "mili reader",
       "type": "python",
@@ -15,7 +16,7 @@
       "cwd": "${workspaceFolder}/src",
       "program": "tests/reader_test.py",
       "args": [
-        "SerialMutliStateFile.test_state_variable_vector_array_component"
+        "ParallelSingleStateFile.test_modify_vector"
       ],
       "console": "integratedTerminal"
     }
