@@ -94,7 +94,7 @@ class MiliDatabase:
         self.__parse_att_file( f )
     else:
       self.__parse_att_file( att_file )
-    sfile_re = re.compile(re.escape(sfile_base) + f"(\d{{{self.__sfile_suf_len},}})$")
+    sfile_re = re.compile(re.escape(sfile_base) + f"(\\d{{{self.__sfile_suf_len},}})$")
 
     # load and sort the state files numerically (NOT alphabetically)
     self.__state_files = list(map(sfile_re.match,os.listdir(dir_name)))
@@ -622,15 +622,22 @@ class MiliDatabase:
           #  if not we need to order them on read
           srec_ordinal_bins = np.digitize( ordinals_we_have, srec.ordinal_blocks )
           # eliminate ordinals where the bin is not odd (not in this srec)
-          srec_ordinals = ordinals_we_have[ ( srec_ordinal_bins & 0x1 ).astype( bool ) ]
+          ordinals_we_have_copy = ordinals_we_have - srec.ordinal_blocks[ srec_ordinal_bins - 1 ]
+          mask = ( srec_ordinal_bins & 0x1 ).astype( bool )
+          # ordinals from the subrecord perspective -- Needed to get the correct values from the subrecord.
+          srec_ordinals = ordinals_we_have_copy[ mask ]
+          # ordinals from the element class perspective -- Needed to get correct labels.
+          class_ordinals = ordinals_we_have[ mask ]
+
         else:
           # case for global values
           srec_ordinals = np_empty(np.int64)
+          class_ordinals = np_empty(np.int64)
 
         srec_ordinal_indices = np.empty( [ srec_ordinals.size, qd_svar_comps.shape[0] ], dtype = np.int64 )
         srec_ordinal_indices[:,0] = srec_ordinals
 
-        res[queried_name]['layout'][srec.name] = self.__labels[class_sname][ srec_ordinals ]
+        res[queried_name]['layout'][srec.name] = self.__labels[class_sname][ class_ordinals ]
 
         # we work from the last column / svar to the first the first contains the ordinal info needed to compute the rest (in the RESULT organization case.. so we just do the same in both cases)
         if srec.organization == Subrecord.Org.OBJECT:
