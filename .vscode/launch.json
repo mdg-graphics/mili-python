@@ -1,7 +1,14 @@
 {
   "version": "0.2.0",
   "configurations": [
-
+    {
+      "name": "Python: Current File",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
     {
       "name": "mili reader",
       "type": "python",
@@ -16,7 +23,7 @@
       "cwd": "${workspaceFolder}/src",
       "program": "tests/reader_test.py",
       "args": [
-        "ParallelSingleStateFile.test_modify_vector"
+        "ParallelSingleStateFile.test_nodes_label"
       ],
       "console": "integratedTerminal"
     }

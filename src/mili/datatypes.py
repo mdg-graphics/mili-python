@@ -1,11 +1,11 @@
 """
 Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
- Produced at the Lawrence Livermore National Laboratory. Written by 
- William Tobin (tobin6@llnl.hov) and Kevin Durrenberger (durrenberger1@llnl.gov). 
+ Produced at the Lawrence Livermore National Laboratory. Written by
+ William Tobin (tobin6@llnl.hov) and Kevin Durrenberger (durrenberger1@llnl.gov).
  CODE-OCEC-16-056.
  All rights reserved.
 
- This file is part of Mili. For details, see 
+ This file is part of Mili. For details, see
  https://rzlc.llnl.gov/gitlab/mdg/mili/mili-python/. For read access to this repo
  please contact the authors listed above.
 
@@ -26,7 +26,7 @@ Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
 """
 
 # defer evaluation of type-annotations until after the module is processed, allowing class members to refer to the class
-from __future__ import annotations 
+from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
@@ -179,9 +179,17 @@ class Subrecord:
   state_byte_offset : int = -1
   atoms_per_label : int = -1
   byte_size : int = 0
-  # for each svar in the srec, the offset 
+  # for each svar in the srec, the offset
   svar_ordinal_offsets : np.ndarray = np.empty([0], dtype = np.int64)
   svar_byte_offsets : np.ndarray = np.empty([0], dtype = np.int64)
+
+  def scalar_svar_coords( self, svar_name ):
+    coords = []
+    for idx, svar_comps in enumerate( self.svar_svar_comp_layout ):
+      matches = [ ( idx, jdx ) for jdx, svar in enumerate(svar_comps) if svar == svar_name ]
+      if len( matches ) > 0:
+        coords.append( matches )
+    return np.array( *coords )
 
   # right now we're assuming we have the ordinals, we could add bounds checking as a debug version, or auto-filter for parallel versions
   # we're also assuming the write_data is filtered appropriately so that only the data being written out to this procs database is included

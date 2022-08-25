@@ -55,7 +55,9 @@ coverage:
         paths:
             - src/coverage.xml
         reports:
-            cobertura: src/coverage.xml
+            coverage_report:
+                coverage_format: cobertura
+                path: src/coverage.xml
         expire_in: 1 week
     coverage: '/TOTAL.+?([0-9]+\%)$/'
 
