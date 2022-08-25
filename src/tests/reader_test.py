@@ -208,7 +208,6 @@ class SerialSingleStateFile(unittest.TestCase):
         np.testing.assert_equal(labels['glob'], GLOB_LBLS)
         np.testing.assert_equal(labels['mat'], MATS_LBLS)
 
-
     # """
     # Testing the getMaterials() method of the Mili class.
     # """
@@ -280,9 +279,10 @@ class SerialSingleStateFile(unittest.TestCase):
     Testing what nodes are associated with a label
     '''
     def test_nodes_label(self):
-        answer = self.mili.nodes_of_elems('brick', 1)
-        self.assertEqual(answer.size, 8)
-        np.testing.assert_equal(answer, np.array( [[65, 81, 85, 69, 66, 82, 86, 70]], dtype = np.int32 ))
+        nodes, elem_labels = self.mili.nodes_of_elems('brick', 1)
+        self.assertEqual( elem_labels[0], 1 )
+        self.assertEqual(nodes.size, 8)
+        np.testing.assert_equal(nodes, np.array( [[65, 81, 85, 69, 66, 82, 86, 70]], dtype = np.int32 ))
 
     '''
     Testing accessing a variable at a given state
@@ -551,6 +551,10 @@ class SerialMutliStateFile(SerialSingleStateFile):
                           'stress', 'svec', 'svec_x', 'svec_y', 'svec_z', 'sx', 'sxy', 'sy', 'syz', 'sz', 'szx', 'tcon_damp_eng',
                           'tcon_eng', 'tcon_fric_eng', 'te', 'thick', 'tor', 'total', 'tshell', 'ux', 'uy', 'uz', 'vx', 'vy', 'vz', 'xfem'])
         self.assertEqual(state_variable_names, SVAR_NAMES)
+
+    def test_class_labels_of_mat(self):
+        answer = self.mili.class_labels_of_material(5,'cseg')
+        np.testing.assert_equal(answer, np.array([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],dtype=np.int32))
 
     def test_modify_vector_array(self):
         '''
@@ -829,7 +833,7 @@ class ParallelSingleStateFile(unittest.TestCase):
     '''
     def test_nodes_label(self):
         answer = self.mili.nodes_of_elems('brick', 1)
-        np.testing.assert_equal( answer[3][0,:], np.array([65,81,85,69,66,82,86,70],dtype=np.int32) )
+        np.testing.assert_equal( answer[3][0][0,:], np.array([65,81,85,69,66,82,86,70],dtype=np.int32) )
 
 
     '''
@@ -1070,6 +1074,41 @@ class ParallelSingleStateFile(unittest.TestCase):
         # Back to original
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2, write_data = v1 )
         np.testing.assert_equal( answer[2]['stress[sy]']['data']['1beam_mmsvn_rec'], v1['stress[sy]']['data']['1beam_mmsvn_rec'] )
+
+
+'''
+Testing labeling bugfixes from 0.2.4
+'''
+class Bugfixes0_2_4(unittest.TestCase):
+    file_name = file_name = os.path.join(dir_path,'data','serial','labeling','dblplt003')
+    '''
+    Set up the mili file object
+    '''
+    def setUp(self):
+        self.mili = reader.open_database( Bugfixes0_2_4.file_name, suppress_parallel=True )
+
+    def test_nodpres_query(self):
+        # this was erroring on the provided database due to srec scalar svar "coord" lookup,
+        #  so as long as it doesn't throw an exception we're good
+        self.mili.query('nodpres','node')
+
+    def test_labels_of_material(self):
+        desired = np.array([
+            22033, 21889, 21745, 21601, 21457, 21313, 21169, 21025, 20881,
+            20737, 20593, 20449, 20305, 20161, 22034, 21890, 21746, 21602,
+            21458, 21314, 21170, 21026, 20882, 20738, 20594, 20450, 20306,
+            20162, 22035, 21891, 21747, 21603, 21459, 21315, 21171, 21027,
+            20883, 20739, 20595, 20451, 20307, 20163, 22036, 21892, 21748,
+            21604, 21460, 21316, 21172, 21028, 20884, 20740, 20596, 20452,
+            20308, 20164, 22037, 21893, 21749, 21605, 21461, 21317, 21173,
+            21029, 20885, 20741, 20597, 20453, 20309, 20165, 20021, 22038,
+            21894, 21750, 21606, 21462, 21318, 21174, 21030, 20886, 20742,
+            20598, 20454, 20310, 20166, 20022, 22039, 21895, 21751, 21607,
+            21463, 21319, 21175, 21031, 20887, 20743, 20599, 20455, 20311,
+            20167, 20023, 19879, 21896, 21752, 21608, 20600, 20456, 20312,
+            20168, 20024, 21897, 21753 ], dtype=np.int32 )
+        answer = self.mili.class_labels_of_material(6,'quad')
+        np.testing.assert_equal( answer, desired )
 
 if __name__ == "__main__":
     unittest.main()

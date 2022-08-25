@@ -288,12 +288,15 @@ class MiliDatabase:
     conn_qty = Superclass(sclass).node_count()
     word_qty = conn_qty + 2
     conn = np.reshape( np.frombuffer( f.read( elem_qty * word_qty * 4 ), dtype = np.int32 ), [-1,word_qty] )
-    self.__conns[sname] = conn[:,:conn_qty] - 1 # account for fortran indexing
-    # self.__conns[sname] = np.array( [ self.__labels['node'][elem_conn] for elem_conn in node_conn ], dtype = np.int32 )
+    if sname not in self.__conns.keys():
+      self.__conns[ sname ] = np.ndarray( (0,conn_qty), dtype = np.int64 )
+    current_elem_count = self.__conns[sname].shape[0]
+    self.__conns[sname] = np.concatenate( ( self.__conns[sname], conn[:,:conn_qty] - 1 ) ) # account for fortran indexing
     mats = np.unique( conn[:,conn_qty] )
     for mat in mats:
-      mat_2_conn_idxs = np.nonzero( conn[:,conn_qty] == mat )[0]
-      # self.__elems_of_mat[ mat ][ sname ].append( mat_2_conn_idxs )
+      # this assumes the load order of the conn blocks is identical to their mo_ids... which is probably the case but also is there not a way to
+      #  make that explicit?
+      mat_2_conn_idxs = current_elem_count + np.nonzero( conn[:,conn_qty] == mat )[0]
       self.__elems_of_mat[ mat ][ sname ] = np.concatenate( ( self.__elems_of_mat[ mat ][ sname ], mat_2_conn_idxs ) )
 
   def __parse_srec( self, srec_data : bytes, directory : Directory ):
@@ -338,7 +341,7 @@ class MiliDatabase:
       srec.svar_atom_offsets = np.zeros( srec.svar_atom_lengths.size, dtype = np.int64 )
       srec.svar_atom_offsets[1:] = srec.svar_atom_lengths.cumsum()[:-1]
       srec.atoms_per_label = sum( srec.svar_atom_lengths )
-      srec.svar_svar_comp_layout = np.array( [ [ svar.name ] if ( svar.order == 0 and len( svar.svars ) == 0 ) else svar.comp_svar_names * int( max( 1, np.prod(svar.dims) ) ) for svar in srec.svars ], dtype = object )
+      srec.svar_svar_comp_layout = [ [ svar.name ] if ( svar.order == 0 and len( svar.svars ) == 0 ) else svar.comp_svar_names * int( max( 1, np.prod(svar.dims) ) ) for svar in srec.svars ]
 
       for svar in srec.svars:
         svar.srecs.append(srec)
@@ -425,7 +428,7 @@ class MiliDatabase:
     # get the indices of the labels we're querying in the list of local labels of the element class, so we can retrieve their connectivity
     indices = (self.__labels[class_sname][:,None] == elem_labels).argmax(axis=0)
     elem_conn = self.__conns[class_sname][indices]
-    return self.__labels['node'][elem_conn]
+    return self.__labels['node'][elem_conn], self.__labels[class_sname][indices,None]
 
   def nodes_of_material( self, mat ):
     ''' Find nodes associated with a material number '''
@@ -434,7 +437,7 @@ class MiliDatabase:
     element_labels = self.all_labels_of_material( mat )
     node_labels = np_empty(np.int32)
     for class_name, class_labels in element_labels.items():
-      node_labels = np.append( node_labels, self.nodes_of_elems( class_name, class_labels ) )
+      node_labels = np.append( node_labels, self.nodes_of_elems( class_name, class_labels )[0] )
     return np.unique( node_labels )
 
   def __init_query_parameters( self,
@@ -603,11 +606,11 @@ class MiliDatabase:
         #        also we're searching by svar sname which isn't technically incorrect, but could become slow if many svars are in subrecs
         qd_svar_comps = np.empty([0,2],dtype=np.int64)
         for svar in svars_to_query:
-          matches = np.argwhere( svar.name == srec.svar_svar_comp_layout )
+          svar_coords = srec.scalar_svar_coords( svar.name )
           ips = matching_int_points.get( svar.name, None )
           if ips is not None:
-            matches = matches[ips]
-          qd_svar_comps = np.concatenate( ( qd_svar_comps, matches ), axis = 0 )
+            svar_coords = svar_coords[ips]
+          qd_svar_comps = np.concatenate( ( qd_svar_comps, svar_coords ), axis = 0 )
 
         # discover which labels we want to query are in the current subrecord
         # TODO : can we eliminate this if/else, will digitize with no bins return empty?

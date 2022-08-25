@@ -40,6 +40,14 @@ class LoopWrapper:
                 cls_obj : Type,
                 proc_pargs : List[List[Any]] = [],
                 proc_kwargs : List[Mapping[Any,Any]] = [] ):
+    num_pargs = len(proc_pargs)
+    num_kwargs = len(proc_kwargs)
+    if num_pargs > 0 and num_kwargs == 0:
+      proc_kwargs = [ {} ] * num_pargs
+    elif num_kwargs > 0 and num_pargs == 0:
+      proc_pargs = [] * num_kwargs
+    elif num_kwargs != num_pargs:
+      raise ValueError(f'Must supply the same number of pargs ({num_pargs}) and kwargs ({num_kwargs}) to instantiate object list.')
     objs = [ cls_obj( *pargs, **kwargs ) for pargs, kwargs in zip(proc_pargs, proc_kwargs) ]
 
     # ensure all contained objects are the same exact type (no instances, subclasses are not valid)
