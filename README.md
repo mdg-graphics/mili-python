@@ -33,7 +33,7 @@
   ``` 
   module load python/3.7.2
   python -m pip install --upgrade pip --user
-  python -m pip install --user --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse --find-links=/collab/usr/gapps/mdg/wheels/ mili
+  python -m pip install --user --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse --find-links=/collab/usr/gapps/mdg/python/wheels/ mili
   ```
 
 ---
