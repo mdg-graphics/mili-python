@@ -30,6 +30,7 @@ Copyright (c) 2016-2021, Lawrence Livermore National Security, LLC.
 import os
 import unittest
 from mili import reader
+from mili.datatypes import Superclass
 import numpy as np
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -151,7 +152,6 @@ class SerialSingleStateFile(unittest.TestCase):
         self.assertEqual(FIRST_STATE, times[0])
         self.assertEqual(LAST_STATE, times[-1])
 
-
     def test_labels_getter(self):
         """
         Testing the labels() method of the Mili class
@@ -230,6 +230,148 @@ class SerialSingleStateFile(unittest.TestCase):
     #             ml1 = materials[k1][m1]
     #             ml2 = materials[k2][m2]
     #             np.testing.assert_equal( ml1, ml2 )
+
+    def test_reload_state_maps(self):
+        """
+        Test the reload_state_maps method of the Mili Class.
+        """
+        # Just make sure it doesn't cause Exception
+        self.mili.reload_state_maps()
+        FIRST_STATE = 0.0
+        LAST_STATE = 0.0010000000474974513
+        STATE_COUNT = 101
+        state_maps = self.mili.state_maps()
+        self.assertEqual(STATE_COUNT, len(state_maps))
+        self.assertEqual(FIRST_STATE, state_maps[0].time)
+        self.assertEqual(LAST_STATE, state_maps[-1].time)
+
+    def test_materials_of_class_name(self):
+        """
+        Test the materials_of_class_name method of Mili Class.
+        """
+        brick_mats = self.mili.materials_of_class_name("brick")
+        beam_mats = self.mili.materials_of_class_name("beam")
+        shell_mats = self.mili.materials_of_class_name("shell")
+        cseg_mats = self.mili.materials_of_class_name("cseg")
+
+        self.assertEqual( brick_mats.size, 36 )
+        np.testing.assert_equal( np.unique(brick_mats), np.array([2]) )
+
+        self.assertEqual( beam_mats.size, 46 )
+        np.testing.assert_equal( np.unique(beam_mats), np.array([1]) )
+
+        self.assertEqual( shell_mats.size, 12 )
+        np.testing.assert_equal( np.unique(shell_mats), np.array([3]) )
+
+        self.assertEqual( cseg_mats.size, 24 )
+        np.testing.assert_equal( cseg_mats, np.array([4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+                                                      5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5]) )
+
+
+
+    def test_parts_of_class_name(self):
+        """
+        Test the parts_of_class_name method of Mili Class.
+        """
+        brick_parts = self.mili.parts_of_class_name("brick")
+        beam_parts = self.mili.parts_of_class_name("beam")
+        shell_parts = self.mili.parts_of_class_name("shell")
+        cseg_parts = self.mili.parts_of_class_name("cseg")
+
+        self.assertEqual( brick_parts.size, 36 )
+        np.testing.assert_equal( np.unique(brick_parts), np.array([2]) )
+
+        self.assertEqual( beam_parts.size, 46 )
+        np.testing.assert_equal( np.unique(beam_parts), np.array([1]) )
+
+        self.assertEqual( shell_parts.size, 12 )
+        np.testing.assert_equal( np.unique(shell_parts), np.array([3]) )
+
+        self.assertEqual( cseg_parts.size, 24 )
+        np.testing.assert_equal( np.unique(cseg_parts), np.array([1]) )
+
+    def test_mesh_object_classes_getter(self):
+        """
+        Test the mesh_object_classes() method of Mili Class.
+        """
+        mo_classes = self.mili.mesh_object_classes()
+
+        # Glob class
+        glob_class = mo_classes["glob"]
+        self.assertEqual(glob_class.mesh_id, 0)
+        self.assertEqual(glob_class.short_name, "glob")
+        self.assertEqual(glob_class.long_name, "Global")
+        self.assertEqual(glob_class.sclass, Superclass.M_MESH)
+        self.assertEqual(glob_class.elem_qty, 1)
+        self.assertEqual(glob_class.idents_exist, True)
+
+        # Mat Class
+        mat_class = mo_classes["mat"]
+        self.assertEqual(mat_class.mesh_id, 0)
+        self.assertEqual(mat_class.short_name, "mat")
+        self.assertEqual(mat_class.long_name, "Material")
+        self.assertEqual(mat_class.sclass, Superclass.M_MAT)
+        self.assertEqual(mat_class.elem_qty, 5)
+        self.assertEqual(mat_class.idents_exist, True)
+
+        # Node class
+        node_class = mo_classes["node"]
+        self.assertEqual(node_class.mesh_id, 0)
+        self.assertEqual(node_class.short_name, "node")
+        self.assertEqual(node_class.long_name, "Node")
+        self.assertEqual(node_class.sclass, Superclass.M_NODE)
+        self.assertEqual(node_class.elem_qty, 144)
+        self.assertEqual(node_class.idents_exist, True)
+
+        # beam class
+        beam_class = mo_classes["beam"]
+        self.assertEqual(beam_class.mesh_id, 0)
+        self.assertEqual(beam_class.short_name, "beam")
+        self.assertEqual(beam_class.long_name, "Beams")
+        self.assertEqual(beam_class.sclass, Superclass.M_BEAM)
+        self.assertEqual(beam_class.elem_qty, 46)
+        self.assertEqual(beam_class.idents_exist, True)
+
+        # brick class
+        brick_class = mo_classes["brick"]
+        self.assertEqual(brick_class.mesh_id, 0)
+        self.assertEqual(brick_class.short_name, "brick")
+        self.assertEqual(brick_class.long_name, "Bricks")
+        self.assertEqual(brick_class.sclass, Superclass.M_HEX)
+        self.assertEqual(brick_class.elem_qty, 36)
+        self.assertEqual(brick_class.idents_exist, True)
+
+        # shell class
+        shell_class = mo_classes["shell"]
+        self.assertEqual(shell_class.mesh_id, 0)
+        self.assertEqual(shell_class.short_name, "shell")
+        self.assertEqual(shell_class.long_name, "Shells")
+        self.assertEqual(shell_class.sclass, Superclass.M_QUAD)
+        self.assertEqual(shell_class.elem_qty, 12)
+        self.assertEqual(shell_class.idents_exist, True)
+
+        # cseg class
+        cseg_class = mo_classes["cseg"]
+        self.assertEqual(cseg_class.mesh_id, 0)
+        self.assertEqual(cseg_class.short_name, "cseg")
+        self.assertEqual(cseg_class.long_name, "Contact Segment")
+        self.assertEqual(cseg_class.sclass, Superclass.M_QUAD)
+        self.assertEqual(cseg_class.elem_qty, 24)
+
+    def test_query_all_classes(self):
+        """
+        Test the query_all_classes method of the Mili Class.
+        """
+        sand_data = self.mili.query_all_classes("sand", states=[10])
+
+        self.assertEqual(set(sand_data.keys()), set(["brick", "shell", "beam"]))
+
+        np.testing.assert_equal( sand_data["brick"]["sand"]["data"]["2hex_sand_rec"][0,:,:],
+                                 np.full((36, 1), 1.0) )
+        np.testing.assert_equal( sand_data["beam"]["sand"]["data"]["1sand_beam_bind"][0,:,:],
+                                 np.full((46, 1), 1.0) )
+        np.testing.assert_equal( sand_data["shell"]["sand"]["data"]["3sand_shell_bind"][0,:,:],
+                                 np.full((12, 1), 1.0) )
 
     def test_statevariables_getter(self):
         """
@@ -800,6 +942,263 @@ class ParallelSingleStateFile(unittest.TestCase):
     #             for mat_name, labels, in mat.items():
     #                 self.assertTrue( mat_name in gr[mat_num].keys() )
     #                 np.testing.assert_equal( labels, gr[mat_num][mat_name])
+
+    def test_reload_state_maps(self):
+        """
+        Test the reload_state_maps method of the Mili Class.
+        """
+        # Just make sure it doesn't cause Exception
+        self.mili.reload_state_maps()
+        state_maps = self.mili.state_maps()
+        FIRST_STATE = 0.0
+        LAST_STATE = 0.0010000000474974513
+        STATE_COUNT = 101
+        PROCS = 8
+        self.assertEqual(len(state_maps), PROCS)  # One entry in list for each processor
+        for state_map in state_maps:
+            self.assertEqual(len(state_map), STATE_COUNT)
+            self.assertEqual(state_map[0].time, FIRST_STATE)
+            self.assertEqual(state_map[-1].time, LAST_STATE)
+
+    def test_materials_of_class_name(self):
+        """
+        Test the materials_of_class_name method of Mili Class.
+        """
+        brick_mats = self.mili.materials_of_class_name("brick")
+        beam_mats = self.mili.materials_of_class_name("beam")
+        shell_mats = self.mili.materials_of_class_name("shell")
+        cseg_mats = self.mili.materials_of_class_name("cseg")
+
+        self.assertEqual( brick_mats[0].size, 11 )
+        self.assertEqual( brick_mats[1].size, 13 )
+        self.assertEqual( brick_mats[2].size, 3 )
+        self.assertEqual( brick_mats[3].size, 6 )
+        self.assertEqual( brick_mats[4].size, 0 )
+        self.assertEqual( brick_mats[5].size, 3 )
+        self.assertEqual( brick_mats[6].size, 0 )
+        self.assertEqual( brick_mats[7].size, 0 )
+        np.testing.assert_equal( np.unique(brick_mats[0]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_mats[1]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_mats[2]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_mats[3]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_mats[5]), np.array([2]) )
+
+        self.assertEqual( beam_mats[0].size, 0 )
+        self.assertEqual( beam_mats[1].size, 0 )
+        self.assertEqual( beam_mats[2].size, 2 )
+        self.assertEqual( beam_mats[3].size, 0 )
+        self.assertEqual( beam_mats[4].size, 14 )
+        self.assertEqual( beam_mats[5].size, 2 )
+        self.assertEqual( beam_mats[6].size, 14 )
+        self.assertEqual( beam_mats[7].size, 14 )
+        np.testing.assert_equal( np.unique(beam_mats[2]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_mats[4]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_mats[5]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_mats[6]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_mats[7]), np.array([1]) )
+
+        self.assertEqual( shell_mats[0].size, 0 )
+        self.assertEqual( shell_mats[1].size, 0 )
+        self.assertEqual( shell_mats[2].size, 3 )
+        self.assertEqual( shell_mats[3].size, 6 )
+        self.assertEqual( shell_mats[4].size, 0 )
+        self.assertEqual( shell_mats[5].size, 3 )
+        self.assertEqual( shell_mats[6].size, 0 )
+        self.assertEqual( shell_mats[7].size, 0 )
+        np.testing.assert_equal( np.unique(shell_mats[2]), np.array([3]) )
+        np.testing.assert_equal( np.unique(shell_mats[3]), np.array([3]) )
+        np.testing.assert_equal( np.unique(shell_mats[5]), np.array([3]) )
+
+        self.assertEqual( cseg_mats[0].size, 0 )
+        self.assertEqual( cseg_mats[1].size, 0 )
+        self.assertEqual( cseg_mats[2].size, 6 )
+        self.assertEqual( cseg_mats[3].size, 12 )
+        self.assertEqual( cseg_mats[4].size, 0 )
+        self.assertEqual( cseg_mats[5].size, 6 )
+        self.assertEqual( cseg_mats[6].size, 0 )
+        self.assertEqual( cseg_mats[7].size, 0 )
+        np.testing.assert_equal( cseg_mats[2], np.array([4, 4, 4, 5, 5, 5]) )
+        np.testing.assert_equal( cseg_mats[3], np.array([4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5]) )
+        np.testing.assert_equal( cseg_mats[5], np.array([4, 4, 4, 5, 5, 5]))
+
+
+    def test_parts_of_class_name(self):
+        """
+        Test the parts_of_class_name method of Mili Class.
+        """
+        brick_parts = self.mili.parts_of_class_name("brick")
+        beam_parts = self.mili.parts_of_class_name("beam")
+        shell_parts = self.mili.parts_of_class_name("shell")
+        cseg_parts = self.mili.parts_of_class_name("cseg")
+
+        self.assertEqual( brick_parts[0].size, 11 )
+        self.assertEqual( brick_parts[1].size, 13 )
+        self.assertEqual( brick_parts[2].size, 3 )
+        self.assertEqual( brick_parts[3].size, 6 )
+        self.assertEqual( brick_parts[4].size, 0 )
+        self.assertEqual( brick_parts[5].size, 3 )
+        self.assertEqual( brick_parts[6].size, 0 )
+        self.assertEqual( brick_parts[7].size, 0 )
+        np.testing.assert_equal( np.unique(brick_parts[0]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_parts[1]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_parts[2]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_parts[3]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_parts[5]), np.array([2]) )
+
+        self.assertEqual( beam_parts[0].size, 0 )
+        self.assertEqual( beam_parts[1].size, 0 )
+        self.assertEqual( beam_parts[2].size, 2 )
+        self.assertEqual( beam_parts[3].size, 0 )
+        self.assertEqual( beam_parts[4].size, 14 )
+        self.assertEqual( beam_parts[5].size, 2 )
+        self.assertEqual( beam_parts[6].size, 14 )
+        self.assertEqual( beam_parts[7].size, 14 )
+        np.testing.assert_equal( np.unique(beam_parts[2]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_parts[4]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_parts[5]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_parts[6]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_parts[7]), np.array([1]) )
+
+        self.assertEqual( shell_parts[0].size, 0 )
+        self.assertEqual( shell_parts[1].size, 0 )
+        self.assertEqual( shell_parts[2].size, 3 )
+        self.assertEqual( shell_parts[3].size, 6 )
+        self.assertEqual( shell_parts[4].size, 0 )
+        self.assertEqual( shell_parts[5].size, 3 )
+        self.assertEqual( shell_parts[6].size, 0 )
+        self.assertEqual( shell_parts[7].size, 0 )
+        np.testing.assert_equal( np.unique(shell_parts[2]), np.array([3]) )
+        np.testing.assert_equal( np.unique(shell_parts[3]), np.array([3]) )
+        np.testing.assert_equal( np.unique(shell_parts[5]), np.array([3]) )
+
+        self.assertEqual( cseg_parts[0].size, 0 )
+        self.assertEqual( cseg_parts[1].size, 0 )
+        self.assertEqual( cseg_parts[2].size, 6 )
+        self.assertEqual( cseg_parts[3].size, 12 )
+        self.assertEqual( cseg_parts[4].size, 0 )
+        self.assertEqual( cseg_parts[5].size, 6 )
+        self.assertEqual( cseg_parts[6].size, 0 )
+        self.assertEqual( cseg_parts[7].size, 0 )
+        np.testing.assert_equal( np.unique(cseg_parts[2]), np.array([1]) )
+        np.testing.assert_equal( np.unique(cseg_parts[3]), np.array([1]) )
+        np.testing.assert_equal( np.unique(cseg_parts[5]), np.array([1]) )
+
+
+    def test_mesh_object_classes_getter(self):
+        """
+        Test the mesh_object_classes() method of Mili Class.
+        """
+        MO_classes = self.mili.mesh_object_classes()
+
+        # Test 0th processor
+        mo_classes = MO_classes[0]
+
+        # Glob class
+        glob_class = mo_classes["glob"]
+        self.assertEqual(glob_class.mesh_id, 0)
+        self.assertEqual(glob_class.short_name, "glob")
+        self.assertEqual(glob_class.long_name, "Global")
+        self.assertEqual(glob_class.sclass, Superclass.M_MESH)
+        self.assertEqual(glob_class.elem_qty, 1)
+        self.assertEqual(glob_class.idents_exist, True)
+
+        # Mat Class
+        mat_class = mo_classes["mat"]
+        self.assertEqual(mat_class.mesh_id, 0)
+        self.assertEqual(mat_class.short_name, "mat")
+        self.assertEqual(mat_class.long_name, "Material")
+        self.assertEqual(mat_class.sclass, Superclass.M_MAT)
+        self.assertEqual(mat_class.elem_qty, 5)
+        self.assertEqual(mat_class.idents_exist, True)
+
+        # Node class
+        node_class = mo_classes["node"]
+        self.assertEqual(node_class.mesh_id, 0)
+        self.assertEqual(node_class.short_name, "node")
+        self.assertEqual(node_class.long_name, "Node")
+        self.assertEqual(node_class.sclass, Superclass.M_NODE)
+        self.assertEqual(node_class.elem_qty, 35)
+        self.assertEqual(node_class.idents_exist, True)
+
+        # brick class
+        brick_class = mo_classes["brick"]
+        self.assertEqual(brick_class.mesh_id, 0)
+        self.assertEqual(brick_class.short_name, "brick")
+        self.assertEqual(brick_class.long_name, "Bricks")
+        self.assertEqual(brick_class.sclass, Superclass.M_HEX)
+        self.assertEqual(brick_class.elem_qty, 11)
+        self.assertEqual(brick_class.idents_exist, True)
+
+        # Test processor 5
+        mo_classes = MO_classes[5]
+
+        # Glob class
+        glob_class = mo_classes["glob"]
+        self.assertEqual(glob_class.mesh_id, 0)
+        self.assertEqual(glob_class.short_name, "glob")
+        self.assertEqual(glob_class.long_name, "Global")
+        self.assertEqual(glob_class.sclass, Superclass.M_MESH)
+        self.assertEqual(glob_class.elem_qty, 1)
+        self.assertEqual(glob_class.idents_exist, True)
+
+        # Mat Class
+        mat_class = mo_classes["mat"]
+        self.assertEqual(mat_class.mesh_id, 0)
+        self.assertEqual(mat_class.short_name, "mat")
+        self.assertEqual(mat_class.long_name, "Material")
+        self.assertEqual(mat_class.sclass, Superclass.M_MAT)
+        self.assertEqual(mat_class.elem_qty, 5)
+        self.assertEqual(mat_class.idents_exist, True)
+
+        # Node class
+        node_class = mo_classes["node"]
+        self.assertEqual(node_class.mesh_id, 0)
+        self.assertEqual(node_class.short_name, "node")
+        self.assertEqual(node_class.long_name, "Node")
+        self.assertEqual(node_class.sclass, Superclass.M_NODE)
+        self.assertEqual(node_class.elem_qty, 27)
+        self.assertEqual(node_class.idents_exist, True)
+
+        # brick class
+        brick_class = mo_classes["brick"]
+        self.assertEqual(brick_class.mesh_id, 0)
+        self.assertEqual(brick_class.short_name, "brick")
+        self.assertEqual(brick_class.long_name, "Bricks")
+        self.assertEqual(brick_class.sclass, Superclass.M_HEX)
+        self.assertEqual(brick_class.elem_qty, 3)
+        self.assertEqual(brick_class.idents_exist, True)
+
+        # shell class
+        shell_class = mo_classes["shell"]
+        self.assertEqual(shell_class.mesh_id, 0)
+        self.assertEqual(shell_class.short_name, "shell")
+        self.assertEqual(shell_class.long_name, "Shells")
+        self.assertEqual(shell_class.sclass, Superclass.M_QUAD)
+        self.assertEqual(shell_class.elem_qty, 3)
+        self.assertEqual(shell_class.idents_exist, True)
+
+        # cseg class
+        cseg_class = mo_classes["cseg"]
+        self.assertEqual(cseg_class.mesh_id, 0)
+        self.assertEqual(cseg_class.short_name, "cseg")
+        self.assertEqual(cseg_class.long_name, "Contact Segment")
+        self.assertEqual(cseg_class.sclass, Superclass.M_QUAD)
+        self.assertEqual(cseg_class.elem_qty, 6)
+
+    def test_query_all_classes(self):
+        """
+        Test the query_all_classes method of the Mili Class.
+        """
+        sand_data = self.mili.query_all_classes("sand", states=[10])
+
+        self.assertEqual(set(sand_data[0].keys()), set(["brick"]))
+        self.assertEqual(set(sand_data[1].keys()), set(["brick"]))
+        self.assertEqual(set(sand_data[2].keys()), set(["brick", "shell", "beam"]))
+        self.assertEqual(set(sand_data[3].keys()), set(["brick", "shell"]))
+        self.assertEqual(set(sand_data[4].keys()), set(["beam"]))
+        self.assertEqual(set(sand_data[5].keys()), set(["brick", "shell", "beam"]))
+        self.assertEqual(set(sand_data[6].keys()), set(["beam"]))
+        self.assertEqual(set(sand_data[7].keys()), set(["beam"]))
 
     """
     Testing the getStateVariables() method of the Mili class.

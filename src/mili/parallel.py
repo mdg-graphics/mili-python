@@ -48,6 +48,7 @@ class LoopWrapper:
       proc_pargs = [] * num_kwargs
     elif num_kwargs != num_pargs:
       raise ValueError(f'Must supply the same number of pargs ({num_pargs}) and kwargs ({num_kwargs}) to instantiate object list.')
+
     objs = [ cls_obj( *pargs, **kwargs ) for pargs, kwargs in zip(proc_pargs, proc_kwargs) ]
 
     # ensure all contained objects are the same exact type (no instances, subclasses are not valid)
