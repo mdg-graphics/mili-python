@@ -35,7 +35,7 @@ unit_tests:
         - shell
     script:
         - cd src
-        - python3 -m unittest tests.reader_test
+        - srun -n1 -A wbronze -p pdebug python3 -m unittest tests.reader_test
 
 coverage:
     stage: test
@@ -45,11 +45,11 @@ coverage:
     script:
         - cd src
         - python3 -m coverage --version
-        - python3 -m coverage run -m unittest tests.reader_test
+        - srun -n1 python3 -m coverage run -m unittest tests.reader_test
         # avoid failure if there are not multiple reports
         - python3 -m coverage combine || freturn 0
         - python3 -m coverage xml
-        - python3 -m coverage report --fail-under=$MINIMUM_COVERAGE
+        - python3 -m coverage report --fail-under=$MINIMUM_COVERAGE --omit=mili/grizinterface.py
     artifacts:
         when: always
         paths:

@@ -44,6 +44,7 @@ from typing import *
 from mili.datatypes import *
 from mili.afileIO import *
 from mili.parallel import *
+import mili.grizinterface as griz
 
 if sys.version_info < (3, 7):
   raise ImportError(f"This module requires python version >= 3.7!")
@@ -69,6 +70,7 @@ class MiliDatabase:
 
     # file data layout
     self.__svars : Mapping[ str, StateVariable ] = {}
+    self.__srec_fmt_qty = 0
     self.__srecs : List[ Subrecord ] = []
 
     # indexing / index discovery
@@ -81,18 +83,23 @@ class MiliDatabase:
 
     # allow query by material
     self.__elems_of_mat = defaultdict(lambda : defaultdict( lambda : np_empty(np.int64)) )  # map from material number to dict of class to elems
+    self.__elems_of_part = defaultdict(lambda : defaultdict( lambda : np_empty(np.int64)) )  # map from part number to dict of class to elems
 
     # mesh data
+    self.__MO_class_data = {}
     self.__conns = {}
     self.__nodes = None
     self.__mesh_dim = 0
 
     self.__params = defaultdict(lambda : defaultdict( list ) )
 
+    self.file_name = ""
     if isinstance( att_file, str ):
       with open( os.path.join( dir_name, att_file ), 'rb' ) as f:
+        self.file_name = f.name
         self.__parse_att_file( f )
     else:
+      self.file_name = att_file.name
       self.__parse_att_file( att_file )
     sfile_re = re.compile(re.escape(sfile_base) + f"(\\d{{{self.__sfile_suf_len},}})$")
 
@@ -102,11 +109,64 @@ class MiliDatabase:
     self.__state_files = list(sorted(self.__state_files, key = lambda match: int(match.group(1))))
     self.__state_files = [ os.path.join(dir_name,match.group(0)) for match in self.__state_files ]
 
+    # Handle case where mesh object class exists but no idents provided just number 1-N
+    for class_sname in self.__MO_class_data:
+      if class_sname not in self.__labels:
+        self.__MO_class_data[class_sname].idents_exist = False
+        self.__labels[class_sname] = np.array( np.arange(1, self.__MO_class_data[class_sname].elem_qty + 1 ))
+
+  def reload_state_maps(self):
+    """Reload the state maps."""
+    self.__smaps = []
+    with open( self.file_name, 'rb') as f:
+      self.__reload_state_maps( f )
+  
+  def get_griz_data(self):
+    unique_class_names = list(self.__MO_class_data.keys())
+    sand_class_names = [srec.class_name for srec in self.__svars["sand"].srecs] if "sand" in self.__svars else []
+    return griz.GrizDataContainer(
+      self.__params,
+      self.__smaps,
+      self.__nodes,
+      self.__conns,
+      self.__labels,
+      list(self.__MO_class_data.values()),
+      { class_name : self.materials_of_class_name(class_name) for class_name in unique_class_names },
+      { class_name : self.parts_of_class_name(class_name) for class_name in unique_class_names },
+      self.element_sets(),
+      self.__srecs,
+      sand_class_names
+    )
+
   def nodes(self):
     return self.__nodes
 
   def state_maps(self):
     return self.__smaps
+  
+  def subrecords(self):
+    return self.__srecs
+  
+  def parameters(self) -> Union[dict, List[dict]]:
+    """Getter for mili parameters dictionary."""
+    return self.__params
+
+  def srec_fmt_qty(self):
+    return self.__srec_fmt_qty
+  
+  def mesh_dimensions(self) -> int:
+    """Getter for Mesh Dimensions."""
+    return self.__mesh_dim
+  
+  def mesh_object_classes(self) -> Union[dict, List[dict]]:
+    """Getter for Mesh Object class data."""
+    return self.__MO_class_data
+  
+  def int_points(self) -> dict:
+    return self.__int_points
+  
+  def element_sets(self) -> dict:
+    return {k:v for k,v in self.__int_points.items() if k.startswith("es_")}
 
   def times( self, states : Optional[Union[List[int],int]] = None ):
     if type(states) is int:
@@ -129,9 +189,17 @@ class MiliDatabase:
 
   def materials(self):
     return self.__mats
-
+  
+  def connectivity(self):
+    return self.__conns
+  
   def material_classes(self, mat):
     return self.__elems_of_mat.get(mat,{}).keys()
+  
+  def __reload_state_maps( self, att_file : BinaryIO ):
+    parser = AFileParser()
+    parser.register( AFileParser.Section.STATE_MAP, self.__parse_smap )
+    parser.read( att_file )
 
   def __parse_att_file( self, att_file : BinaryIO ):
     """
@@ -147,10 +215,11 @@ class MiliDatabase:
     # read order is important as some later phases depend on
     #   data from earlier phases
     dir_callbacks = { Directory.Type.MILI_PARAM : self.__parse_param,
+                      Directory.Type.CLASS_DEF : self.__parse_mesh_class_def,
                       Directory.Type.TI_PARAM : self.__parse_ti_param,
+                      Directory.Type.APPLICATION_PARAM : self.__parse_application_param,
                       Directory.Type.STATE_VAR_DICT : self.__parse_svars,
                       Directory.Type.CLASS_IDENTS : self.__parse_mesh_class_ident,
-                      Directory.Type.CLASS_DEF : self.__parse_mesh_class_def,
                       Directory.Type.NODES : self.__parse_nodes,
                       Directory.Type.ELEM_CONNS : self.__parse_elem_conn,
                       Directory.Type.STATE_REC_DATA : self.__parse_srec }
@@ -166,21 +235,67 @@ class MiliDatabase:
 
   def __parse_smap( self, smap_data : bytes ):
     self.__smaps.append( StateMap( *struct.unpack('<iqfi',smap_data) ) )
+  
+  def __generic_parameter_add( self, param_data: bytes, directory: Directory ):
+    """Parses a parameter and adds it to the __params dictionary.
 
-  def __parse_param( self, param_data : bytes, directory : Directory ):
+      Arguments:
+        param_data (bytes): The binary data for the given directory.
+        directory (Directory): Object defining the structure and contents of param_data.
+    """
+    sname = directory.strings[0]
+    param_type = directory.modifier_idx1
+    mili_type = MiliType(param_type)
+    type_rep = mili_type.repr()
+    type_size = mili_type.byte_size()
+    item_count = len(param_data) // type_size
+    if mili_type is MiliType.M_STRING:
+      self.__params[sname] = str(struct.unpack(f"{item_count}{type_rep}", param_data)[0])[2:].split('\\x00')[0]
+    else:
+      if(item_count == 1):
+        # If it is a single value, remove surrounding tuple
+        self.__params[sname] = struct.unpack(f"{item_count}{type_rep}", param_data)[0]
+      else:
+        self.__params[sname] = struct.unpack(f"{item_count}{type_rep}", param_data)
+  
+  def __parse_application_param( self, param_data: bytes, directory: Directory ) -> None:
+    """Handle parameters of type APPLICATION_PARAM.
+
+      Arguments:
+        param_data (bytes): The binary data for the given directory.
+        directory (Directory): Object defining the structure and contents of param_data.
+    """
+    offset = directory.modifier_idx2 * MiliType(directory.modifier_idx1).byte_size()
+    self.__generic_parameter_add(param_data[offset:], directory)
+
+  def __parse_param( self, param_data : bytes, directory : Directory ) -> None:
+    """Handle parameters of type MILI_PARAM.
+
+      Arguments:
+        param_data (bytes): The binary data for the given directory.
+        directory (Directory): Object defining the structure and contents of param_data.
+    """
+    offset = directory.modifier_idx2 * MiliType(directory.modifier_idx1).byte_size()
+    self.__generic_parameter_add(param_data[offset:], directory)
     sname = directory.strings[0]
     if sname.startswith('mesh dimensions'):
-      self.__params[sname] = struct.unpack(f'{len(param_data)//4}i',param_data)
-      self.__mesh_dim = self.__params[sname][0]
+      self.__mesh_dim = self.__params[sname]
       self.__nodes = np.empty( [0,self.__mesh_dim], dtype = np.float32 )
-    # TODO: parse other params (mostly strings) correctly
-    # else:
-    #   self.__params[sname] =
 
-  def __parse_ti_param( self, ti_param_data : bytes, directory : Directory ):
+  def __parse_ti_param( self, ti_param_data : bytes, directory : Directory ) -> None:
+    """Handle expected parameters of type TI_PARAM.
+
+      Parses various TI (Time Invariant) parameters that commonly appear in mili plot files including
+      node and element labels, material names and element sets.
+
+      Arguments:
+        param_data (bytes): The binary data for the given directory.
+        directory (Directory): Object defining the structure and contents of param_data.
+    """
     sname = directory.strings[0]
     if sname.startswith('Node Labels'):
       self.__labels['node'] = np.frombuffer( ti_param_data[8:], dtype = np.int32 )
+      self.__MO_class_data['node'].elem_qty = self.__labels['node'].size
     elif sname.startswith('Element Labels') and not 'ElemIds' in sname:
       elem_labels = np.frombuffer( ti_param_data[8:], dtype = np.int32 )
       class_name = re.search( r'Sname-(\w*)', sname ).group(1)
@@ -195,6 +310,8 @@ class MiliDatabase:
       ip_name = sname[ sname.find('es_'): ]
       ips = struct.unpack(f'{len(ti_param_data)//4}i', ti_param_data)[2:-1]
       self.__int_points[ip_name] = ips
+    offset = directory.modifier_idx2 * MiliType(directory.modifier_idx1).byte_size()
+    self.__generic_parameter_add(ti_param_data[offset:], directory)
 
   def __parse_svars( self, svars_data : bytes, _ : Directory ):
     svar_words, svar_bytes = struct.unpack('2i', svars_data[:8])
@@ -265,13 +382,22 @@ class MiliDatabase:
 
   def __parse_mesh_class_ident( self, class_data : bytes, directory : Directory ):
     sname = directory.strings[0]
+    self.__MO_class_data[sname].elem_qty = directory.modifier_idx2
+    self.__MO_class_data[sname].idents_exist = True
     start, stop = struct.unpack('2i',class_data[4:12])
     if sname not in self.__labels.keys():
       self.__labels[sname] = np_empty(np.int32)
     self.__labels[sname] = np.append( self.__labels[sname], np.arange( start, stop+1, dtype = np.int32 ))
 
   def __parse_mesh_class_def( self, _, directory ):
-    self.__class_to_sclass[directory.strings[0]] = Superclass(directory.modifier_idx2)
+    short_name = directory.strings[0]
+    long_name = directory.strings[1]
+    mesh_id = directory.modifier_idx1
+    sclass = Superclass(directory.modifier_idx2)
+    MO_class = MeshObjectClass(mesh_id, short_name, long_name, sclass)
+    self.__MO_class_data[short_name] = MO_class
+    self.__MO_class_data[short_name].elem_qty = 0
+    self.__class_to_sclass[short_name] = sclass
 
   def __parse_nodes( self, class_data : bytes, _ : Directory ):
     f = io.BytesIO( class_data )
@@ -285,6 +411,7 @@ class MiliDatabase:
     sclass, block_cnt = struct.unpack( '2i', f.read(8) )
     f.read( 8 * block_cnt )
     elem_qty = directory.modifier_idx2
+    self.__MO_class_data[sname].elem_qty += elem_qty
     conn_qty = Superclass(sclass).node_count()
     word_qty = conn_qty + 2
     conn = np.reshape( np.frombuffer( f.read( elem_qty * word_qty * 4 ), dtype = np.int32 ), [-1,word_qty] )
@@ -298,6 +425,11 @@ class MiliDatabase:
       #  make that explicit?
       mat_2_conn_idxs = current_elem_count + np.nonzero( conn[:,conn_qty] == mat )[0]
       self.__elems_of_mat[ mat ][ sname ] = np.concatenate( ( self.__elems_of_mat[ mat ][ sname ], mat_2_conn_idxs ) )
+
+    parts = np.unique( conn[:,conn_qty+1] )
+    for part in parts:
+      part_2_conn_idxs = current_elem_count + np.nonzero( conn[:,conn_qty+1] == part)[0]
+      self.__elems_of_part[ part ][ sname ] = np.concatenate( (self.__elems_of_part[ part ][ sname ], part_2_conn_idxs ) )
 
   def __parse_srec( self, srec_data : bytes, directory : Directory ):
     f = io.BytesIO( srec_data )
@@ -322,8 +454,8 @@ class MiliDatabase:
       c_pos += qty_svars
 
       svars = [ self.__svars[svar_name] for svar_name in svar_names ]
-      srec = Subrecord(name, class_name, org, qty_svars, svar_names, svars = svars)
       superclass = self.__class_to_sclass[class_name]
+      srec = Subrecord(name, class_name, superclass, org, qty_svars, svar_names, svars = svars)
       if superclass != Superclass.M_MESH:
         # TODO: these are NUM blocks, not label blocks, so we need to store the labels and map from label to num and operate on num internaly instead of mapping conn to labels
         #       has the above been resolved?
@@ -355,10 +487,16 @@ class MiliDatabase:
       if srec.organization == Subrecord.Org.RESULT:
         srec.svar_ordinal_offsets = np.cumsum( np.fromiter( ( svar.atom_qty * srec.total_ordinal_count for svar in srec.svars ), dtype = np.int64 ) )
         srec.svar_byte_offsets = np.cumsum( np.fromiter( ( svar.atom_qty * srec.total_ordinal_count * svar.data_type.byte_size() for svar in srec.svars ), dtype = np.int64 ) )
-        srec.svar_byte_offsets = np.append( srec.svar_byte_offsets, [srec.byte_size] )
+        # Insert 0 a front of arrays 
+        srec.svar_ordinal_offsets = np.insert( srec.svar_ordinal_offsets, 0, 0, axis=0 )
+        srec.svar_byte_offsets = np.insert( srec.svar_byte_offsets, 0, 0, axis=0 )
+
+      srec.srec_fmt_id = self.__srec_fmt_qty
 
       self.__srecs.append( srec )
 
+    # Keep track of number of state record formats
+    self.__srec_fmt_qty += 1
     # TODO: end of last refactoring block
 
   def __parse_query_name( self, svar_query_input ):
@@ -373,6 +511,36 @@ class MiliDatabase:
       svar_name = svar_query_input
       svar_comps = []
     return svar_name, svar_comps
+  
+  """Get List of part numbers for all elements of a given class name."""
+  def parts_of_class_name( self, class_name ):
+    if class_name not in self.__labels.keys():
+      return np_empty(np.int32)
+    elem_parts = np.array( self.__labels[class_name], dtype=np.int32)
+    found = False
+    for part, labels in self.__elems_of_part.items():
+      if class_name in labels:
+        found = True
+        elem_parts[labels[class_name]] = part
+    if found:
+      return elem_parts
+    else:
+      return np_empty(np.int32)
+  
+  """Get List of materials for all elements of a given class name."""
+  def materials_of_class_name( self, class_name ):
+    if class_name not in self.__labels.keys():
+      return np_empty(np.int32)
+    found = False
+    elem_mats = np.array( self.__labels[class_name], dtype=np.int32)
+    for mat, labels in self.__elems_of_mat.items():
+      if class_name in labels:
+        found = True
+        elem_mats[labels[class_name]] = mat
+    if found:
+      return elem_mats
+    else:
+      return np_empty(np.int32)
 
   def class_labels_of_material( self, mat, class_name ):
     '''
@@ -439,6 +607,27 @@ class MiliDatabase:
     for class_name, class_labels in element_labels.items():
       node_labels = np.append( node_labels, self.nodes_of_elems( class_name, class_labels )[0] )
     return np.unique( node_labels )
+  
+  def query_all_classes( self, svar_name: str, states: Optional[Union[int,List[int]]] = None ):
+    """Helper function to query a state variable for all element classes for which it exists."""
+    if not svar_name in self.__svars.keys():
+      raise ValueError( f"No state variable '{svar_name}' found in database." )
+
+    if states is None:
+      states = np.arange( 1, len(self.__smaps) + 1, dtype = np.int32 )
+    if type(states) is int:
+      states = np.array( [ states ], dtype = np.int32 )
+    elif iterable( states ) and not type( states ) == str:
+      states = np.array( states, dtype = np.int32 )
+    
+    class_names = [ srec.class_name for srec in self.__svars[svar_name].srecs ]
+    class_names = set(list(class_names))
+
+    res = {}
+    for class_sname in class_names:
+      res[class_sname] = self.query( svar_name, class_sname, None, None, states, None, None, output_object_labels=False )
+    
+    return res
 
   def __init_query_parameters( self,
                                svar_names : Union[List[str],str],
@@ -454,13 +643,19 @@ class MiliDatabase:
         the result of the argument deviation from the norm would be expected to be encountered when operating in parallel.
 
     """
+    min_st = 1
+    max_st = len(self.__smaps) + 1
     if states is None:
-      states = np.arange( 1, len(self.__smaps) + 1, dtype = np.int32 )
+      states = np.arange( min_st, max_st, dtype = np.int32 )
 
     if type(states) is int:
       states = np.array( [ states ], dtype = np.int32 )
     elif iterable( states ) and not type( states ) == str:
       states = np.array( states, dtype = np.int32 )
+    # Check for any states that are out of bounds
+    if np.any( states < min_st ) or np.any( states > max_st ):
+        raise ValueError((f"Attempting to query states that do not exist. "
+                           "Minimum state = {min_st}, Maximum state = {max_st}"))
 
     if not isinstance( states, np.ndarray ):
       raise TypeError( f"'states' must be None, an integer, or a list of integers" )
@@ -507,6 +702,7 @@ class MiliDatabase:
 
     return svar_names, class_sname, material, labels, states, ips, write_data
 
+
   def query( self,
              svar_names : Union[List[str],str],
              class_sname : str,
@@ -514,7 +710,8 @@ class MiliDatabase:
              labels : Optional[Union[List[int],int]] = None,
              states : Optional[Union[List[int],int]] = None,
              ips : Optional[Union[List[int],int]] = None,
-             write_data : Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]] = None ):
+             write_data : Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]] = None,
+             **kwargs ):
     '''
     Query the database for svars, returning data for the specified parameters, optionally writing data to the database.
     The parameters passed to query can be identical across a parallel invocation of query, since each individual
@@ -532,6 +729,10 @@ class MiliDatabase:
 
     # normalize arguments to expected types / default values
     svar_names, class_sname, material, labels, states, ips, write_data = self.__init_query_parameters( svar_names, class_sname, material, labels, states, ips, write_data )
+
+    # Handle possible keyword arguments
+    output_object_labels = kwargs.get("output_object_labels", True)
+    subrec = kwargs.get("subrec", None)
 
     res = dict.fromkeys( svar_names )
     for ikey in res.keys():
@@ -569,6 +770,10 @@ class MiliDatabase:
         for srec in srecs_with_svar_and_class:
           if srec not in srecs_to_query:
             srecs_to_query.append( srec )
+      
+      # If user only requested single subrecord, only query single subrecord
+      if subrec is not None:
+        srecs_to_query = [srec for srec in srecs_to_query if srec.name == subrec]
 
       res[queried_name]['layout'].update( { srec.name : np_empty(np.int32) for srec in srecs_to_query } )
 
@@ -606,10 +811,10 @@ class MiliDatabase:
         #        also we're searching by svar sname which isn't technically incorrect, but could become slow if many svars are in subrecs
         qd_svar_comps = np.empty([0,2],dtype=np.int64)
         for svar in svars_to_query:
-          svar_coords = srec.scalar_svar_coords( svar.name )
-          ips = matching_int_points.get( svar.name, None )
-          if ips is not None:
-            svar_coords = svar_coords[ips]
+          svar_coords = srec.scalar_svar_coords( svar.name, svar_name )
+          ipts = matching_int_points.get( svar.name, None )
+          if ipts is not None:
+            svar_coords = svar_coords[ipts]
           qd_svar_comps = np.concatenate( ( qd_svar_comps, svar_coords ), axis = 0 )
 
         # discover which labels we want to query are in the current subrecord
@@ -640,7 +845,10 @@ class MiliDatabase:
         srec_ordinal_indices = np.empty( [ srec_ordinals.size, qd_svar_comps.shape[0] ], dtype = np.int64 )
         srec_ordinal_indices[:,0] = srec_ordinals
 
-        res[queried_name]['layout'][srec.name] = self.__labels[class_sname][ class_ordinals ]
+        if output_object_labels:
+          res[queried_name]['layout'][srec.name] = self.__labels[class_sname][ class_ordinals ]
+        else:
+          res[queried_name]['layout'][srec.name] = class_ordinals
 
         # we work from the last column / svar to the first the first contains the ordinal info needed to compute the rest (in the RESULT organization case.. so we just do the same in both cases)
         if srec.organization == Subrecord.Org.OBJECT:
@@ -721,7 +929,9 @@ def open_database( base_filename : os.PathLike, procs = [], suppress_parallel = 
   dir_names = [ dir_name ] * len(sfiles)
 
   proc_pargs = [ [afile,sfile,dir_name] for afile, sfile, dir_name in zip(afiles,sfiles,dir_names) ]
-  if suppress_parallel:
+
+  # Open Mili Database.
+  if suppress_parallel or len(proc_pargs) == 1:
     if len(proc_pargs) == 1:
       mili_database = MiliDatabase( *proc_pargs[0] )
     else:

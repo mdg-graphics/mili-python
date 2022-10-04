@@ -30,15 +30,16 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, IntEnum
 import numpy as np
 import numpy.typing as npt
 from numpy.core.fromnumeric import prod
 import warnings
+import pdb
 
 from typing import *
 
-class MiliType(Enum):
+class MiliType(IntEnum):
   M_INVALID = 0
   M_STRING = 1
   M_FLOAT = 2
@@ -54,7 +55,7 @@ class MiliType(Enum):
   def repr(self):
     return 'sffdiiq '[self.value-1]
 
-class Superclass(Enum):
+class Superclass(IntEnum):
   ''' The superclass denotes what mesh class an object belongs to. '''
   M_UNIT = 0
   M_NODE = 1
@@ -113,7 +114,7 @@ class Directory:
 
 @dataclass
 class StateVariable:
-  class Aggregation(Enum):
+  class Aggregation(IntEnum):
     '''
     The aggregate determines how a state variable contains other state variables
     and/or stores vectors of data.
@@ -140,6 +141,10 @@ class StateVariable:
     return [ ssvar.name for ssvar in self.svars ]
 
   @property
+  def comp_svar_titles( self ):
+    return [ ssvar.title for ssvar in self.svars ]
+
+  @property
   def atom_qty( self ):
     ''' Returns the quantity of atoms (scalars of the contained type) based on the aggregate type. '''
     if self.agg_type == StateVariable.Aggregation.VECTOR:
@@ -156,7 +161,7 @@ class StateVariable:
 
 @dataclass
 class Subrecord:
-  class Org(Enum):
+  class Org(IntEnum):
     ''' The organization of data in a subrecord is either ordered by variable or object. '''
     RESULT = 0
     OBJECT = 1
@@ -167,6 +172,7 @@ class Subrecord:
   ## ordinal variables describe the association of the svars in the srec with blocks of locally-numbered (ordinal) mesh entities by ordinal
   name : str = ''
   class_name : str = ''
+  superclass : Superclass = Superclass.M_QTY_SUPERCLASS
   organization : Org = Org.INVALID
   qty_svars : int = -1
   svar_names : List[str] = dataclasses.field(default_factory=list)
@@ -182,11 +188,17 @@ class Subrecord:
   # for each svar in the srec, the offset
   svar_ordinal_offsets : np.ndarray = np.empty([0], dtype = np.int64)
   svar_byte_offsets : np.ndarray = np.empty([0], dtype = np.int64)
+  srec_fmt_id: int = 0
 
-  def scalar_svar_coords( self, svar_name ):
+  def scalar_svar_coords( self, svar_name, containing_svar_name ):
     coords = []
+    match_containing_svar = False
+    if containing_svar_name in self.svar_names:
+        match_containing_svar = True
     for idx, svar_comps in enumerate( self.svar_svar_comp_layout ):
       matches = [ ( idx, jdx ) for jdx, svar in enumerate(svar_comps) if svar == svar_name ]
+      if match_containing_svar:
+        matches = [ m for m in matches if self.svar_names[m[0]] == containing_svar_name ]
       if len( matches ) > 0:
         coords.append( matches )
     return np.array( *coords )
@@ -204,11 +216,11 @@ class Subrecord:
       svar_idxs = np.digitize( ordinals, self.svar_ordinal_offsets )
       # assert all labels are from the same svar
       assert( np.min(svar_idxs) == np.max(svar_idxs) )
-      svar_idx = svar_idxs[0]
-      # modify the ordinals to offset into the svar for this srec
-      ordinals -= self.svar_ordinal_offsets[svar_idx]
-      # only read the portion of the subrecord buffer related to this svar
-      buffer_slice = (self.svar_byte_offsets[svar_idx], self.svar_byte_offsets[svar_idx+1])
+      svar_idx = np.min(svar_idxs)
+      # modify the ordinals to offset in the svar for this srec
+      ordinals -= self.svar_ordinal_offsets[svar_idx-1]
+      # only read the portion of the subrecord related to this svar
+      buffer_slice = (self.svar_byte_offsets[svar_idx-1], self.svar_byte_offsets[svar_idx])
     var_data = np.frombuffer( buffer[ buffer_slice[0] : buffer_slice[1] ], dtype = self.svars[svar_idx].data_type.numpy_dtype() )
     if write_data is not None:
       var_data = var_data.copy( )
@@ -237,3 +249,13 @@ class Subrecord:
       else:
         warnings.warn( "Querying data from a mixed-type subrecord is currently unsupported." )
         return [str(svar.atom_qty * self.total_ordinal_count) + svar.data_type.repr() for svar in self.svars ], False
+
+@dataclass
+class MeshObjectClass:
+  """Dataclass storing basic information about each Mesh Element Class."""
+  mesh_id : int = 0
+  short_name : str = ''
+  long_name : str = ''
+  sclass : Superclass = Superclass.M_QTY_SUPERCLASS
+  elem_qty : int = 0
+  idents_exist: bool = True
