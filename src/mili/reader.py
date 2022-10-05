@@ -644,9 +644,9 @@ class MiliDatabase:
 
     """
     min_st = 1
-    max_st = len(self.__smaps) + 1
+    max_st = len(self.__smaps)
     if states is None:
-      states = np.arange( min_st, max_st, dtype = np.int32 )
+      states = np.arange( min_st, max_st+1, dtype = np.int32 )
 
     if type(states) is int:
       states = np.array( [ states ], dtype = np.int32 )
@@ -655,7 +655,7 @@ class MiliDatabase:
     # Check for any states that are out of bounds
     if np.any( states < min_st ) or np.any( states > max_st ):
         raise ValueError((f"Attempting to query states that do not exist. "
-                           "Minimum state = {min_st}, Maximum state = {max_st}"))
+                          f"Minimum state = {min_st}, Maximum state = {max_st}"))
 
     if not isinstance( states, np.ndarray ):
       raise TypeError( f"'states' must be None, an integer, or a list of integers" )
