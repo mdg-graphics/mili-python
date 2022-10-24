@@ -746,20 +746,24 @@ class MiliDatabase:
       return res
 
     for queried_name in svar_names:
-      svar_name, comp_svar_names = self.__parse_query_name( queried_name )
+      queried_svar_name, comp_svar_names = self.__parse_query_name( queried_name )
 
-      if not svar_name in self.__svars.keys():
-        raise ValueError( f"No state variable '{svar_name}' found in database." )
+      if not queried_svar_name in self.__svars.keys():
+        raise ValueError( f"No state variable '{queried_svar_name}' found in database." )
       for comp_svar_name in comp_svar_names:
         if not comp_svar_name in self.__svars.keys():
           raise ValueError( f"No state variable '{comp_svar_name}' found in database." )
 
+      match_aggregate_svar = ""
+      if self.__svars[queried_svar_name].agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:
+          match_aggregate_svar = queried_svar_name
+
       # if svar is an aggregate svar and we're not querying specific comps, query all the comps
       if comp_svar_names == []:
-        if self.__svars[svar_name].agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:
-          svars_to_query = self.__svars[svar_name].svars
+        if self.__svars[queried_svar_name].agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:
+          svars_to_query = self.__svars[queried_svar_name].svars
         else:
-          svars_to_query = [ self.__svars[ svar_name ] ]
+          svars_to_query = [ self.__svars[ queried_svar_name ] ]
       else:
         svars_to_query = [ self.__svars[ comp_svar_name ] for comp_svar_name in comp_svar_names ]
 
@@ -811,11 +815,13 @@ class MiliDatabase:
         # TODO: technically we can arbitrarily nest svars, this really only accounts for a two-deep nesting, same with the srec.svar_svar_comp_layout...
         #        also we're searching by svar sname which isn't technically incorrect, but could become slow if many svars are in subrecs
         qd_svar_comps = np.empty([0,2],dtype=np.int64)
+        # TODO : remove special stress/strain handling when dyna/diablo aggregate them appropriately
+        match_aggregate_svar = '' if match_aggregate_svar in ('stress','strain') else match_aggregate_svar
         for svar in svars_to_query:
-          svar_coords = srec.scalar_svar_coords( svar.name, svar_name )
-          ipts = matching_int_points.get( svar.name, None )
-          if ipts is not None:
-            svar_coords = svar_coords[ipts]
+          svar_coords = srec.scalar_svar_coords( match_aggregate_svar, svar.name )
+          ipts = matching_int_points.get( svar.name, [] )
+          if len( ipts ) > 0:
+            svar_coords = svar_coords[ ipts ]
           qd_svar_comps = np.concatenate( ( qd_svar_comps, svar_coords ), axis = 0 )
 
         # discover which labels we want to query are in the current subrecord
@@ -899,8 +905,7 @@ class MiliDatabase:
 
       # initialize the results structure for this queried name
       for srec in srecs_to_query:
-        res_shape = [ len(states), *srec_internal_offsets[srec.name].shape ]
-        res[queried_name]['data'][srec.name] = np.empty( res_shape, dtype = np.float32 )
+        res[queried_name]['data'][srec.name] = np.empty( [ len(states), *srec_internal_offsets[srec.name].shape ], dtype = np.float32 )
 
       # Determine which states (of those requested) appear in each of the state files.
       # This way we can open each file only once and process all the states that appear in it

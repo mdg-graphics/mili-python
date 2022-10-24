@@ -1395,7 +1395,7 @@ class ParallelSingleStateFile(unittest.TestCase):
     '''
     def test_state_variable_vector_array(self):
         answer = self.mili.query('stress', 'beam', labels = 5, states = [21,22], ips = 2 )
-        np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'][1,:,:], np.array([ [ -1018.4232177734375, -1012.2537231445312, -6.556616085617861e-07, 1015.3384399414062, 0.3263571858406067, -0.32636013627052307 ] ], dtype = np.float32 ) )
+        np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'][1,:,:], np.array([ [ -1018.4232177734375, -1012.2537231445312, -6.556616085617861e-07, 1015.3384399414062, 0.3263571858406067, -0.32636013627052307] ], dtype = np.float32 ) )
 
     '''
     Test accessing a vector array component

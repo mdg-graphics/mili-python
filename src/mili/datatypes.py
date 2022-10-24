@@ -198,16 +198,11 @@ class Subrecord:
     r.maxlevel(1)
     return r.repr(self)
 
-  def scalar_svar_coords( self, svar_name, containing_svar_name ):
+  def scalar_svar_coords( self, aggregate_match, scalar_svar_name ):
     coords = []
-    match_containing_svar = False
-    if containing_svar_name in self.svar_names:
-        match_containing_svar = True
-    for idx, svar_comps in enumerate( self.svar_svar_comp_layout ):
-      matches = [ ( idx, jdx ) for jdx, svar in enumerate(svar_comps) if svar == svar_name ]
-      if match_containing_svar:
-        matches = [ m for m in matches if self.svar_names[m[0]] == containing_svar_name ]
-      if len( matches ) > 0:
+    for idx, (svar_name, svar_comps) in enumerate( zip(self.svar_names, self.svar_svar_comp_layout) ):
+      matches = [ ( idx, jdx ) for jdx, svar in enumerate(svar_comps) if svar == scalar_svar_name ]
+      if ( svar_name == aggregate_match or aggregate_match == "" ) and len( matches ) > 0:
         coords.append( matches )
     return np.array( *coords )
 
