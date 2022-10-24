@@ -35,7 +35,7 @@ unit_tests:
         - shell
     script:
         - cd src
-        - srun -n1 -A wbronze -p pdebug python3 -m unittest tests.reader_test
+        - srun -n1 -p pdebug python3 -m unittest tests.reader_test
 
 coverage:
     stage: test

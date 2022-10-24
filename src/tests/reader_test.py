@@ -27,6 +27,7 @@ Copyright (c) 2016-2021, Lawrence Livermore National Security, LLC.
  Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 """
+import re
 import os
 import unittest
 from mili import reader
@@ -1475,11 +1476,12 @@ class ParallelSingleStateFile(unittest.TestCase):
         np.testing.assert_equal( answer[2]['stress[sy]']['data']['1beam_mmsvn_rec'], v1['stress[sy]']['data']['1beam_mmsvn_rec'] )
 
 
-'''
-Testing labeling bugfixes from 0.2.4
-'''
+
 class Bugfixes0_2_4(unittest.TestCase):
-    file_name = file_name = os.path.join(dir_path,'data','serial','labeling','dblplt003')
+    '''
+    Testing labeling bugfixes from 0.2.4
+    '''
+    file_name = os.path.join(dir_path,'data','serial','labeling','dblplt003')
     '''
     Set up the mili file object
     '''
@@ -1508,6 +1510,43 @@ class Bugfixes0_2_4(unittest.TestCase):
             20168, 20024, 21897, 21753 ], dtype=np.int32 )
         answer = self.mili.class_labels_of_material(6,'quad')
         np.testing.assert_equal( answer, desired )
+
+class Bugfixes0_2_5(unittest.TestCase):
+    '''
+    Testing bugfixes from 0.2.5
+    '''
+    file_name = os.path.join(dir_path,'data','serial','vecarray','shell_mat15','shell_mat15.plt')
+    '''
+    Set up the mili file object
+    '''
+    def setUp(self):
+        self.mili = reader.open_database( Bugfixes0_2_5.file_name, suppress_parallel=True )
+
+    def test_strain_query(self):
+        ''' prior to the 0.2.5 bugfixes, this returned 0,0,1e10,0,1e10,0 due to an srec offset error '''
+        desired = { 'strain' :
+                    { 'data' : { '1shell_str_def_rec' : np.array([[[0., 0., 0., 0., 0., 0.]]], dtype=np.float32)},
+                      'layout': { 'states': np.array([1], dtype=np.int32), '1shell_str_def_rec': np.array([1], dtype=np.int32) }
+                    }
+                  }
+        answer = self.mili.query('strain','shell',labels=1,states=1)
+        np.testing.assert_equal( answer, desired )
+
+    def test_srec_offsets(self):
+        '''
+        our vec-array svar size calculation was off resulting in invalide srec offsets, this checks against
+        the offsets directly from mili
+        '''
+        oracle_re = re.compile(r"([\w ]+):\s+Offset:\s+(\d+)\s+[\w\s]+=\s(\w+)")
+        with open( os.path.join(dir_path,'data','serial','vecarray','shell_mat15','srec-offsets.txt') ) as fin:
+            oracle_data = fin.read()
+        desired = {}
+        for srec_name, offset, _ in oracle_re.findall(oracle_data):
+            desired[ srec_name ] = int( offset )
+        result = {}
+        for srec in self.mili._MiliDatabase__srecs:
+            result[ srec.name ] = srec.state_byte_offset
+        self.assertEqual( result, desired )
 
 if __name__ == "__main__":
     unittest.main()

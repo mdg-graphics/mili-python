@@ -1,6 +1,7 @@
 {
   "version": "0.2.0",
   "configurations": [
+
     {
       "name": "Python: Current File",
       "type": "python",
@@ -13,7 +14,8 @@
       "name": "mili reader",
       "type": "python",
       "request": "launch",
-      "program": "src/mili/reader.py",
+      "cwd": "${workspaceFolder}/src",
+      "program": "mili/reader.py",
       "console": "integratedTerminal"
     },
     {
@@ -23,7 +25,7 @@
       "cwd": "${workspaceFolder}/src",
       "program": "tests/reader_test.py",
       "args": [
-        "ParallelSingleStateFile.test_nodes_label"
+        "Bugfixes0_2_5"
       ],
       "console": "integratedTerminal"
     }

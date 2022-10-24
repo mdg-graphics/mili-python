@@ -120,7 +120,7 @@ class MiliDatabase:
     self.__smaps = []
     with open( self.file_name, 'rb') as f:
       self.__reload_state_maps( f )
-  
+
   def get_griz_data(self):
     unique_class_names = list(self.__MO_class_data.keys())
     sand_class_names = [srec.class_name for srec in self.__svars["sand"].srecs] if "sand" in self.__svars else []
@@ -143,28 +143,28 @@ class MiliDatabase:
 
   def state_maps(self):
     return self.__smaps
-  
+
   def subrecords(self):
     return self.__srecs
-  
+
   def parameters(self) -> Union[dict, List[dict]]:
     """Getter for mili parameters dictionary."""
     return self.__params
 
   def srec_fmt_qty(self):
     return self.__srec_fmt_qty
-  
+
   def mesh_dimensions(self) -> int:
     """Getter for Mesh Dimensions."""
     return self.__mesh_dim
-  
+
   def mesh_object_classes(self) -> Union[dict, List[dict]]:
     """Getter for Mesh Object class data."""
     return self.__MO_class_data
-  
+
   def int_points(self) -> dict:
     return self.__int_points
-  
+
   def element_sets(self) -> dict:
     return {k:v for k,v in self.__int_points.items() if k.startswith("es_")}
 
@@ -189,13 +189,13 @@ class MiliDatabase:
 
   def materials(self):
     return self.__mats
-  
+
   def connectivity(self):
     return self.__conns
-  
+
   def material_classes(self, mat):
     return self.__elems_of_mat.get(mat,{}).keys()
-  
+
   def __reload_state_maps( self, att_file : BinaryIO ):
     parser = AFileParser()
     parser.register( AFileParser.Section.STATE_MAP, self.__parse_smap )
@@ -235,7 +235,7 @@ class MiliDatabase:
 
   def __parse_smap( self, smap_data : bytes ):
     self.__smaps.append( StateMap( *struct.unpack('<iqfi',smap_data) ) )
-  
+
   def __generic_parameter_add( self, param_data: bytes, directory: Directory ):
     """Parses a parameter and adds it to the __params dictionary.
 
@@ -246,7 +246,7 @@ class MiliDatabase:
     sname = directory.strings[0]
     param_type = directory.modifier_idx1
     mili_type = MiliType(param_type)
-    type_rep = mili_type.repr()
+    type_rep = mili_type.struct_repr()
     type_size = mili_type.byte_size()
     item_count = len(param_data) // type_size
     if mili_type is MiliType.M_STRING:
@@ -257,7 +257,7 @@ class MiliDatabase:
         self.__params[sname] = struct.unpack(f"{item_count}{type_rep}", param_data)[0]
       else:
         self.__params[sname] = struct.unpack(f"{item_count}{type_rep}", param_data)
-  
+
   def __parse_application_param( self, param_data: bytes, directory: Directory ) -> None:
     """Handle parameters of type APPLICATION_PARAM.
 
@@ -444,7 +444,7 @@ class MiliDatabase:
     offset = 0
 
     # TODO: refactor this to be more pythonic/performant, pull as much into the subrecord init as possible:
-    for kk in range(srec_qty_subrecs):
+    for _ in range(srec_qty_subrecs):
       org, qty_svars, ord_blk_cnt = Subrecord.Org(idata[int_pos]), idata[int_pos + 1], idata[int_pos + 2]
 
       int_pos += 3
@@ -462,7 +462,8 @@ class MiliDatabase:
 
         srec.ordinal_blocks = np.array( idata[ int_pos : int_pos + (2 * ord_blk_cnt) ], dtype = np.int32 )
         srec.ordinal_blocks[1::2] = srec.ordinal_blocks[1::2] + 1 # add 1 to each STOP to allow inclusive bining during queries
-        srec.ordinal_counts = np.concatenate( ( [0], np.diff( srec.ordinal_blocks.reshape(-1,2), axis=1 ).flatten( ) ) ) # sum stop - start + 1 over all blocks
+        srec.ordinal_block_counts = np.concatenate( ( [0], np.diff( srec.ordinal_blocks.reshape(-1,2), axis=1 ).flatten( ) ) ) # sum stop - start + 1 over all blocks
+        srec.ordinal_block_offsets = np.cumsum( srec.ordinal_block_counts )
         srec.ordinal_blocks -= 1 # account for 1-indexing used by mili/fortran
         int_pos += 2 * ord_blk_cnt
       else:
@@ -487,7 +488,7 @@ class MiliDatabase:
       if srec.organization == Subrecord.Org.RESULT:
         srec.svar_ordinal_offsets = np.cumsum( np.fromiter( ( svar.atom_qty * srec.total_ordinal_count for svar in srec.svars ), dtype = np.int64 ) )
         srec.svar_byte_offsets = np.cumsum( np.fromiter( ( svar.atom_qty * srec.total_ordinal_count * svar.data_type.byte_size() for svar in srec.svars ), dtype = np.int64 ) )
-        # Insert 0 a front of arrays 
+        # Insert 0 a front of arrays
         srec.svar_ordinal_offsets = np.insert( srec.svar_ordinal_offsets, 0, 0, axis=0 )
         srec.svar_byte_offsets = np.insert( srec.svar_byte_offsets, 0, 0, axis=0 )
 
@@ -511,7 +512,7 @@ class MiliDatabase:
       svar_name = svar_query_input
       svar_comps = []
     return svar_name, svar_comps
-  
+
   """Get List of part numbers for all elements of a given class name."""
   def parts_of_class_name( self, class_name ):
     if class_name not in self.__labels.keys():
@@ -526,7 +527,7 @@ class MiliDatabase:
       return elem_parts
     else:
       return np_empty(np.int32)
-  
+
   """Get List of materials for all elements of a given class name."""
   def materials_of_class_name( self, class_name ):
     if class_name not in self.__labels.keys():
@@ -607,7 +608,7 @@ class MiliDatabase:
     for class_name, class_labels in element_labels.items():
       node_labels = np.append( node_labels, self.nodes_of_elems( class_name, class_labels )[0] )
     return np.unique( node_labels )
-  
+
   def query_all_classes( self, svar_name: str, states: Optional[Union[int,List[int]]] = None ):
     """Helper function to query a state variable for all element classes for which it exists."""
     if not svar_name in self.__svars.keys():
@@ -619,14 +620,14 @@ class MiliDatabase:
       states = np.array( [ states ], dtype = np.int32 )
     elif iterable( states ) and not type( states ) == str:
       states = np.array( states, dtype = np.int32 )
-    
+
     class_names = [ srec.class_name for srec in self.__svars[svar_name].srecs ]
     class_names = set(list(class_names))
 
     res = {}
     for class_sname in class_names:
       res[class_sname] = self.query( svar_name, class_sname, None, None, states, None, None, output_object_labels=False )
-    
+
     return res
 
   def __init_query_parameters( self,
@@ -740,8 +741,8 @@ class MiliDatabase:
 
     # for parallel operation it will often be the case a specific file doesn't have any labels
     labels_of_class = self.__labels.get( class_sname, np_empty(np.int32) )
-    ordinals_we_have = np.where( np.isin( labels_of_class, labels ) )[0]
-    if ordinals_we_have.size == 0:
+    ordinals = np.where( np.isin( labels_of_class, labels ) )[0]
+    if ordinals.size == 0:
       return res
 
     for queried_name in svar_names:
@@ -770,19 +771,19 @@ class MiliDatabase:
         for srec in srecs_with_svar_and_class:
           if srec not in srecs_to_query:
             srecs_to_query.append( srec )
-      
+
       # If user only requested single subrecord, only query single subrecord
       if subrec is not None:
         srecs_to_query = [srec for srec in srecs_to_query if srec.name == subrec]
 
-      res[queried_name]['layout'].update( { srec.name : np_empty(np.int32) for srec in srecs_to_query } )
+      # res[queried_name]['layout'].update( { srec.name : np_empty(np.int32) for srec in srecs_to_query } )
 
       filtered_write_data = copy.deepcopy( write_data )
-      if write_data is not None and ordinals_we_have.size != labels.size:
-      #   # if we don't have all the labels queried and we're writing data, we potentially need
-      #   #  to filter for the subset of the labels we *do* have locally
+      if write_data is not None and ordinals.size != labels.size:
+        # if we don't have all the labels queried and we're writing data, we potentially need
+        #  to filter for the subset of the labels we *do* have locally
         for srec in srecs_to_query:
-          local_write_labels = labels_of_class[ ordinals_we_have ]
+          local_write_labels = labels_of_class[ ordinals ]
           rows_to_write = np.where( np.isin( local_write_labels,  filtered_write_data[queried_name]['layout'][srec.name] ) )[0]
           filtered_write_data[queried_name]['layout'][srec.name] = local_write_labels
           filtered_write_data[queried_name]['data'][srec.name] = filtered_write_data[queried_name]['data'][srec.name][ :, rows_to_write, : ]
@@ -802,7 +803,7 @@ class MiliDatabase:
       # For each subrecord, determine which elements (labels) appear in that subrecord
       # and create a dictionary entry for each subrecord that contains the labels in that
       # subrecord and the indexes at which the data for that label appears in the subrecord
-      srecs_ordinal_indices = {} # { subrecord name --> [ label_cols, index_cols... ] }
+      srec_internal_offsets = {} # { subrecord name --> [ label_cols, index_cols... ] }
       for srec in srecs_to_query:
 
         #  determine if any of the queried svar components are in the subrecord.. and extract only the ips we're querying for
@@ -826,47 +827,79 @@ class MiliDatabase:
           # this is currently where basically ALL the time cost for calculating labels/indices for a query
           #   and there isn't much to do to improve performance at the python level unless there is a better numpy/pandas algo to apply
           #   all labels will be in bins, but only odd # bins are actual bins, even bins are between the block ranges so mask to only grab rows with odd bins
-          # THE ORDINAL BLOCKS MUST BE MONOTONICALLY INCREASING FOR THIS TO WORK, since they denote local ordinals this should always be the case
-          #  if not we need to order them on read
-          srec_ordinal_bins = np.digitize( ordinals_we_have, srec.ordinal_blocks )
-          # eliminate ordinals where the bin is not odd (not in this srec)
-          ordinals_we_have_copy = ordinals_we_have - srec.ordinal_blocks[ srec_ordinal_bins - 1 ]
-          mask = ( srec_ordinal_bins & 0x1 ).astype( bool )
-          # ordinals from the subrecord perspective -- Needed to get the correct values from the subrecord.
-          srec_ordinals = ordinals_we_have_copy[ mask ]
-          # ordinals from the element class perspective -- Needed to get correct labels.
-          class_ordinals = ordinals_we_have[ mask ]
+
+          # *** THE ORDINAL BLOCKS MUST BE MONOTONICALLY INCREASING FOR THIS TO WORK ***
+          #  since they denote local ordinals and define the srec label layout this *should* always be the case
+          # ... and yes this things falling into the first bin return index 1, essentially they return the first index greater than them
+          blocks_of_ordinals = np.digitize( ordinals, srec.ordinal_blocks )
+
+          # for each ordinal we have, which block does that ordinal fall into from the set of blocks the srec has
+          # a mask that is true only for odd-index blocks, which are those defining the ranges of ordinals that belong to the srec
+          # this is the same size as srec_ordinal_bins and ordinals
+          in_srec = ( blocks_of_ordinals & 0x1 ).astype( bool )
+
+          # each ordinal for queried labels that is in the subrecord, using these
+          #  to index the label set for the class should give the correct set of labels, in the correct order
+          #  for the result
+          ordinals_in_srec = ordinals[ in_srec ]
+
+          # for each ordinal that is in the subrecord, which block is it in
+          # this gives the index into the list of blocks (for the current srec) that the lower bound of the block range is located at
+          indices_of_blocks_of_ordinals_in_srec = blocks_of_ordinals[ in_srec ] - 1 # subtract one to get the index of the starting ordinal of the block instead of ending ordinal
+
+          # for each ordinal in the srec, subtract starting range of that block
+          # for each ordinal this gives the location of that ordinal in the block that it lies in
+          block_local_indices_of_ordinals_in_srec = (ordinals_in_srec - srec.ordinal_blocks[ indices_of_blocks_of_ordinals_in_srec ])
+
+          # take the location of each ordinal relative to the block it lies in and add the cumsum of the block counts of all previous blocks in the srec
+          # to give the location of the ordinal when the blocks are densely-packed to form the srec
+          dense_index_of_ordinals_in_srec = block_local_indices_of_ordinals_in_srec + srec.ordinal_block_offsets[ indices_of_blocks_of_ordinals_in_srec ]
+
+          # this relates the mesh entities to the srec as it will be laid out in memory, we still need to get only the svars we care about from the srec,
+          # so additional components for each of the above mesh-related indices is required
+          # this latter step might be able to be simplified since the set of srec-local svar-offsets to be queried for each mesh entity associated with
+          # the srec is identical for object ordering. result ordering complicates things and is why we handle both cases by calculating all the srec-local
+          # memory locations we'll be pulling data from
 
         else:
           # case for global values
-          srec_ordinals = np_empty(np.int64)
-          class_ordinals = np_empty(np.int64)
+          dense_index_of_ordinals_in_srec = np_empty(np.int64)
+          ordinals_in_srec = np_empty(np.int64)
 
-        srec_ordinal_indices = np.empty( [ srec_ordinals.size, qd_svar_comps.shape[0] ], dtype = np.int64 )
-        srec_ordinal_indices[:,0] = srec_ordinals
+        srec_memory_offsets = np.empty( [ dense_index_of_ordinals_in_srec.size, qd_svar_comps.shape[0] ], dtype = np.int64 )
+        # we set the first column of the memory offsets we'll be querying for this srec for this query to the dense indices of the mesh entity locations
+        srec_memory_offsets[:,:] = 0
+        srec_memory_offsets[:,0] = dense_index_of_ordinals_in_srec
 
-        if output_object_labels:
-          res[queried_name]['layout'][srec.name] = self.__labels[class_sname][ class_ordinals ]
-        else:
-          res[queried_name]['layout'][srec.name] = class_ordinals
+        if len( ordinals_in_srec ) > 0:
+          if output_object_labels:
+            res[queried_name]['layout'][srec.name] = self.__labels[ class_sname ][ ordinals_in_srec ]
+          else:
+            res[queried_name]['layout'][srec.name] = ordinals_in_srec
+
+        # we then loop backward over the set of individual memory locations (where we pull the atomic values from, often scalars but also can be arrays, regardless
+        #  they're the smallest unit we deal with in the database, hence "atoms"), calculating the atom offsets from the base label offset
+        #  this is easier to understand in the object-ordered case, where the mesh-entity dense location is multiplied by the total size of the srec svars for each label
+        #  that gives us the actual memory offset of the data for this particular mesh-entity, then we add the offset for the specific state-variable, and
+        #  finally for the specific term in that state variable ( for aggregate state variables, otherwise that last offset is 0 ( for all scalar terms especially ))
 
         # we work from the last column / svar to the first the first contains the ordinal info needed to compute the rest (in the RESULT organization case.. so we just do the same in both cases)
         if srec.organization == Subrecord.Org.OBJECT:
-          for idx_col, comp in zip( srec_ordinal_indices.T[::-1,:], qd_svar_comps[::-1,:]):
-            idx_col[:] = srec_ordinals * srec.atoms_per_label + srec.svar_atom_offsets[ comp[0] ] + comp[1]
+          for idx_col, comp in zip( srec_memory_offsets.T[::-1,:], qd_svar_comps[::-1,:]):
+            idx_col[:] = srec_memory_offsets[:,0] * srec.atoms_per_label + srec.svar_atom_offsets[ comp[0] ] + comp[1]
         elif srec.organization == Subrecord.Org.RESULT:
-          for idx_col, comp in zip( srec_ordinal_indices.T[::-1,:], qd_svar_comps[::-1,:]):
-            idx_col[:] = srec.svar_atom_offsets[ comp[0] ] * srec.total_ordinal_count + srec.svar_atom_lengths[ comp[1] ] * srec_ordinal_indices[:,0] + comp[1]
-        srecs_ordinal_indices[srec.name] = srec_ordinal_indices
+          for idx_col, comp in zip( srec_memory_offsets.T[::-1,:], qd_svar_comps[::-1,:]):
+            idx_col[:] = srec.svar_atom_offsets[ comp[0] ] * srec.total_ordinal_count + srec.svar_atom_lengths[ comp[1] ] * srec_memory_offsets[:,0] + comp[1]
+        srec_internal_offsets[srec.name] = srec_memory_offsets
 
       # filter out any subrecords we have no labels for
-      srecs_to_query = [ srec for srec in srecs_to_query if srecs_ordinal_indices[srec.name].size != 0 ]
+      srecs_to_query = [ srec for srec in srecs_to_query if srec_internal_offsets[srec.name].size != 0 ]
       if not srecs_to_query:
         break
 
       # initialize the results structure for this queried name
       for srec in srecs_to_query:
-        res_shape = [ len(states), *srecs_ordinal_indices[srec.name].shape ]
+        res_shape = [ len(states), *srec_internal_offsets[srec.name].shape ]
         res[queried_name]['data'][srec.name] = np.empty( res_shape, dtype = np.float32 )
 
       # Determine which states (of those requested) appear in each of the state files.
@@ -889,16 +922,16 @@ class MiliDatabase:
             state_offset = self.__smaps[state-1].file_offset + 8
 
             for srec in srecs_to_query:
-              ordinal_indices = srecs_ordinal_indices[srec.name]
+              srec_offsets = srec_internal_offsets[srec.name]
               state_file.seek( state_offset + srec.state_byte_offset )
               byte_read_data = state_file.read( srec.byte_size )
 
               if filtered_write_data is not None:
-                var_data, byte_write_data = srec.extract_ordinals( byte_read_data, ordinal_indices, write_data = filtered_write_data[ queried_name ][ 'data' ][ srec.name ][ sidx,:,: ] )
+                var_data, byte_write_data = srec.extract_ordinals( byte_read_data, srec_offsets, write_data = filtered_write_data[ queried_name ][ 'data' ][ srec.name ][ sidx,:,: ] )
                 state_file.seek( state_offset + srec.state_byte_offset )
                 state_file.write( byte_write_data )
               else:
-                var_data, _ = srec.extract_ordinals( byte_read_data, ordinal_indices )
+                var_data, _ = srec.extract_ordinals( byte_read_data, srec_offsets )
 
               res[ queried_name ][ "data" ][ srec.name ][ sidx,:,: ] = var_data
 

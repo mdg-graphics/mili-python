@@ -34,8 +34,8 @@ from enum import Enum, IntEnum
 import numpy as np
 import numpy.typing as npt
 from numpy.core.fromnumeric import prod
+import reprlib
 import warnings
-import pdb
 
 from typing import *
 
@@ -52,7 +52,7 @@ class MiliType(IntEnum):
     return [ -1, 1, 4, 4, 8, 4, 4, 8 ][self.value]
   def numpy_dtype(self):
     return [ None, object, np.float32, np.float32, np.float64, np.int32, np.int32, np.int64 ][self.value]
-  def repr(self):
+  def struct_repr(self):
     return 'sffdiiq '[self.value-1]
 
 class Superclass(IntEnum):
@@ -136,6 +136,11 @@ class StateVariable:
   svars : List[StateVariable] = dataclasses.field(default_factory=list)
   srecs : List[Subrecord] = dataclasses.field(default_factory=list)
 
+  def __repr__( self ) -> str:
+    r = reprlib.Repr()
+    r.maxlevel(1)
+    return r.repr(self)
+
   @property
   def comp_svar_names( self ):
     return [ ssvar.name for ssvar in self.svars ]
@@ -148,14 +153,11 @@ class StateVariable:
   def atom_qty( self ):
     ''' Returns the quantity of atoms (scalars of the contained type) based on the aggregate type. '''
     if self.agg_type == StateVariable.Aggregation.VECTOR:
-      return self.list_size
+      return sum( svar.atom_qty for svar in self.svars )
     elif self.agg_type == StateVariable.Aggregation.ARRAY:
-      return prod( self.dims )
+      return int( prod( self.dims ) )
     elif self.agg_type == StateVariable.Aggregation.VEC_ARRAY:
-      base = int( prod( self.dims ) ) * self.list_size
-      for svar in self.svars:
-        base *= svar.atom_qty
-      return base
+      return int( prod( self.dims ) ) * sum( svar.atom_qty for svar in self.svars )
     return 1
 
 
@@ -181,7 +183,8 @@ class Subrecord:
   svar_atom_offsets : np.ndarray = np.empty([0],dtype = np.int64)
   svar_svar_comp_layout : np.ndarray = np.empty([0],dtype = object )
   ordinal_blocks : np.ndarray = np.empty([0], dtype = np.int64)
-  ordinal_counts : np.ndarray = np.empty([0], dtype = np.int64)
+  ordinal_block_counts : np.ndarray = np.empty([0], dtype = np.int64)
+  ordinal_block_offsets : np.ndarray = np.empty([0], dtype = np.int64)
   state_byte_offset : int = -1
   atoms_per_label : int = -1
   byte_size : int = 0
@@ -189,6 +192,11 @@ class Subrecord:
   svar_ordinal_offsets : np.ndarray = np.empty([0], dtype = np.int64)
   svar_byte_offsets : np.ndarray = np.empty([0], dtype = np.int64)
   srec_fmt_id: int = 0
+
+  def __repr__( self ) -> str:
+    r = reprlib.Repr()
+    r.maxlevel(1)
+    return r.repr(self)
 
   def scalar_svar_coords( self, svar_name, containing_svar_name ):
     coords = []
@@ -232,7 +240,7 @@ class Subrecord:
 
   @property
   def total_ordinal_count( self ):
-    return max( 1, np.sum( self.ordinal_counts ) )
+    return max( 1, np.sum( self.ordinal_block_counts ) ) #+ 1 - len(self.ordinal_block_counts) )
 
   def struct_repr( self ):
     '''
@@ -240,15 +248,15 @@ class Subrecord:
     '''
     if self.organization == Subrecord.Org.OBJECT:
       # if subrecord is Object ordered there will only be 1 data type, so just pull the datatype of the first svar
-      return str(self.atoms_per_label * self.total_ordinal_count) + self.svars[0].data_type.repr(), True
+      return str(self.atoms_per_label * self.total_ordinal_count) + self.svars[0].data_type.struct_repr(), True
     else:
       # if all the svars are the same type, merge the struct repr into one to make querying easier
-      base_repr = self.svars[0].data_type.repr()
-      if ( all( base_repr == svar.data_type.repr() for svar in self.svars ) ):
-        return str(self.atoms_per_label * self.total_ordinal_count) + self.svars[0].data_type.repr(), True
+      base_repr = self.svars[0].data_type.struct_repr()
+      if ( all( base_repr == svar.data_type.struct_repr() for svar in self.svars ) ):
+        return str(self.atoms_per_label * self.total_ordinal_count) + self.svars[0].data_type.struct_repr(), True
       else:
         warnings.warn( "Querying data from a mixed-type subrecord is currently unsupported." )
-        return [str(svar.atom_qty * self.total_ordinal_count) + svar.data_type.repr() for svar in self.svars ], False
+        return [str(svar.atom_qty * self.total_ordinal_count) + svar.data_type.struct_repr() for svar in self.svars ], False
 
 @dataclass
 class MeshObjectClass:
