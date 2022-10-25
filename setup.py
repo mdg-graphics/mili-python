@@ -20,10 +20,11 @@ setup(
   version=get_property('__version__','mili').strip('()').replace(',','.'),
   description="modules for interacting with mili database files",
   long_description=long_description,
-  author="William R Tobin, Kevin Durrenberger",
-  author_email="tobin6@llnl.gov, durrenberger1@llnl.gov",
+  author="William R Tobin, Kevin Durrenberger, Ryan Hathaway",
+  author_email="tobin6@llnl.gov, durrenberger1@llnl.gov, hathaway6@llnl.gov",
   packages=find_packages('src',exclude=['tests']),
   package_dir={'': 'src'},
+  package_data={ 'mili' : ["src/mili/py.typed"] },
   install_requires=[x + prod[x] if prod[x] != "*" else x for x in prod],
   python_requires=requirements['project']['requires-python']
 )

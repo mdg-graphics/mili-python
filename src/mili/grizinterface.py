@@ -1,7 +1,8 @@
 """
 Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
  Produced at the Lawrence Livermore National Laboratory. Written by
- William Tobin (tobin6@llnl.hov) and Kevin Durrenberger (durrenberger1@llnl.gov).
+ William Tobin (tobin6@llnl.hov), Kevin Durrenberger (durrenberger1@llnl.gov),
+ and Ryan Hathaway (hathaway6@llnl.gov).
  CODE-OCEC-16-056.
  All rights reserved.
 
@@ -26,7 +27,7 @@ Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
 """
 
 # defer evaluation of type-annotations until after the module is processed, allowing class members to refer to the class
-from __future__ import annotations 
+from __future__ import annotations
 import os
 from typing import *
 from dataclasses import dataclass
@@ -65,7 +66,7 @@ class GrizDataContainer:
   element_sets: dict
   subrecords: list
   classes_with_sand: List[str]
-  
+
 
 @dataclass
 class FreeNodeData:
@@ -112,14 +113,14 @@ class GrizInterface:
     # Reflection for mili reader functions we need to access
     for func in ["query_all_classes", "query"]:
       if func in dir(self.db):
-        call_lambda = lambda *pargs, **kwargs : getattr(self.db, func)(*pargs, **kwargs) 
+        call_lambda = lambda *pargs, **kwargs : getattr(self.db, func)(*pargs, **kwargs)
         setattr( self, func, call_lambda )
-  
+
   def reload(self) -> None:
     """Reload the state maps for the plot file."""
     self.db.reload_state_maps()
     self.smaps = self.db.state_maps()[0]
-  
+
 
   def load_free_node_data(self) -> None:
     """Get Free Node Mass/Volume if it exists."""
@@ -136,7 +137,7 @@ class GrizInterface:
         fn_vol.append(proc_params["Nodal Volume"])
       else:
         fn_vol.append(None)
-    
+
     self.free_node_data = FreeNodeData( fn_mass, fn_vol )
 
 
@@ -146,22 +147,22 @@ class GrizInterface:
       for proc_key, proc_value in proc_params.items():
         if proc_key not in self.params:
           self.params[proc_key] = proc_value
-  
+
 
   def parameters(self) -> dict:
     """Getter for params dictionary."""
     return self.params
-  
+
   def state_maps(self) -> List:
     """Getter for state maps list."""
     return self.smaps
 
   def parameter_wildcard_search(self, key: str) -> List[str]:
     """Wildcard search of Mili parameters dictionary.
-    
+
     Args:
       key (str): The key to search for.
-    
+
     Returns:
       List of keys that match or startwith the key searched for.
     """
@@ -192,13 +193,13 @@ class GrizInterface:
         data.materials, data.parts
       ) for data in self.griz_data
     ]
-  
+
   @dataclass
   class GrizStDescriptorsCallData:
     """Dataclass containing all data needed by Griz get_st_descriptors call."""
     element_sets: List[dict]
     subrecords: List[List[Subrecord]]
-  
+
   def griz_get_st_descriptors_call(self):
     """Populate GrizStDescriptorsCallData object for each processor."""
     return [
@@ -207,13 +208,13 @@ class GrizInterface:
         data.subrecords
       ) for data in self.griz_data
     ]
-  
+
   @dataclass
   class GrizGetStateCallData:
     """Dataclass containing all data needed by Griz get_state call."""
     nodpos: dict
     sand: dict
-  
+
   def griz_get_state_call(self):
     """Populate GrizGetStateCallData object for each processor."""
     node_data = self.db.query("nodpos", "node")

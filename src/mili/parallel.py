@@ -1,7 +1,8 @@
 """
 Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
  Produced at the Lawrence Livermore National Laboratory. Written by
- William Tobin (tobin6@llnl.hov) and Kevin Durrenberger (durrenberger1@llnl.gov).
+ William Tobin (tobin6@llnl.hov), Kevin Durrenberger (durrenberger1@llnl.gov),
+ and Ryan Hathaway (hathaway6@llnl.gov).
  CODE-OCEC-16-056.
  All rights reserved.
 

@@ -1,7 +1,8 @@
 """
 Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
  Produced at the Lawrence Livermore National Laboratory. Written by
- William Tobin (tobin6@llnl.hov) and Kevin Durrenberger (durrenberger1@llnl.gov).
+ William Tobin (tobin6@llnl.hov), Kevin Durrenberger (durrenberger1@llnl.gov),
+ and Ryan Hathaway (hathaway6@llnl.gov).
  CODE-OCEC-16-056.
  All rights reserved.
 
@@ -183,6 +184,21 @@ class MiliDatabase:
 
   def state_variables(self):
     return self.__svars
+
+  def queriable_svars(self, vector_only = False, show_ips = False):
+    queriable = []
+    for sname, svar in self.__svars.items():
+      if svar.agg_type in ( StateVariable.Aggregation.VEC_ARRAY, StateVariable.Aggregation.VECTOR ):
+        for subvar in svar.svars:
+          name = sname
+          if show_ips and svar.agg_type == StateVariable.Aggregation.VEC_ARRAY:
+            name += f"[0-{svar.dims[0]}]"
+          name += f"[{subvar.name}]"
+          queriable.append( name )
+      else:
+        if not vector_only:
+          queriable.append( sname )
+    return queriable
 
   def labels(self):
     return self.__labels
@@ -609,27 +625,6 @@ class MiliDatabase:
       node_labels = np.append( node_labels, self.nodes_of_elems( class_name, class_labels )[0] )
     return np.unique( node_labels )
 
-  def query_all_classes( self, svar_name: str, states: Optional[Union[int,List[int]]] = None ):
-    """Helper function to query a state variable for all element classes for which it exists."""
-    if not svar_name in self.__svars.keys():
-      raise ValueError( f"No state variable '{svar_name}' found in database." )
-
-    if states is None:
-      states = np.arange( 1, len(self.__smaps) + 1, dtype = np.int32 )
-    if type(states) is int:
-      states = np.array( [ states ], dtype = np.int32 )
-    elif iterable( states ) and not type( states ) == str:
-      states = np.array( states, dtype = np.int32 )
-
-    class_names = [ srec.class_name for srec in self.__svars[svar_name].srecs ]
-    class_names = set(list(class_names))
-
-    res = {}
-    for class_sname in class_names:
-      res[class_sname] = self.query( svar_name, class_sname, None, None, states, None, None, output_object_labels=False )
-
-    return res
-
   def __init_query_parameters( self,
                                svar_names : Union[List[str],str],
                                class_sname : str,
@@ -939,6 +934,27 @@ class MiliDatabase:
                 var_data, _ = srec.extract_ordinals( byte_read_data, srec_offsets )
 
               res[ queried_name ][ "data" ][ srec.name ][ sidx,:,: ] = var_data
+
+    return res
+
+  def query_all_classes( self, svar_name: str, states: Optional[Union[int,List[int]]] = None ):
+    """Helper function to query a state variable for all element classes for which it exists."""
+    if not svar_name in self.__svars.keys():
+      raise ValueError( f"No state variable '{svar_name}' found in database." )
+
+    if states is None:
+      states = np.arange( 1, len(self.__smaps) + 1, dtype = np.int32 )
+    if type(states) is int:
+      states = np.array( [ states ], dtype = np.int32 )
+    elif iterable( states ) and not type( states ) == str:
+      states = np.array( states, dtype = np.int32 )
+
+    class_names = [ srec.class_name for srec in self.__svars[svar_name].srecs ]
+    class_names = set(list(class_names))
+
+    res = {}
+    for class_sname in class_names:
+      res[class_sname] = self.query( svar_name, class_sname, None, None, states, None, None, output_object_labels=False )
 
     return res
 
