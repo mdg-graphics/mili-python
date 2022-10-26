@@ -4,36 +4,27 @@
 
 ---
 ##### Installation:
-
+  ```
+  module load python/3.7.2
+  python -m venv <venv_name>
+  source <venv_name>/bin/activate
+  pip install --upgrade pip
+  pip install --upgrade --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse mili
+  ```
   - Make sure you're using python > 3.7:
-
-  `module load python/3.7.2`
-
   - Create a python virtual environment to install packages into locally:
-
-  `python -m venv <venv_name>`
-
   - Activate the environment:
-
-  `source <venv_name>/bin/activate`
-
   - Upgrade pip (numpy > 1.20.0 will fail to build with the base RZ pip):
+  - Install the mili python package into the local venv from the LC wheelhouse:
 
-  `pip install --upgrade pip`
-
-  - Install the mili python package into the local venv:
-
-  `pip install --upgrade --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse --find-links=/collab/usr/gapps/mdg/python/wheels/ mili`
-
-  **Note:** Using `--find-links=<url>` will pull dependencies from the LC python wheelhouse, which should contain sufficient requirements and should be available on OCF and SCF
-
-  This should install `mili` in the python venv.
+  **Note:** Using `--find-links=<url>` will pull dependencies from the LC python wheelhouse, which should contain sufficient requirements to install mili-python and should be available on OCF and SCF.
+  **Note:** Using `--upgrade` will upgrade any already-installed copies of the mili module in the venv.
 
   If you want to install the packages into your ~/.local/ python cache so the module is usable with the system python install, try instead not creating and activating a virtual environment and instead (untested and may not work):
   ``` 
   module load python/3.7.2
   python -m pip install --upgrade pip --user
-  python -m pip install --user --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse --find-links=/collab/usr/gapps/mdg/python/wheels/ mili
+  python -m pip install --upgrade --user --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse mili
   ```
 
 ---
