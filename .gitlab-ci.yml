@@ -18,7 +18,7 @@ stages:
 
 before_script:
     - freturn() { return "$1" ; }
-    - . util/venv.sh
+    - . .venv.sh
 
 unit_tests:
     stage: test
