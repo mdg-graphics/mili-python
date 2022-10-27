@@ -220,11 +220,11 @@ class Subrecord:
       svar_idxs = np.digitize( ordinals, self.svar_ordinal_offsets )
       # assert all labels are from the same svar
       assert( np.min(svar_idxs) == np.max(svar_idxs) )
-      svar_idx = np.min(svar_idxs)
+      svar_idx = np.min(svar_idxs) - 1
       # modify the ordinals to offset in the svar for this srec
-      ordinals -= self.svar_ordinal_offsets[svar_idx-1]
+      ordinals -= self.svar_ordinal_offsets[svar_idx]
       # only read the portion of the subrecord related to this svar
-      buffer_slice = (self.svar_byte_offsets[svar_idx-1], self.svar_byte_offsets[svar_idx])
+      buffer_slice = (self.svar_byte_offsets[svar_idx], self.svar_byte_offsets[svar_idx+1])
     var_data = np.frombuffer( buffer[ buffer_slice[0] : buffer_slice[1] ], dtype = self.svars[svar_idx].data_type.numpy_dtype() )
     if write_data is not None:
       var_data = var_data.copy( )

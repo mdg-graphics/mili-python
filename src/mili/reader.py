@@ -854,7 +854,7 @@ class MiliDatabase:
 
           # take the location of each ordinal relative to the block it lies in and add the cumsum of the block counts of all previous blocks in the srec
           # to give the location of the ordinal when the blocks are densely-packed to form the srec
-          dense_index_of_ordinals_in_srec = block_local_indices_of_ordinals_in_srec + srec.ordinal_block_offsets[ indices_of_blocks_of_ordinals_in_srec ]
+          dense_index_of_ordinals_in_srec = block_local_indices_of_ordinals_in_srec + srec.ordinal_block_offsets[ (indices_of_blocks_of_ordinals_in_srec // 2) ]
 
           # this relates the mesh entities to the srec as it will be laid out in memory, we still need to get only the svars we care about from the srec,
           # so additional components for each of the above mesh-related indices is required

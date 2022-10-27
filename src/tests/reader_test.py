@@ -51,6 +51,30 @@ class NonsequentialMOBlocks(unittest.TestCase):
         result = mili.query( 'sx', 'brick', labels = [228], states = [10] )
         self.assertAlmostEqual(result[7]['sx']['data']['7hex_mmsvn_rec'][0][0][0],20.355846, places = 6 )
 
+class NonsequentialMOBlocksTwo(unittest.TestCase):
+    def __init__(self, *args, **kwargs):
+        super(NonsequentialMOBlocksTwo, self).__init__(*args,**kwargs)
+        self.file_name = os.path.join(dir_path,'data','serial','fdamp1','fdamp1.plt')
+
+    def test_refrcx( self ):
+        mili = reader.open_database( self.file_name, procs = [7], suppress_parallel = True )
+        result = mili.query( 'refrcx', 'node', labels = [6], states = [1,2,3])
+        self.assertAlmostEqual(result['refrcx']['data']['reaction_force'][0][0][0],0.000000, places = 6 )
+        self.assertAlmostEqual(result['refrcx']['data']['reaction_force'][1][0][0],-195.680618, places = 6 )
+        self.assertAlmostEqual(result['refrcx']['data']['reaction_force'][2][0][0],-374.033813, places = 6 )
+
+class DoublePrecisionNodpos(unittest.TestCase):
+    def __init__(self, *args, **kwargs):
+        super(DoublePrecisionNodpos, self).__init__(*args,**kwargs)
+        self.file_name = os.path.join(dir_path,'data','serial','beam_udi','beam_udi.plt')
+
+    def test_nodpos( self ):
+        mili = reader.open_database( self.file_name, suppress_parallel = True )
+        result = mili.query( 'nodpos', 'node', labels = [6], states = [3])
+        self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][0],499.86798, places = 5 )
+        self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][1],100.000000, places = 5 )
+        self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][2],198.08432, places = 5 )
+
 '''
 These are tests to assert the correctness of the Mili Reader
 These tests use d3samp6.plt
