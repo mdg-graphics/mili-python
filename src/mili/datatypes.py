@@ -139,7 +139,7 @@ class StateVariable:
 
   def __repr__( self ) -> str:
     r = reprlib.Repr()
-    r.maxlevel(1)
+    r.maxlevel = 1
     return r.repr(self)
 
   @property
@@ -196,7 +196,7 @@ class Subrecord:
 
   def __repr__( self ) -> str:
     r = reprlib.Repr()
-    r.maxlevel(1)
+    r.maxlevel = 1
     return r.repr(self)
 
   def scalar_svar_coords( self, aggregate_match, scalar_svar_name ):
