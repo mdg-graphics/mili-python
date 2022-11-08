@@ -79,7 +79,7 @@ class Superclass(IntEnum):
   M_INVALID_LABEL = -1
 
   def node_count(self):
-    return [ 0, 0, 2, 3, 4, 4, 4, 5, 6, 8, 0, 0, 0, 1, 10 ][self.value]
+    return [ 0, 0, 2, 3, 3, 4, 4, 5, 6, 8, 0, 0, 0, 1, 10 ][self.value]
 
 @dataclass
 class StateMap:

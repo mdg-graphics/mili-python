@@ -206,11 +206,21 @@ class MiliDatabase:
   def materials(self):
     return self.__mats
 
+  def material_numbers(self):
+    return list(self.__elems_of_mat.keys())
+
   def connectivity(self):
     return self.__conns
 
   def material_classes(self, mat):
     return self.__elems_of_mat.get(mat,{}).keys()
+
+  def classes_of_state_variable(self, svar: str):
+    classes = []
+    state_variable = self.__svars.get(svar, None)
+    if state_variable:
+      classes = list(set([ srec.class_name for srec in state_variable.srecs ]))
+    return classes
 
   def __reload_state_maps( self, att_file : BinaryIO ):
     parser = AFileParser()
@@ -365,7 +375,7 @@ class MiliDatabase:
           if comp_svar is None:
             _ = next( str_iter )
             svar_comp_title = next( str_iter )
-            comp_agg_type = StateVariable.Aggregation(next(int_iter)),
+            comp_agg_type = StateVariable.Aggregation(next(int_iter))
             comp_data_type = MiliType(next(int_iter))
             comp_svar = self.__svars[svar_comp_name] = StateVariable( svar_comp_name, svar_comp_title, comp_agg_type, comp_data_type )
           svar.svars.append( comp_svar )
@@ -483,7 +493,19 @@ class MiliDatabase:
         srec.ordinal_blocks -= 1 # account for 1-indexing used by mili/fortran
         int_pos += 2 * ord_blk_cnt
       else:
+        srec.ordinal_blocks = np.array( [0, 1], dtype=np.int32 )
+        srec.ordinal_block_counts = np.array( [0, 1], dtype=np.int32 )
+        srec.ordinal_block_offsets = np.array( [0, 1], dtype=np.int32 )
         int_pos += 2 * ord_blk_cnt
+
+      # Check that ordinal blocks are monotonically increasing
+      monotonically_increasing = np.all( srec.ordinal_blocks[1:] >= srec.ordinal_blocks[:-1] )
+      if not monotonically_increasing:
+        # Sort ordinal_blocks and ordinal_block offsets together
+        srec.ordinal_blocks = np.reshape( srec.ordinal_blocks, (-1,2) )
+        blocks, offsets = zip( *(sorted( zip(srec.ordinal_blocks, srec.ordinal_block_offsets[:-1]), key=lambda x: x[0][0]) ) )
+        srec.ordinal_blocks = np.array( blocks ).flatten()
+        srec.ordinal_block_offsets = np.array( offsets )
 
       # atom-based lengths and offsets to make querying operations easier... this can be done after the read is complete
       srec.svar_atom_lengths = np.fromiter( ( svar.atom_qty for svar in srec.svars ), dtype = np.int64 )
@@ -572,7 +594,7 @@ class MiliDatabase:
     elif type(mat) is int:
       all_reps = list( itertools.chain.from_iterable(self.__mats.values()) )
     if mat not in all_reps and mat not in self.__elems_of_mat.keys():
-      raise ValueError('There is no ' + str(mat) + ' material')
+      return np_empty(np.int32)
     elem_idxs = np_empty(np.int32)
     if mat in self.__mats.keys():
       for mat in self.__mats[mat]:
@@ -585,7 +607,7 @@ class MiliDatabase:
   def all_labels_of_material( self, mat ):
     ''' Given a specific material. Find all labels with that material and return their values. '''
     if mat not in self.__mats.keys() and mat not in self.__elems_of_mat.keys():
-      raise ValueError('There is no material ' + str(mat))
+      return np_empty(np.int32)
     if type(mat) == int:
       mat_nums = [ mat ]
     else:
@@ -618,7 +640,7 @@ class MiliDatabase:
   def nodes_of_material( self, mat ):
     ''' Find nodes associated with a material number '''
     if mat not in self.__mats and mat not in self.__elems_of_mat:
-      raise ValueError( f'There is no material {mat}' )
+      return np_empty(np.int32)
     element_labels = self.all_labels_of_material( mat )
     node_labels = np_empty(np.int32)
     for class_name, class_labels in element_labels.items():
@@ -744,14 +766,13 @@ class MiliDatabase:
       queried_svar_name, comp_svar_names = self.__parse_query_name( queried_name )
 
       if not queried_svar_name in self.__svars.keys():
-        raise ValueError( f"No state variable '{queried_svar_name}' found in database." )
-      for comp_svar_name in comp_svar_names:
-        if not comp_svar_name in self.__svars.keys():
-          raise ValueError( f"No state variable '{comp_svar_name}' found in database." )
+        continue
+      if not all([comp_svar_name in self.__svars.keys() for comp_svar_name in comp_svar_names]):
+        continue
 
       match_aggregate_svar = ""
       if self.__svars[queried_svar_name].agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:
-          match_aggregate_svar = queried_svar_name
+        match_aggregate_svar = queried_svar_name
 
       # if svar is an aggregate svar and we're not querying specific comps, query all the comps
       if comp_svar_names == []:
@@ -766,7 +787,10 @@ class MiliDatabase:
       srecs_to_query : List[Subrecord] = []
       for svar in svars_to_query:
         # filter so we only have those subrecords with the appropriate class_sname
-        srecs_with_svar_and_class = [ srec for srec in svar.srecs if srec.class_name == class_sname ]
+        if "es_" in queried_svar_name:
+          srecs_with_svar_and_class = [ srec for srec in svar.srecs if (srec.class_name == class_sname and queried_svar_name in srec.svar_names) ]
+        else:
+          srecs_with_svar_and_class = [ srec for srec in svar.srecs if srec.class_name == class_sname ]
         for srec in srecs_with_svar_and_class:
           if srec not in srecs_to_query:
             srecs_to_query.append( srec )
@@ -890,7 +914,7 @@ class MiliDatabase:
             idx_col[:] = srec_memory_offsets[:,0] * srec.atoms_per_label + srec.svar_atom_offsets[ comp[0] ] + comp[1]
         elif srec.organization == Subrecord.Org.RESULT:
           for idx_col, comp in zip( srec_memory_offsets.T[::-1,:], qd_svar_comps[::-1,:]):
-            idx_col[:] = srec.svar_atom_offsets[ comp[0] ] * srec.total_ordinal_count + srec.svar_atom_lengths[ comp[1] ] * srec_memory_offsets[:,0] + comp[1]
+            idx_col[:] = srec.svar_atom_offsets[ comp[0] ] * srec.total_ordinal_count + srec.svar_atom_lengths[ comp[0] ] * srec_memory_offsets[:,0] + comp[1]
         srec_internal_offsets[srec.name] = srec_memory_offsets
 
       # filter out any subrecords we have no labels for
@@ -899,8 +923,9 @@ class MiliDatabase:
         break
 
       # initialize the results structure for this queried name
+      svar_np_dtype = self.__svars[queried_svar_name].data_type.numpy_dtype()
       for srec in srecs_to_query:
-        res[queried_name]['data'][srec.name] = np.empty( [ len(states), *srec_internal_offsets[srec.name].shape ], dtype = np.float32 )
+        res[queried_name]['data'][srec.name] = np.empty( [ len(states), *srec_internal_offsets[srec.name].shape ], dtype = svar_np_dtype )
 
       # Determine which states (of those requested) appear in each of the state files.
       # This way we can open each file only once and process all the states that appear in it

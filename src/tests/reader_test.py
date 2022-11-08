@@ -71,7 +71,7 @@ class DoublePrecisionNodpos(unittest.TestCase):
     def test_nodpos( self ):
         mili = reader.open_database( self.file_name, suppress_parallel = True )
         result = mili.query( 'nodpos', 'node', labels = [6], states = [3])
-        self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][0],499.86798, places = 5 )
+        self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][0],499.867992, places = 5 )
         self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][1],100.000000, places = 5 )
         self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][2],198.08432, places = 5 )
 
@@ -97,16 +97,6 @@ class SerialSingleStateFile(unittest.TestCase):
     Testing invalid inputs
     '''
     def test_invalid_inputs(self):
-        with self.assertRaises(ValueError):
-            self.mili.all_labels_of_material('es_13121')
-        with self.assertRaises(ValueError):
-            self.mili.nodes_of_material('es_13121')
-        with self.assertRaises(ValueError):
-            self.mili.query(['nodpos[uxxx]'], 'node', labels = 4, states = 3)
-        with self.assertRaises(ValueError):
-            self.mili.query(['nodposss[ux]'], 'node', labels = 4, states = 3)
-        with self.assertRaises(ValueError):
-            self.mili.query(['nodpos[ux]'], 'node', material = 'cat', labels = 4, states = 3)
         with self.assertRaises(ValueError):
             self.mili.query(['nodpos[ux]'], 'node', labels = 4, states = 300)
         with self.assertRaises(ValueError):
@@ -270,6 +260,26 @@ class SerialSingleStateFile(unittest.TestCase):
         self.assertEqual(FIRST_STATE, state_maps[0].time)
         self.assertEqual(LAST_STATE, state_maps[-1].time)
 
+    def test_material_numbers(self):
+        """
+        Test getter for list of material numbers.
+        """
+        mat_nums = self.mili.material_numbers()
+        self.assertEqual(set(mat_nums), set([1,2,3,4,5]))
+
+    def test_classes_of_state_variable(self):
+        """
+        Test the classes_of_state_variable method of Mili Class.
+        """
+        sx_classes = self.mili.classes_of_state_variable('sx')
+        self.assertEqual(set(sx_classes), set(["beam", "shell", "brick"]))
+
+        uy_classes = self.mili.classes_of_state_variable('uy')
+        self.assertEqual(uy_classes, ["node"])
+
+        axf_classes = self.mili.classes_of_state_variable('axf')
+        self.assertEqual(axf_classes, ["beam"])
+
     def test_materials_of_class_name(self):
         """
         Test the materials_of_class_name method of Mili Class.
@@ -291,8 +301,6 @@ class SerialSingleStateFile(unittest.TestCase):
         self.assertEqual( cseg_mats.size, 24 )
         np.testing.assert_equal( cseg_mats, np.array([4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
                                                       5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5]) )
-
-
 
     def test_parts_of_class_name(self):
         """
@@ -694,6 +702,19 @@ class SerialSingleStateFile(unittest.TestCase):
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 71, ips = 2, write_data = v1 )
         np.testing.assert_equal( answer['stress[sy]']['data']['1beam_mmsvn_rec'], v1['stress[sy]']['data']['1beam_mmsvn_rec'] )
 
+    def test_query_glob_results(self):
+        """
+        Test querying for results for M_MESH ("glob") element class.
+        """
+        answer = self.mili.query("he", "glob", states=[22])
+        self.assertAlmostEqual( answer["he"]["data"]["glob"][0,0,0], 3.0224223, delta=1e-7)
+
+        answer = self.mili.query("bve", "glob", states=[22])
+        self.assertAlmostEqual( answer["bve"]["data"]["glob"][0,0,0], 2.05536485, delta=1e-7)
+
+        answer = self.mili.query("te", "glob", states=[22])
+        self.assertAlmostEqual( answer["te"]["data"]["glob"][0,0,0], 1629.718, delta=1e-4)
+
 class SerialMutliStateFile(SerialSingleStateFile):
     def __init__(self, *args, **kwargs):
         super(SerialMutliStateFile, self).__init__(*args, **kwargs)
@@ -796,16 +817,6 @@ class ParallelSingleStateFile(unittest.TestCase):
     Testing invalid inputs
     '''
     def test_invalid_inputs(self):
-        with self.assertRaises(ValueError):
-            self.mili.all_labels_of_material('es_13121')
-        with self.assertRaises(ValueError):
-            self.mili.nodes_of_material('es_13121')
-        with self.assertRaises(ValueError):
-            self.mili.query(['nodpos[uxxx]'], 'node', labels = 4, states = 3)
-        with self.assertRaises(ValueError):
-            self.mili.query(['nodposss[ux]'], 'node', labels = 4, states = 3)
-        with self.assertRaises(ValueError):
-            self.mili.query(['nodpos[ux]'], 'node', material = 'cat', labels = 4, states = 3)
         with self.assertRaises(ValueError):
             self.mili.query(['nodpos[ux]'], 'node', labels = 4, states = 300)
         with self.assertRaises(ValueError):
@@ -984,6 +995,48 @@ class ParallelSingleStateFile(unittest.TestCase):
             self.assertEqual(len(state_map), STATE_COUNT)
             self.assertEqual(state_map[0].time, FIRST_STATE)
             self.assertEqual(state_map[-1].time, LAST_STATE)
+
+    def test_material_numbers(self):
+        mat_nums = self.mili.material_numbers()
+        self.assertEqual(mat_nums[0], [2])
+        self.assertEqual(mat_nums[1], [2])
+        self.assertEqual(mat_nums[2], [1,2,3,4,5])
+        self.assertEqual(mat_nums[3], [2,3,4,5])
+        self.assertEqual(mat_nums[4], [1])
+        self.assertEqual(mat_nums[5], [1,2,3,4,5])
+        self.assertEqual(mat_nums[6], [1])
+        self.assertEqual(mat_nums[7], [1])
+
+    def test_classes_of_state_variable(self):
+        sx_classes = self.mili.classes_of_state_variable('sx')
+        self.assertEqual(sx_classes[0], ["brick"])
+        self.assertEqual(sx_classes[1], ["brick"])
+        self.assertEqual(set(sx_classes[2]), set(["beam", "shell", "brick"]))
+        self.assertEqual(set(sx_classes[3]), set(["shell", "brick"]))
+        self.assertEqual(sx_classes[4], ["beam"])
+        self.assertEqual(set(sx_classes[5]), set(["beam", "shell", "brick"]))
+        self.assertEqual(sx_classes[6], ["beam"])
+        self.assertEqual(sx_classes[7], ["beam"])
+
+        uy_classes = self.mili.classes_of_state_variable('uy')
+        self.assertEqual(uy_classes[0], ["node"])
+        self.assertEqual(uy_classes[1], ["node"])
+        self.assertEqual(uy_classes[2], ["node"])
+        self.assertEqual(uy_classes[3], ["node"])
+        self.assertEqual(uy_classes[4], ["node"])
+        self.assertEqual(uy_classes[5], ["node"])
+        self.assertEqual(uy_classes[6], ["node"])
+        self.assertEqual(uy_classes[7], ["node"])
+
+        axf_classes = self.mili.classes_of_state_variable('axf')
+        self.assertEqual(axf_classes[0], [])
+        self.assertEqual(axf_classes[1], [])
+        self.assertEqual(axf_classes[2], ["beam"])
+        self.assertEqual(axf_classes[3], [])
+        self.assertEqual(axf_classes[4], ["beam"])
+        self.assertEqual(axf_classes[5], ["beam"])
+        self.assertEqual(axf_classes[6], ["beam"])
+        self.assertEqual(axf_classes[7], ["beam"])
 
     def test_materials_of_class_name(self):
         """
@@ -1499,6 +1552,18 @@ class ParallelSingleStateFile(unittest.TestCase):
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2, write_data = v1 )
         np.testing.assert_equal( answer[2]['stress[sy]']['data']['1beam_mmsvn_rec'], v1['stress[sy]']['data']['1beam_mmsvn_rec'] )
 
+    def test_query_glob_results(self):
+        """
+        Test querying for results for M_MESH ("glob") element class.
+        """
+        answer = self.mili.query("he", "glob", states=[22])
+        self.assertAlmostEqual( answer[0]["he"]["data"]["glob"][0,0,0], 3.0224223, delta=1e-7)
+
+        answer = self.mili.query("bve", "glob", states=[22])
+        self.assertAlmostEqual( answer[0]["bve"]["data"]["glob"][0,0,0], 2.05536485, delta=1e-7)
+
+        answer = self.mili.query("te", "glob", states=[22])
+        self.assertAlmostEqual( answer[0]["te"]["data"]["glob"][0,0,0], 1629.718, delta=1e-4)
 
 
 class Bugfixes0_2_4(unittest.TestCase):
