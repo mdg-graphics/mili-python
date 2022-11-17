@@ -75,6 +75,18 @@ class DoublePrecisionNodpos(unittest.TestCase):
         self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][1],100.000000, places = 5 )
         self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][2],198.08432, places = 5 )
 
+class VectorsInVectorArrays(unittest.TestCase):
+    def __init__(self, *args, **kwargs):
+        super(VectorsInVectorArrays, self).__init__(*args,**kwargs)
+        self.file_name = os.path.join(dir_path,'data','serial','d3samp4','d3samp4.plt')
+
+    def test_query( self ):
+        mili = reader.open_database( self.file_name, suppress_parallel = True )
+        result = mili.query( 'eps', 'shell', labels = [1], states = [2], ips = [1])
+        self.assertAlmostEqual(result['eps']['data']['1shell_mmsvn_rec'][0][0][0], 0.02329357, places = 5 )
+        result = mili.query( 'eps', 'shell', labels = [1], states = [2], ips = [2])
+        self.assertAlmostEqual(result['eps']['data']['1shell_mmsvn_rec'][0][0][0], 0.00712155, places = 5 )
+
 '''
 These are tests to assert the correctness of the Mili Reader
 These tests use d3samp6.plt

@@ -183,6 +183,7 @@ class Subrecord:
   svar_atom_lengths : np.ndarray = np.empty([0],dtype = np.int64)
   svar_atom_offsets : np.ndarray = np.empty([0],dtype = np.int64)
   svar_svar_comp_layout : np.ndarray = np.empty([0],dtype = object )
+  svar_svar_comp_length : np.ndarray = np.empty([0], dtype = np.int64)
   ordinal_blocks : np.ndarray = np.empty([0], dtype = np.int64)
   ordinal_block_counts : np.ndarray = np.empty([0], dtype = np.int64)
   ordinal_block_offsets : np.ndarray = np.empty([0], dtype = np.int64)
@@ -202,7 +203,7 @@ class Subrecord:
   def scalar_svar_coords( self, aggregate_match, scalar_svar_name ):
     coords = []
     for idx, (svar_name, svar_comps) in enumerate( zip(self.svar_names, self.svar_svar_comp_layout) ):
-      matches = [ ( idx, jdx ) for jdx, svar in enumerate(svar_comps) if svar == scalar_svar_name ]
+      matches = [ ( idx, self.svar_svar_comp_length[idx][jdx] ) for jdx, svar in enumerate(svar_comps) if svar == scalar_svar_name ]
       if ( svar_name == aggregate_match or aggregate_match == "" ) and len( matches ) > 0:
         coords.append( matches )
     return np.array( *coords )

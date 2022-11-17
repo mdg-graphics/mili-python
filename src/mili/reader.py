@@ -513,6 +513,12 @@ class MiliDatabase:
       srec.svar_atom_offsets[1:] = srec.svar_atom_lengths.cumsum()[:-1]
       srec.atoms_per_label = sum( srec.svar_atom_lengths )
       srec.svar_svar_comp_layout = [ [ svar.name ] if ( svar.order == 0 and len( svar.svars ) == 0 ) else svar.comp_svar_names * int( max( 1, np.prod(svar.dims) ) ) for svar in srec.svars ]
+      srec.svar_svar_comp_length = []
+      for svar_comp in srec.svar_svar_comp_layout:
+        svar_length = [ self.__svars[svar].list_size if self.__svars[svar].agg_type is not StateVariable.Aggregation.SCALAR else 1 for svar in svar_comp ]
+        svar_length = np.insert(svar_length, 0, 0)
+        svar_length = np.cumsum( svar_length )
+        srec.svar_svar_comp_length.append(svar_length)
 
       for svar in srec.svars:
         svar.srecs.append(srec)
