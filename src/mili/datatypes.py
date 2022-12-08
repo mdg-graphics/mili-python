@@ -10,7 +10,8 @@ Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
  https://rzlc.llnl.gov/gitlab/mdg/mili/mili-python/. For read access to this repo
  please contact the authors listed above.
 
- Our Notice and GNU Lesser General Public License.
+ Please also read this link-- Our Notice and GNU Lesser General
+ Public License.
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License (as published by
@@ -24,20 +25,24 @@ Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
  You should have received a copy of the GNU Lesser General Public License
  along with this program; if not, write to the Free Software Foundation,
  Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+
 """
 
 # defer evaluation of type-annotations until after the module is processed, allowing class members to refer to the class
 from __future__ import annotations
-
+# standard imports
 import dataclasses
-from dataclasses import dataclass
-from enum import Enum, IntEnum
 import numpy as np
 import numpy.typing as npt
-from numpy.core.fromnumeric import prod
 import reprlib
+import sys
 import warnings
-
+# from imports
+from collections import defaultdict
+from dataclasses import dataclass
+from enum import Enum, IntEnum
+from numpy.core.fromnumeric import prod
+# * imports
 from typing import *
 
 class MiliType(IntEnum):
@@ -89,15 +94,23 @@ class StateMap:
   state_map_id : int = -1
 
 @dataclass
-class Directory:
+class Param:
+  file_index : int = -1
+  entry_index : int = -1
+  rank : int = 0
+  dims : np.ndarray = np.empty([0],dtype = np.int32)
+  data : np.ndarray = np.empty([0],dtype = np.float64)
+
+@dataclass
+class DirectoryDecl:
   class Type(Enum):
-    ''' Every direcotry has a type that dictates what informaiton
+    ''' Every directory has a type that dictates what information
          is in the directory. '''
     NODES = 0
     ELEM_CONNS = 1
     CLASS_IDENTS = 2
     STATE_VAR_DICT = 3
-    STATE_REC_DATA = 4
+    SREC_DATA = 4
     MILI_PARAM = 5
     APPLICATION_PARAM = 6
     CLASS_DEF = 7
@@ -123,31 +136,28 @@ class StateVariable:
     SCALAR = 0        # has a single value
     VECTOR = 1        # contains svar components
     ARRAY = 2         # contains an array of multiple values
-    VEC_ARRAY = 3     # contains an array of svar components
+    VEC_ARRAY = 3     # contains an array of vectors of svars, so each array index has a full vector as described by the vector list
     NUM_AGG_TYPES = 4
 
   ''' Describes the layout of an aggregation of atoms of data, see StateVariable.Aggregation for more layout info '''
   name : str = ''
   title : str = ''
-  agg_type : Aggregation = Aggregation.NUM_AGG_TYPES
+  agg_type : int = Aggregation.NUM_AGG_TYPES
   data_type : MiliType = MiliType.M_INVALID
   list_size : int = 0
   order : int = 0
   dims : List[int] = dataclasses.field(default_factory=list)
+  comp_names : List[str] = dataclasses.field(default_factory=list)
   svars : List[StateVariable] = dataclasses.field(default_factory=list)
   srecs : List[Subrecord] = dataclasses.field(default_factory=list)
 
-  def __repr__( self ) -> str:
-    r = reprlib.Repr()
-    r.maxlevel = 1
-    return r.repr(self)
+  # def __repr__( self ) -> str:
+  #   r = reprlib.Repr()
+  #   r.maxlevel = 1
+  #   return r.repr(self)
 
   @property
-  def comp_svar_names( self ):
-    return [ ssvar.name for ssvar in self.svars ]
-
-  @property
-  def comp_svar_titles( self ):
+  def comp_titles( self ):
     return [ ssvar.title for ssvar in self.svars ]
 
   @property
@@ -161,7 +171,6 @@ class StateVariable:
       return int( prod( self.dims ) ) * sum( svar.atom_qty for svar in self.svars )
     return 1
 
-
 @dataclass
 class Subrecord:
   class Org(IntEnum):
@@ -170,7 +179,7 @@ class Subrecord:
     OBJECT = 1
     INVALID = -1
 
-  '''   A subrecord contains a number of state varaibles organized in a certain order. '''
+  '''   A Subrecord contains a number of state varaibles organized in a certain order. '''
   ## atom variables describe the layout of the svars by their scalar components, e.g. svar_atom_lengths[0] gives the number of scalars in the first svar in the srec
   ## ordinal variables describe the association of the svars in the srec with blocks of locally-numbered (ordinal) mesh entities by ordinal
   name : str = ''
@@ -179,11 +188,14 @@ class Subrecord:
   organization : Org = Org.INVALID
   qty_svars : int = -1
   svar_names : List[str] = dataclasses.field(default_factory=list)
+
+  # Everything after this is calculated by the reader to make queries easier
+  # TODO: break this information out into a seperate class as much as possible
   svars : List[StateVariable] = dataclasses.field(default_factory=list)
   svar_atom_lengths : np.ndarray = np.empty([0],dtype = np.int64)
   svar_atom_offsets : np.ndarray = np.empty([0],dtype = np.int64)
-  svar_svar_comp_layout : np.ndarray = np.empty([0],dtype = object )
-  svar_svar_comp_length : np.ndarray = np.empty([0], dtype = np.int64)
+  svar_comp_layout : np.ndarray = np.empty([0],dtype = object )
+  svar_comp_offsets : np.ndarray = np.empty([0], dtype = np.int64)
   ordinal_blocks : np.ndarray = np.empty([0], dtype = np.int64)
   ordinal_block_counts : np.ndarray = np.empty([0], dtype = np.int64)
   ordinal_block_offsets : np.ndarray = np.empty([0], dtype = np.int64)
@@ -195,15 +207,15 @@ class Subrecord:
   svar_byte_offsets : np.ndarray = np.empty([0], dtype = np.int64)
   srec_fmt_id: int = 0
 
-  def __repr__( self ) -> str:
-    r = reprlib.Repr()
-    r.maxlevel = 1
-    return r.repr(self)
+  # def __repr__( self ) -> str:
+  #   r = reprlib.Repr()
+  #   r.maxlevel = 1
+  #   return r.repr(self)
 
   def scalar_svar_coords( self, aggregate_match, scalar_svar_name ):
     coords = []
-    for idx, (svar_name, svar_comps) in enumerate( zip(self.svar_names, self.svar_svar_comp_layout) ):
-      matches = [ ( idx, self.svar_svar_comp_length[idx][jdx] ) for jdx, svar in enumerate(svar_comps) if svar == scalar_svar_name ]
+    for idx, (svar_name, svar_comps) in enumerate( zip(self.svar_names, self.svar_comp_layout) ):
+      matches = [ ( idx, self.svar_comp_offsets[idx][jdx] ) for jdx, svar in enumerate(svar_comps) if svar == scalar_svar_name ]
       if ( svar_name == aggregate_match or aggregate_match == "" ) and len( matches ) > 0:
         coords.append( matches )
     return np.array( *coords )
@@ -237,11 +249,11 @@ class Subrecord:
 
   @property
   def total_ordinal_count( self ):
-    return max( 1, np.sum( self.ordinal_block_counts ) ) #+ 1 - len(self.ordinal_block_counts) )
+    return max( 1, np.sum( self.ordinal_block_counts ) )
 
   def struct_repr( self ):
     '''
-    This function returns the string representation of a subrecord, to be used when interpreting the bytes during reading of state.
+    This function returns the string representation of a Subrecord, to be used when interpreting the bytes during reading of state.
     '''
     if self.organization == Subrecord.Org.OBJECT:
       # if subrecord is Object ordered there will only be 1 data type, so just pull the datatype of the first svar
@@ -264,3 +276,46 @@ class MeshObjectClass:
   sclass : Superclass = Superclass.M_QTY_SUPERCLASS
   elem_qty : int = 0
   idents_exist: bool = True
+
+
+@dataclass
+class AFile:
+  class Section(Enum):
+    HEADER = 0
+    FOOTER = 1
+    STATE_MAP = 2
+    DIR_DECL = 3
+    STRINGS = 4
+  class Format:
+    MILI = 'mili'
+    TAURUS = 'taur'
+  class Version:
+    MIN = 1
+    MAX = 3
+  class DirectoryVersion:
+    MIN = 1
+    MAX = 3
+  class Endian:
+    LITTLE = 1
+    BIG = 2
+  class Precision:
+    SINGLE = 1
+    DOUBLE = 2
+
+  file_format : str = Format.MILI
+  file_version : int = 3
+  directory_version : int = 2
+  endian_flag : int = Endian.LITTLE if sys.byteorder == 'little' else Endian.BIG
+  precision_flag : int = Precision.DOUBLE
+  sfile_suffix_length : int = 2
+  partition_scheme : int = 0
+  string_bytes : int = 0
+  commit_count : int = 0
+  directory_count : int = 0
+  srec_count : int = 0
+
+  strings : List[str] = dataclasses.field(default_factory=list)
+  smaps : List[StateMap] = dataclasses.field(default_factory=list)
+  dir_decls_list : List[DirectoryDecl] = dataclasses.field(default_factory=list)
+  dir_decls : DefaultDict[DirectoryDecl.Type,List[DirectoryDecl]] = dataclasses.field(default_factory=lambda : defaultdict(list))
+  dirs : DefaultDict[DirectoryDecl.Type,DefaultDict[str,List]] = dataclasses.field(default_factory=lambda : defaultdict(lambda : defaultdict(list)))

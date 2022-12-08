@@ -6,11 +6,11 @@ Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
  CODE-OCEC-16-056.
  All rights reserved.
 
- This file is part of Mili. For details, see
- https://rzlc.llnl.gov/gitlab/mdg/mili/mili-python/. For read access to this repo
- please contact the authors listed above.
+ This file is part of Mili. For details, see TODO: <URL describing code
+ and how to download source>.
 
- Our Notice and GNU Lesser General Public License.
+ Please also read this link-- Our Notice and GNU Lesser General
+ Public License.
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License (as published by
@@ -24,18 +24,18 @@ Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
  You should have received a copy of the GNU Lesser General Public License
  along with this program; if not, write to the Free Software Foundation,
  Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+
 """
 
-# TODO : when we read raw data into numpy buffers, modify the dtype to account for endianness: https://numpy.org/doc/stable/reference/generated/numpy.frombuffer.html
+# TODO : account for endianness
+#        for numpy: modify the dtype to account for endianness: https://numpy.org/doc/stable/reference/generated/numpy.frombuffer.html
 
 import copy
-import io
 import itertools
 import numpy as np
 import numpy.typing as npt
 import os
 import re
-import struct
 import sys
 
 from collections import defaultdict
@@ -57,34 +57,35 @@ def np_empty(dtype):
 
 class MiliDatabase:
 
-  def __init__( self, att_file : BinaryIO, sfile_base : os.PathLike, dir_name : os.PathLike):
+  def __init__( self, dir_name : os.PathLike, base_filename : os.PathLike ):
     """
     A Mili database querying object, able to parse a single A-file and query state information
       from the state files described by that A-file.
     Parameters:
-      att_file (BinaryIO) : a BinaryIO stream containing the data of an A-file describing the mili database layout
-      sfile_base (os.PathLike) : an os.PathLike describing the base name of the mili state files, to match against based on the A-file description of the state file naming
       dir_name (os.PathLike) : an os.PathLike denoting the file sytem directory to search for all state files described by the A-file
+      base_filename (os.PathLike) : the base of the files for this database (usually for one process):
+                                     - {base_filename}A is the A-file
+                                     - {base_filename}T is the T-file in mili format >= v3
+                                     - {base_filename}### are state file(s) containing state data for this database
     """
     self.__state_files = []
     self.__smaps = []
 
-    # file data layout
     self.__svars : Mapping[ str, StateVariable ] = {}
     self.__srec_fmt_qty = 0
     self.__srecs : List[ Subrecord ] = []
 
     # indexing / index discovery
-    self.__labels = defaultdict(lambda : defaultdict( lambda : np_empty(np.int64)) )
+    self.__labels = defaultdict( lambda : defaultdict( lambda : np_empty(np.int64)) )
     self.__mats = defaultdict(list)
-    self.__int_points = defaultdict(lambda : defaultdict( list ) )
+    self.__int_points = defaultdict( lambda : defaultdict( list ) )
 
     # mostly used for input validation
     self.__class_to_sclass = {}
 
     # allow query by material
-    self.__elems_of_mat = defaultdict(lambda : defaultdict( lambda : np_empty(np.int64)) )  # map from material number to dict of class to elems
-    self.__elems_of_part = defaultdict(lambda : defaultdict( lambda : np_empty(np.int64)) )  # map from part number to dict of class to elems
+    self.__elems_of_mat = defaultdict( lambda : defaultdict( lambda : np_empty(np.int64)) )  # map from material number to dict of class to elems
+    self.__elems_of_part = defaultdict( lambda : defaultdict( lambda : np_empty(np.int64)) )  # map from part number to dict of class to elems
 
     # mesh data
     self.__MO_class_data = {}
@@ -92,17 +93,17 @@ class MiliDatabase:
     self.__nodes = None
     self.__mesh_dim = 0
 
-    self.__params = defaultdict(lambda : defaultdict( list ) )
+    self.__params = defaultdict( lambda : defaultdict( list ) )
 
-    self.file_name = ""
-    if isinstance( att_file, str ):
-      with open( os.path.join( dir_name, att_file ), 'rb' ) as f:
-        self.file_name = f.name
-        self.__parse_att_file( f )
-    else:
-      self.file_name = att_file.name
-      self.__parse_att_file( att_file )
-    sfile_re = re.compile(re.escape(sfile_base) + f"(\\d{{{self.__sfile_suf_len},}})$")
+    self.__afile = AFile()
+    self.__base_filename = base_filename
+    self.__dir_name = dir_name
+    parse_success = AFileParser().parse( self.__afile, os.path.join( dir_name, base_filename ) )
+    if not parse_success:
+      logging.error("AFile parsing validation failure!\nPlease inspect your database via afileIO.parse_database() before attempting any queries.")
+
+    self.__sfile_suf_len = self.__afile.sfile_suffix_length
+    sfile_re = re.compile(re.escape(base_filename) + f"(\d{{{self.__sfile_suf_len},}})$")
 
     # load and sort the state files numerically (NOT alphabetically)
     self.__state_files = list(map(sfile_re.match,os.listdir(dir_name)))
@@ -110,17 +111,155 @@ class MiliDatabase:
     self.__state_files = list(sorted(self.__state_files, key = lambda match: int(match.group(1))))
     self.__state_files = [ os.path.join(dir_name,match.group(0)) for match in self.__state_files ]
 
+    # pull values out of the afile and compute utility values/arrays to speed up query operations
+    self.__smaps = self.__afile.smaps
+    self.__mesh_dim = self.__afile.dirs[DirectoryDecl.Type.MILI_PARAM].get( "mesh dimensions", 3 )
+    for sname, param in self.__afile.dirs[DirectoryDecl.Type.TI_PARAM].items():
+      if sname.startswith("Node Labels"):
+        self.__labels[ "node" ] = param
+      elif sname.startswith("Element Labels") and not "ElemIds" in sname:
+        class_sname = re.search( r'Sname-(\w*)', sname ).group(1)
+        if class_sname not in self.__labels.keys():
+          self.__labels[ class_sname ] = np_empty( np.int64 )
+        self.__labels[ class_sname ] = np.concatenate( ( self.__labels[ class_sname ], param ) )
+      elif sname.startswith("MAT_NAME"):
+        mat_num = int( re.match(r"MAT_NAME_(\d+)", sname).group(1) )
+        self.__mats[ param ].append( mat_num )
+      elif sname.startswith('IntLabel_es_'):
+        ip_name = sname[ sname.find('es_'): ]
+        self.__int_points[ip_name] = param.tolist()
+
+    # setup svar.svars for easier VECTOR svar traversal
+    self.__svars = self.__afile.dirs[DirectoryDecl.Type.STATE_VAR_DICT]
+    def addComps( svar ):
+      """small recursive function to populate svar.svars[] all the way down"""
+      if svar.agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ] and len(svar.svars) == 0:
+        for comp_name in svar.comp_names:
+          comp = self.__svars[comp_name]
+          svar.svars.append( comp )
+          addComps( comp )
+
+    # add component svar objects to vec/vec_array aggregate svars instead of just names
+    for svar in self.__svars.values():
+      addComps( svar )
+
+      if svar.name[:-1] in self.__int_points.keys():
+        svar_comp_names = [ svar.name for svar in svar.svars ]
+        stress = self.__svars.get('stress')
+        stress_comps = [ svar.name for svar in stress.svars ] if stress is not None else []
+        strain = self.__svars.get('strain')
+        strain_comps = [ svar.name for svar in strain.svars ] if strain is not None else []
+
+        if len( list(set(svar_comp_names) & set(stress_comps)) ) == 6:
+          if 'stress' not in self.__int_points.keys():
+            self.__int_points['stress'] = {}
+          self.__int_points['stress'][svar.name] = self.__int_points[svar.name[:-1]]
+
+        if len( list(set(svar_comp_names) & set(strain_comps)) ) == 6:
+          if 'strain' not in self.__int_points.keys():
+            self.__int_points['strain'] = {}
+            self.__int_points['strain'][svar.name] = self.__int_points[svar.name[:-1]]
+
+        for svar_comp_name in svar_comp_names:
+          if not svar_comp_name in self.__int_points.keys():
+            self.__int_points[svar_comp_name] = {}
+          self.__int_points[svar_comp_name][svar.name] = self.__int_points[svar.name[:-1]]
+
+    # the class def info is stored in the DirectoryDecl, not in a parsed directory data structure
+    for class_def in self.__afile.dir_decls[DirectoryDecl.Type.CLASS_DEF]:
+      self.__class_to_sclass[ class_def.strings[0] ] = Superclass( class_def.modifier_idx2 )
+
+    for sname, mesh_ident in self.__afile.dirs[DirectoryDecl.Type.CLASS_IDENTS].items():
+      if sname not in self.__labels.keys():
+        self.__labels[ sname ] = np_empty( np.int32 )
+      self.__labels[ sname ] = np.append( self.__labels[sname], np.arange( mesh_ident[0], mesh_ident[1] + 1, dtype = np.int32 ) )
+
+    self.__nodes = np.empty( [0, self.__mesh_dim], np.float32 )
+    for _, nodes in self.__afile.dirs[DirectoryDecl.Type.NODES].items():
+      self.__nodes = np.concatenate( (self.__nodes, nodes) )
+
+    for sname, mo_class_data in self.__afile.dirs[DirectoryDecl.Type.CLASS_DEF].items():
+      self.__MO_class_data[sname] = mo_class_data
+      self.__class_to_sclass[sname] = mo_class_data.sclass
+
+    for sname, elem_conn in self.__afile.dirs[DirectoryDecl.Type.ELEM_CONNS].items():
+      if sname not in self.__conns.keys():
+        self.__conns[ sname ] = np.ndarray( (0,elem_conn.shape[1]-2), dtype = np.int64 )
+      # current_elem_count = self.__conns[ sname ].shape[0]
+      self.__conns[ sname ] = elem_conn[:,:-2] - 1 # remove the part id and material number and account for fortran indexing
+      mats = np.unique( elem_conn[:,-2] )
+      for mat in mats:
+        # this assumes the load order of the conn blocks is identical to their mo_ids... which is probably the case but also is there not a way to make that explicit?
+        self.__elems_of_mat[ mat ][ sname ] = np.concatenate( ( self.__elems_of_mat[ mat ][ sname ], np.nonzero( elem_conn[:,-2] == mat )[0] ) )
+
+      parts = np.unique( elem_conn[:,-1] )
+      for part in parts:
+        # this assumes the load order of the conn blocks is identical to their mo_ids... which is probably the case but also is there not a way to make that explicit?
+        self.__elems_of_part[ part ][ sname ] = np.concatenate( (self.__elems_of_part[ part ][ sname ], np.nonzero( elem_conn[:,-1] == part)[0] ) )
+
+    offset = 0
+    for sname, srec in self.__afile.dirs[DirectoryDecl.Type.SREC_DATA].items():
+      srec : Subrecord
+      # add all svars to srec
+      srec.svars = [ self.__afile.dirs[DirectoryDecl.Type.STATE_VAR_DICT][svar_name] for svar_name in srec.svar_names ]
+      # add srec to list of srecs for reach svar and comp_svar in the srec
+      for svar in srec.svars:
+        svar.srecs.append(srec)
+        for comp_svar in svar.svars:
+          comp_svar.srecs.append(srec)
+      srec.svar_atom_lengths = np.fromiter( (svar.atom_qty for svar in srec.svars), dtype = np.int64 )
+      srec.svar_atom_offsets = np.zeros( srec.svar_atom_lengths.size, dtype = np.int64 )
+      srec.svar_atom_offsets[1:] = srec.svar_atom_lengths.cumsum()[:-1]
+      srec.atoms_per_label = sum( srec.svar_atom_lengths )
+
+      svar_comp_layout = []
+      for svar in srec.svars:
+        if svar.agg_type == StateVariable.Aggregation.SCALAR:
+          svar_comp_layout.append( [ svar.name ] )
+        elif svar.agg_type == StateVariable.Aggregation.ARRAY:
+          svar_comp_layout.append( [ svar.name ] * np.prod(svar.dims) )
+        elif svar.agg_type == StateVariable.Aggregation.VECTOR:
+          svar_comp_layout.append( svar.comp_names )
+        else:
+          svar_comp_layout.append( svar.comp_names * np.prod(svar.dims) )
+      srec.svar_comp_layout = svar_comp_layout
+
+      srec.svar_comp_offsets = []
+      for svar_comp in srec.svar_comp_layout:
+        svar_length = [ self.__svars[svar].list_size if self.__svars[svar].agg_type != StateVariable.Aggregation.SCALAR.value else 1 for svar in svar_comp ]
+        svar_length = np.insert( svar_length, 0, 0 )
+        srec.svar_comp_offsets.append( np.cumsum( svar_length ) )
+
+      # the ordinal blocks are set during the parse, these are only precomputed to make the query easier so we don't deal with them during the parse, only the query setup
+      srec.ordinal_block_counts = np.concatenate( ( [0], np.diff( srec.ordinal_blocks.reshape(-1,2), axis=1).flatten( ) ) )
+      srec.svar_ordinal_offsets = np.cumsum( np.fromiter( ( svar.atom_qty * srec.total_ordinal_count for svar in srec.svars ), dtype = np.int64 ) )
+      srec.svar_byte_offsets = np.cumsum( np.fromiter( ( svar.atom_qty * srec.total_ordinal_count * svar.data_type.byte_size() for svar in srec.svars ), dtype = np.int64 ) )
+      # Insert 0 a front of arrays
+      srec.svar_ordinal_offsets = np.insert( srec.svar_ordinal_offsets, 0, 0, axis=0 )
+      srec.svar_byte_offsets = np.insert( srec.svar_byte_offsets, 0, 0, axis=0 )
+
+      srec.byte_size = srec.total_ordinal_count * sum( svar.data_type.byte_size() * svar.atom_qty for svar in srec.svars )
+      srec.state_byte_offset = offset
+      offset += srec.byte_size
+
+      self.__srecs.append( srec )
+
     # Handle case where mesh object class exists but no idents provided just number 1-N
     for class_sname in self.__MO_class_data:
       if class_sname not in self.__labels:
+        self.__MO_class_data[class_sname].elem_qty = self.__conns.get(class_sname,np_empty(np.int32)).shape[0]
         self.__MO_class_data[class_sname].idents_exist = False
         self.__labels[class_sname] = np.array( np.arange(1, self.__MO_class_data[class_sname].elem_qty + 1 ))
+      else:
+        self.__MO_class_data[class_sname].elem_qty = self.__labels[class_sname].size
 
   def reload_state_maps(self):
     """Reload the state maps."""
-    self.__smaps = []
-    with open( self.file_name, 'rb') as f:
-      self.__reload_state_maps( f )
+    afile = AFile()
+    parse_success = AFileParser().parse( afile, os.path.join( self.__dir_name, self.__base_filename ) )
+    if not parse_success:
+      logging.error("AFile parsing validation failure!\nPlease inspect your database via afileIO.parse_database() before attempting any queries.")
+    self.__smaps = afile.smaps
 
   def get_griz_data(self):
     unique_class_names = list(self.__MO_class_data.keys())
@@ -222,370 +361,23 @@ class MiliDatabase:
       classes = list(set([ srec.class_name for srec in state_variable.srecs ]))
     return classes
 
-  def __reload_state_maps( self, att_file : BinaryIO ):
-    parser = AFileParser()
-    parser.register( AFileParser.Section.STATE_MAP, self.__parse_smap )
-    parser.read( att_file )
-
-  def __parse_att_file( self, att_file : BinaryIO ):
-    """
-    Parse the provided AFile and setup all internal data structures to allow
-      querying the described database.
-    Parameters:
-      att_file (BinaryIO) : a BinaryIO stream containing the data of an A-file describing the mili database layout
-    """
-    parser = AFileParser()
-    parser.register( AFileParser.Section.HEADER, self.__parse_header )
-    parser.register( AFileParser.Section.STATE_MAP, self.__parse_smap )
-
-    # read order is important as some later phases depend on
-    #   data from earlier phases
-    dir_callbacks = { Directory.Type.MILI_PARAM : self.__parse_param,
-                      Directory.Type.CLASS_DEF : self.__parse_mesh_class_def,
-                      Directory.Type.TI_PARAM : self.__parse_ti_param,
-                      Directory.Type.APPLICATION_PARAM : self.__parse_application_param,
-                      Directory.Type.STATE_VAR_DICT : self.__parse_svars,
-                      Directory.Type.CLASS_IDENTS : self.__parse_mesh_class_ident,
-                      Directory.Type.NODES : self.__parse_nodes,
-                      Directory.Type.ELEM_CONNS : self.__parse_elem_conn,
-                      Directory.Type.STATE_REC_DATA : self.__parse_srec }
-    for key, func in dir_callbacks.items():
-      parser.register( key, func )
-
-    parser.read( att_file )
-    for dir_type in dir_callbacks.keys():
-      parser.read_dirs( att_file, dir_type )
-
-  def __parse_header( self, header_data : bytes ):
-    self.__sfile_suf_len = header_data[8]
-
-  def __parse_smap( self, smap_data : bytes ):
-    self.__smaps.append( StateMap( *struct.unpack('<iqfi',smap_data) ) )
-
-  def __generic_parameter_add( self, param_data: bytes, directory: Directory ):
-    """Parses a parameter and adds it to the __params dictionary.
-
-      Arguments:
-        param_data (bytes): The binary data for the given directory.
-        directory (Directory): Object defining the structure and contents of param_data.
-    """
-    sname = directory.strings[0]
-    param_type = directory.modifier_idx1
-    mili_type = MiliType(param_type)
-    type_rep = mili_type.struct_repr()
-    type_size = mili_type.byte_size()
-    item_count = len(param_data) // type_size
-    if mili_type is MiliType.M_STRING:
-      self.__params[sname] = str(struct.unpack(f"{item_count}{type_rep}", param_data)[0])[2:].split('\\x00')[0]
-    else:
-      if(item_count == 1):
-        # If it is a single value, remove surrounding tuple
-        self.__params[sname] = struct.unpack(f"{item_count}{type_rep}", param_data)[0]
-      else:
-        self.__params[sname] = struct.unpack(f"{item_count}{type_rep}", param_data)
-
-  def __parse_application_param( self, param_data: bytes, directory: Directory ) -> None:
-    """Handle parameters of type APPLICATION_PARAM.
-
-      Arguments:
-        param_data (bytes): The binary data for the given directory.
-        directory (Directory): Object defining the structure and contents of param_data.
-    """
-    offset = directory.modifier_idx2 * MiliType(directory.modifier_idx1).byte_size()
-    self.__generic_parameter_add(param_data[offset:], directory)
-
-  def __parse_param( self, param_data : bytes, directory : Directory ) -> None:
-    """Handle parameters of type MILI_PARAM.
-
-      Arguments:
-        param_data (bytes): The binary data for the given directory.
-        directory (Directory): Object defining the structure and contents of param_data.
-    """
-    offset = directory.modifier_idx2 * MiliType(directory.modifier_idx1).byte_size()
-    self.__generic_parameter_add(param_data[offset:], directory)
-    sname = directory.strings[0]
-    if sname.startswith('mesh dimensions'):
-      self.__mesh_dim = self.__params[sname]
-      self.__nodes = np.empty( [0,self.__mesh_dim], dtype = np.float32 )
-
-  def __parse_ti_param( self, ti_param_data : bytes, directory : Directory ) -> None:
-    """Handle expected parameters of type TI_PARAM.
-
-      Parses various TI (Time Invariant) parameters that commonly appear in mili plot files including
-      node and element labels, material names and element sets.
-
-      Arguments:
-        param_data (bytes): The binary data for the given directory.
-        directory (Directory): Object defining the structure and contents of param_data.
-    """
-    sname = directory.strings[0]
-    if sname.startswith('Node Labels'):
-      self.__labels['node'] = np.frombuffer( ti_param_data[8:], dtype = np.int32 )
-      self.__MO_class_data['node'].elem_qty = self.__labels['node'].size
-    elif sname.startswith('Element Labels') and not 'ElemIds' in sname:
-      elem_labels = np.frombuffer( ti_param_data[8:], dtype = np.int32 )
-      class_name = re.search( r'Sname-(\w*)', sname ).group(1)
-      if class_name not in self.__labels.keys():
-        self.__labels[class_name] = np_empty(np.int32)
-      self.__labels[class_name] = np.append( self.__labels[class_name], elem_labels )
-    elif sname.startswith('MAT_NAME'):
-      mat_name = str(struct.unpack(f"{directory.length}s", ti_param_data)[0])[2:].split('\\x00')[0]
-      mat_num = int( re.match(r"MAT_NAME_(\d+)", sname).group(1) )
-      self.__mats[mat_name].append( mat_num )
-    elif sname.startswith('IntLabel_es_'):
-      ip_name = sname[ sname.find('es_'): ]
-      ips = struct.unpack(f'{len(ti_param_data)//4}i', ti_param_data)[2:-1]
-      self.__int_points[ip_name] = ips
-    offset = directory.modifier_idx2 * MiliType(directory.modifier_idx1).byte_size()
-    self.__generic_parameter_add(ti_param_data[offset:], directory)
-
-  def __parse_svars( self, svars_data : bytes, _ : Directory ):
-    svar_words, svar_bytes = struct.unpack('2i', svars_data[:8])
-    int_cnt = svar_words - 2
-    int_bytes = int_cnt * 4
-    byte_data = svars_data[8:]
-    int_data = struct.unpack(f'{int_cnt}i', byte_data[:int_bytes])
-    svar_strs = str(struct.unpack(f'{svar_bytes}s', byte_data[int_bytes:])[0])[2:].split('\\x00')
-
-    int_iter = int_data.__iter__()
-    str_iter = svar_strs.__iter__()
-
-    # TODO: still don't like this, mostly due to the looping mechanism,
-    #       but since we don't know a-priori how many bytes and the layout of
-    #       each top-level svar, we have to iteratively discover as we parse
-    while True:
-      try:
-        agg_type = StateVariable.Aggregation(next(int_iter))
-      except:
-        break
-      data_type = MiliType(next(int_iter))
-      svar_name = next( str_iter )
-      svar_title = next( str_iter )
-      svar = StateVariable(svar_name, svar_title, agg_type, data_type)
-
-      if agg_type == StateVariable.Aggregation.ARRAY or agg_type == StateVariable.Aggregation.VEC_ARRAY:
-        svar.order = next( int_iter )
-        svar.dims = list( itertools.islice( int_iter, svar.order ) )
-
-      if agg_type == StateVariable.Aggregation.VECTOR or agg_type == StateVariable.Aggregation.VEC_ARRAY:
-        svar.list_size = next( int_iter )
-        svar_comp_names = list( itertools.islice( str_iter, svar.list_size ) )
-        for svar_comp_name in svar_comp_names:
-          comp_svar = self.__svars.get( svar_comp_name )
-          if comp_svar is None:
-            _ = next( str_iter )
-            svar_comp_title = next( str_iter )
-            comp_agg_type = StateVariable.Aggregation(next(int_iter))
-            comp_data_type = MiliType(next(int_iter))
-            comp_svar = self.__svars[svar_comp_name] = StateVariable( svar_comp_name, svar_comp_title, comp_agg_type, comp_data_type )
-          svar.svars.append( comp_svar )
-
-        # TODO : clean this nonsense up, handling integration points with hard-coding specific svar names is cumbersome...
-        #        really we don't need specific ip handling, just StateVariable.Aggregation.ARRAY and VEC_ARRAY handling, since
-        #        in that case we want to allow indexing specific svar-indices (as in integration point data)
-        if svar_name[:-1] in self.__int_points:
-          stress = self.__svars.get('stress')
-          stress_comps = [ svar.name for svar in stress.svars ] if stress is not None else []
-          strain = self.__svars.get('strain')
-          strain_comps = [ svar.name for svar in strain.svars ] if strain is not None else []
-
-          if len( list(set(svar_comp_names) & set(stress_comps)) ) == 6:
-            if 'stress' not in self.__int_points.keys():
-              self.__int_points['stress'] = {}
-            self.__int_points['stress'][svar_name] = self.__int_points[svar_name[:-1]]
-
-          if len( list(set(svar_comp_names) & set(strain_comps)) ) == 6:
-            if 'strain' not in self.__int_points.keys():
-              self.__int_points['strain'] = {}
-              self.__int_points['strain'][svar_name] = self.__int_points[svar_name[:-1]]
-
-          for svar_comp_name in svar_comp_names:
-            if not svar_comp_name in self.__int_points.keys():
-              self.__int_points[svar_comp_name] = {}
-            self.__int_points[svar_comp_name][svar_name] = self.__int_points[svar_name[:-1]]
-
-      self.__svars[svar_name] = svar
-
-  def __parse_mesh_class_ident( self, class_data : bytes, directory : Directory ):
-    sname = directory.strings[0]
-    self.__MO_class_data[sname].elem_qty = directory.modifier_idx2
-    self.__MO_class_data[sname].idents_exist = True
-    start, stop = struct.unpack('2i',class_data[4:12])
-    if sname not in self.__labels.keys():
-      self.__labels[sname] = np_empty(np.int32)
-    self.__labels[sname] = np.append( self.__labels[sname], np.arange( start, stop+1, dtype = np.int32 ))
-
-  def __parse_mesh_class_def( self, _, directory ):
-    short_name = directory.strings[0]
-    long_name = directory.strings[1]
-    mesh_id = directory.modifier_idx1
-    sclass = Superclass(directory.modifier_idx2)
-    MO_class = MeshObjectClass(mesh_id, short_name, long_name, sclass)
-    self.__MO_class_data[short_name] = MO_class
-    self.__MO_class_data[short_name].elem_qty = 0
-    self.__class_to_sclass[short_name] = sclass
-
-  def __parse_nodes( self, class_data : bytes, _ : Directory ):
-    f = io.BytesIO( class_data )
-    blocks = np.reshape( np.frombuffer(f.read(8), dtype = np.int32 ), [-1,2] )
-    blocks_atoms = np.sum( np.diff( blocks, axis=1 ).flatten( ) + 1 )
-    self.__nodes = np.concatenate( ( self.__nodes, np.reshape( np.frombuffer( f.read( 4 * blocks_atoms * self.__mesh_dim ), dtype = np.float32 ), [-1, self.__mesh_dim] ) ) )
-
-  def __parse_elem_conn( self, conn_data : bytes, directory : Directory ):
-    f = io.BytesIO( conn_data )
-    sname = directory.strings[0]
-    sclass, block_cnt = struct.unpack( '2i', f.read(8) )
-    f.read( 8 * block_cnt )
-    elem_qty = directory.modifier_idx2
-    self.__MO_class_data[sname].elem_qty += elem_qty
-    conn_qty = Superclass(sclass).node_count()
-    word_qty = conn_qty + 2
-    conn = np.reshape( np.frombuffer( f.read( elem_qty * word_qty * 4 ), dtype = np.int32 ), [-1,word_qty] )
-    if sname not in self.__conns.keys():
-      self.__conns[ sname ] = np.ndarray( (0,conn_qty), dtype = np.int64 )
-    current_elem_count = self.__conns[sname].shape[0]
-    self.__conns[sname] = np.concatenate( ( self.__conns[sname], conn[:,:conn_qty] - 1 ) ) # account for fortran indexing
-    mats = np.unique( conn[:,conn_qty] )
-    for mat in mats:
-      # this assumes the load order of the conn blocks is identical to their mo_ids... which is probably the case but also is there not a way to
-      #  make that explicit?
-      mat_2_conn_idxs = current_elem_count + np.nonzero( conn[:,conn_qty] == mat )[0]
-      self.__elems_of_mat[ mat ][ sname ] = np.concatenate( ( self.__elems_of_mat[ mat ][ sname ], mat_2_conn_idxs ) )
-
-    parts = np.unique( conn[:,conn_qty+1] )
-    for part in parts:
-      part_2_conn_idxs = current_elem_count + np.nonzero( conn[:,conn_qty+1] == part)[0]
-      self.__elems_of_part[ part ][ sname ] = np.concatenate( (self.__elems_of_part[ part ][ sname ], part_2_conn_idxs ) )
-
-  def __parse_srec( self, srec_data : bytes, directory : Directory ):
-    f = io.BytesIO( srec_data )
-    srec_int_data = directory.modifier_idx1 - 4
-    srec_c_data = directory.modifier_idx2
-    _, _, _, srec_qty_subrecs = struct.unpack('4i', f.read( 16 ))
-    idata = struct.unpack(str(srec_int_data) + 'i', f.read( srec_int_data * 4 ))
-    cdata = [ name.rstrip('\x00') for name in struct.unpack(str(srec_c_data) + 's', f.read(srec_c_data))[0].decode('utf-8').split('\x00') ]
-    cdata.remove('')
-    int_pos = 0
-    c_pos = 0
-    offset = 0
-
-    # TODO: refactor this to be more pythonic/performant, pull as much into the subrecord init as possible:
-    for _ in range(srec_qty_subrecs):
-      org, qty_svars, ord_blk_cnt = Subrecord.Org(idata[int_pos]), idata[int_pos + 1], idata[int_pos + 2]
-
-      int_pos += 3
-      name, class_name = cdata[c_pos:c_pos + 2]
-      c_pos += 2
-      svar_names = cdata[c_pos:c_pos + qty_svars]
-      c_pos += qty_svars
-
-      svars = [ self.__svars[svar_name] for svar_name in svar_names ]
-      superclass = self.__class_to_sclass[class_name]
-      srec = Subrecord(name, class_name, superclass, org, qty_svars, svar_names, svars = svars)
-      if superclass != Superclass.M_MESH:
-        # TODO: these are NUM blocks, not label blocks, so we need to store the labels and map from label to num and operate on num internaly instead of mapping conn to labels
-        #       has the above been resolved?
-
-        srec.ordinal_blocks = np.array( idata[ int_pos : int_pos + (2 * ord_blk_cnt) ], dtype = np.int32 )
-        srec.ordinal_blocks[1::2] = srec.ordinal_blocks[1::2] + 1 # add 1 to each STOP to allow inclusive bining during queries
-        srec.ordinal_block_counts = np.concatenate( ( [0], np.diff( srec.ordinal_blocks.reshape(-1,2), axis=1 ).flatten( ) ) ) # sum stop - start + 1 over all blocks
-        srec.ordinal_block_offsets = np.cumsum( srec.ordinal_block_counts )
-        srec.ordinal_blocks -= 1 # account for 1-indexing used by mili/fortran
-        int_pos += 2 * ord_blk_cnt
-      else:
-        srec.ordinal_blocks = np.array( [0, 1], dtype=np.int32 )
-        srec.ordinal_block_counts = np.array( [0, 1], dtype=np.int32 )
-        srec.ordinal_block_offsets = np.array( [0, 1], dtype=np.int32 )
-        int_pos += 2 * ord_blk_cnt
-
-      # Check that ordinal blocks are monotonically increasing
-      monotonically_increasing = np.all( srec.ordinal_blocks[1:] >= srec.ordinal_blocks[:-1] )
-      if not monotonically_increasing:
-        # Sort ordinal_blocks and ordinal_block offsets together
-        srec.ordinal_blocks = np.reshape( srec.ordinal_blocks, (-1,2) )
-        blocks, offsets = zip( *(sorted( zip(srec.ordinal_blocks, srec.ordinal_block_offsets[:-1]), key=lambda x: x[0][0]) ) )
-        srec.ordinal_blocks = np.array( blocks ).flatten()
-        srec.ordinal_block_offsets = np.array( offsets )
-
-      # atom-based lengths and offsets to make querying operations easier... this can be done after the read is complete
-      srec.svar_atom_lengths = np.fromiter( ( svar.atom_qty for svar in srec.svars ), dtype = np.int64 )
-      srec.svar_atom_offsets = np.zeros( srec.svar_atom_lengths.size, dtype = np.int64 )
-      srec.svar_atom_offsets[1:] = srec.svar_atom_lengths.cumsum()[:-1]
-      srec.atoms_per_label = sum( srec.svar_atom_lengths )
-      srec.svar_svar_comp_layout = [ [ svar.name ] if ( svar.order == 0 and len( svar.svars ) == 0 ) else svar.comp_svar_names * int( max( 1, np.prod(svar.dims) ) ) for svar in srec.svars ]
-      srec.svar_svar_comp_length = []
-      for svar_comp in srec.svar_svar_comp_layout:
-        svar_length = [ self.__svars[svar].list_size if self.__svars[svar].agg_type is not StateVariable.Aggregation.SCALAR else 1 for svar in svar_comp ]
-        svar_length = np.insert(svar_length, 0, 0)
-        svar_length = np.cumsum( svar_length )
-        srec.svar_svar_comp_length.append(svar_length)
-
-      for svar in srec.svars:
-        svar.srecs.append(srec)
-        for comp_svar in svar.svars:
-          comp_svar.srecs.append(srec)
-
-      srec.byte_size = srec.total_ordinal_count * sum( svar.data_type.byte_size() * svar.atom_qty for svar in srec.svars )
-      srec.state_byte_offset = offset
-      offset += srec.byte_size
-
-      if srec.organization == Subrecord.Org.RESULT:
-        srec.svar_ordinal_offsets = np.cumsum( np.fromiter( ( svar.atom_qty * srec.total_ordinal_count for svar in srec.svars ), dtype = np.int64 ) )
-        srec.svar_byte_offsets = np.cumsum( np.fromiter( ( svar.atom_qty * srec.total_ordinal_count * svar.data_type.byte_size() for svar in srec.svars ), dtype = np.int64 ) )
-        # Insert 0 a front of arrays
-        srec.svar_ordinal_offsets = np.insert( srec.svar_ordinal_offsets, 0, 0, axis=0 )
-        srec.svar_byte_offsets = np.insert( srec.svar_byte_offsets, 0, 0, axis=0 )
-
-      srec.srec_fmt_id = self.__srec_fmt_qty
-
-      self.__srecs.append( srec )
-
-    # Keep track of number of state record formats
-    self.__srec_fmt_qty += 1
-    # TODO: end of last refactoring block
-
-  def __parse_query_name( self, svar_query_input ):
-    """
-    Parse the svar name from a query input into a base svar and component svar list
-    """
-    comp_start_idx = svar_query_input.find('[')
-    if comp_start_idx != -1:
-      svar_name = svar_query_input[:comp_start_idx]
-      svar_comps = svar_query_input[comp_start_idx+1:-1].split(',')
-    else:
-      svar_name = svar_query_input
-      svar_comps = []
-    return svar_name, svar_comps
-
-  """Get List of part numbers for all elements of a given class name."""
   def parts_of_class_name( self, class_name ):
-    if class_name not in self.__labels.keys():
-      return np_empty(np.int32)
-    elem_parts = np.array( self.__labels[class_name], dtype=np.int32)
-    found = False
+    """Get List of part numbers for all elements of a given class name."""
+    elem_parts = np.zeros( self.__labels.get( class_name, np_empty(np.int32) ).shape, dtype=np.int32 )
+    elem_parts[:] = -1
     for part, labels in self.__elems_of_part.items():
-      if class_name in labels:
-        found = True
-        elem_parts[labels[class_name]] = part
-    if found:
-      return elem_parts
-    else:
-      return np_empty(np.int32)
+      idxs = labels.get( class_name, np_empty(np.int32) )
+      elem_parts[ idxs ] = part
+    return elem_parts
 
-  """Get List of materials for all elements of a given class name."""
   def materials_of_class_name( self, class_name ):
-    if class_name not in self.__labels.keys():
-      return np_empty(np.int32)
-    found = False
-    elem_mats = np.array( self.__labels[class_name], dtype=np.int32)
+    """Get List of materials for all elements of a given class name."""
+    elem_mats = np.zeros( self.__labels.get( class_name, np_empty(np.int32) ).shape, dtype=np.int32 )
+    elem_mats[:] = -1
     for mat, labels in self.__elems_of_mat.items():
-      if class_name in labels:
-        found = True
-        elem_mats[labels[class_name]] = mat
-    if found:
-      return elem_mats
-    else:
-      return np_empty(np.int32)
+      idxs = labels.get( class_name, np_empty(np.int32) )
+      elem_mats[ idxs ] = mat
+    return elem_mats
 
   def class_labels_of_material( self, mat, class_name ):
     '''
@@ -653,6 +445,19 @@ class MiliDatabase:
       node_labels = np.append( node_labels, self.nodes_of_elems( class_name, class_labels )[0] )
     return np.unique( node_labels )
 
+  def __parse_query_name( self, svar_query_input ):
+    """
+    Parse the svar name from a query input into a base svar and component svar list
+    """
+    comp_start_idx = svar_query_input.find('[')
+    if comp_start_idx != -1:
+      svar_name = svar_query_input[:comp_start_idx]
+      svar_comps = svar_query_input[comp_start_idx+1:-1].split(',')
+    else:
+      svar_name = svar_query_input
+      svar_comps = []
+    return svar_name, svar_comps
+
   def __init_query_parameters( self,
                                svar_names : Union[List[str],str],
                                class_sname : str,
@@ -714,7 +519,7 @@ class MiliDatabase:
       ips = []
 
     if type(ips) is not list:
-      raise TypeError( 'ip must be an integer or list of integers' )
+      raise TypeError( 'comp must be an integer or list of integers' )
 
     if any( sn < 0 for sn in states ) or any( sn > len(self.__smaps) for sn in states ):
       raise ValueError(f'state numbers outside of range [0,{len(self.__smaps)}] requested but not in database')
@@ -745,8 +550,8 @@ class MiliDatabase:
     : param class_sname : mesh class name being queried
     : param material : optional sname or material number to select labels from
     : param labels : optional labels to query data about, filtered by material if material if material is supplied, default is all
-    : param state_numbers: optional state numbers from which to query data, default is all
-    : param ips : optional integration points (really just indices into svars that have array aggregation) to specifically query, default is all available
+    : param states: optional state numbers from which to query data, default is all
+    : param ips : optional for svars with array or vec_array aggregation query just these components, default is all available
     : param write_data : optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
                    then modify the values desired, then query again with the modified result in this param
     '''
@@ -754,7 +559,7 @@ class MiliDatabase:
     # normalize arguments to expected types / default values
     svar_names, class_sname, material, labels, states, ips, write_data = self.__init_query_parameters( svar_names, class_sname, material, labels, states, ips, write_data )
 
-    # Handle possible keyword arguments
+    # handle possible hidden keyword arguments
     output_object_labels = kwargs.get("output_object_labels", True)
     subrec = kwargs.get("subrec", None)
 
@@ -798,7 +603,7 @@ class MiliDatabase:
         else:
           srecs_with_svar_and_class = [ srec for srec in svar.srecs if srec.class_name == class_sname ]
         for srec in srecs_with_svar_and_class:
-          if srec not in srecs_to_query:
+          if srec not in srecs_to_query: # would prefer to just unique after this, but they're unhashable so the trivial list(set()) isn't possible
             srecs_to_query.append( srec )
 
       # If user only requested single subrecord, only query single subrecord
@@ -835,9 +640,9 @@ class MiliDatabase:
       srec_internal_offsets = {} # { subrecord name --> [ label_cols, index_cols... ] }
       for srec in srecs_to_query:
 
-        #  determine if any of the queried svar components are in the subrecord.. and extract only the ips we're querying for
+        #  determine if any of the queried svar components are in the StateRecord.. and extract only the comps we're querying for
         # col 0 is supposed to be the svar, col 2 is supposed to be the comp in the svar for agg svars
-        # TODO: technically we can arbitrarily nest svars, this really only accounts for a two-deep nesting, same with the srec.svar_svar_comp_layout...
+        # TODO: technically we can arbitrarily nest svars, this really only accounts for a two-deep nesting, same with the srec.svar_comp_layout...
         #        also we're searching by svar sname which isn't technically incorrect, but could become slow if many svars are in subrecs
         qd_svar_comps = np.empty([0,2],dtype=np.int64)
         # TODO : remove special stress/strain handling when dyna/diablo aggregate them appropriately
@@ -849,53 +654,45 @@ class MiliDatabase:
             svar_coords = svar_coords[ ipts ]
           qd_svar_comps = np.concatenate( ( qd_svar_comps, svar_coords ), axis = 0 )
 
-        # discover which labels we want to query are in the current subrecord
-        # TODO : can we eliminate this if/else, will digitize with no bins return empty?
-        if len(srec.ordinal_blocks) != 0:
-          # at this point we use the subrecord mo_blocks to find which block each label belongs to using a bining algorithym from numpy
-          #   we have [start1, stop1, start2, stop2, etc], but digitize operates as [ start1, start2, start3, etc...] where start2 = stop1
-          #   can't just ::2 the blocks and use that to digitize, since we need to exclude labels falling OUTSIDE the upper limit
-          # this is currently where basically ALL the time cost for calculating labels/indices for a query
-          #   and there isn't much to do to improve performance at the python level unless there is a better numpy/pandas algo to apply
-          #   all labels will be in bins, but only odd # bins are actual bins, even bins are between the block ranges so mask to only grab rows with odd bins
+        # at this point we use the StateRecord mo_blocks to find which block each label belongs to using a bining algorithym from numpy
+        #   we have [start1, stop1, start2, stop2, etc], but digitize operates as [ start1, start2, start3, etc...] where start2 = stop1
+        #   can't just ::2 the blocks and use that to digitize, since we need to exclude labels falling OUTSIDE the upper limit
+        # this is currently where basically ALL the time cost for calculating labels/indices for a query
+        #   and there isn't much to do to improve performance at the python level unless there is a better numpy/pandas algo to apply
+        #   all labels will be in bins, but only odd # bins are actual bins, even bins are between the block ranges so mask to only grab rows with odd bins
 
-          # *** THE ORDINAL BLOCKS MUST BE MONOTONICALLY INCREASING FOR THIS TO WORK ***
-          #  since they denote local ordinals and define the srec label layout this *should* always be the case
-          # ... and yes this things falling into the first bin return index 1, essentially they return the first index greater than them
-          blocks_of_ordinals = np.digitize( ordinals, srec.ordinal_blocks )
+        # *** THE ORDINAL BLOCKS MUST BE MONOTONICALLY INCREASING FOR THIS TO WORK ***
+        #  since they denote local ordinals and define the srec label layout this *should* always be the case
+        # ... and yes this things falling into the first bin return index 1, essentially they return the first index greater than them
+        blocks_of_ordinals = np.digitize( ordinals, srec.ordinal_blocks )
 
-          # for each ordinal we have, which block does that ordinal fall into from the set of blocks the srec has
-          # a mask that is true only for odd-index blocks, which are those defining the ranges of ordinals that belong to the srec
-          # this is the same size as srec_ordinal_bins and ordinals
-          in_srec = ( blocks_of_ordinals & 0x1 ).astype( bool )
+        # for each ordinal we have, which block does that ordinal fall into from the set of blocks the srec has
+        # a mask that is true only for odd-index blocks, which are those defining the ranges of ordinals that belong to the srec
+        # this is the same size as srec_ordinal_bins and ordinals
+        in_srec = ( blocks_of_ordinals & 0x1 ).astype( bool )
 
-          # each ordinal for queried labels that is in the subrecord, using these
-          #  to index the label set for the class should give the correct set of labels, in the correct order
-          #  for the result
-          ordinals_in_srec = ordinals[ in_srec ]
+        # each ordinal for queried labels that is in the subrecord, using these
+        #  to index the label set for the class should give the correct set of labels, in the correct order
+        #  for the result
+        ordinals_in_srec = ordinals[ in_srec ]
 
-          # for each ordinal that is in the subrecord, which block is it in
-          # this gives the index into the list of blocks (for the current srec) that the lower bound of the block range is located at
-          indices_of_blocks_of_ordinals_in_srec = blocks_of_ordinals[ in_srec ] - 1 # subtract one to get the index of the starting ordinal of the block instead of ending ordinal
+        # for each ordinal that is in the subrecord, which block is it in
+        # this gives the index into the list of blocks (for the current srec) that the lower bound of the block range is located at
+        indices_of_blocks_of_ordinals_in_srec = blocks_of_ordinals[ in_srec ] - 1 # subtract one to get the index of the starting ordinal of the block instead of ending ordinal
 
-          # for each ordinal in the srec, subtract starting range of that block
-          # for each ordinal this gives the location of that ordinal in the block that it lies in
-          block_local_indices_of_ordinals_in_srec = (ordinals_in_srec - srec.ordinal_blocks[ indices_of_blocks_of_ordinals_in_srec ])
+        # for each ordinal in the srec, subtract starting range of that block
+        # for each ordinal this gives the location of that ordinal in the block that it lies in
+        block_local_indices_of_ordinals_in_srec = (ordinals_in_srec - srec.ordinal_blocks[ indices_of_blocks_of_ordinals_in_srec ])
 
-          # take the location of each ordinal relative to the block it lies in and add the cumsum of the block counts of all previous blocks in the srec
-          # to give the location of the ordinal when the blocks are densely-packed to form the srec
-          dense_index_of_ordinals_in_srec = block_local_indices_of_ordinals_in_srec + srec.ordinal_block_offsets[ (indices_of_blocks_of_ordinals_in_srec // 2) ]
+        # take the location of each ordinal relative to the block it lies in and add the cumsum of the block counts of all previous blocks in the srec
+        # to give the location of the ordinal when the blocks are densely-packed to form the srec
+        dense_index_of_ordinals_in_srec = block_local_indices_of_ordinals_in_srec + srec.ordinal_block_offsets[ (indices_of_blocks_of_ordinals_in_srec // 2) ]
 
-          # this relates the mesh entities to the srec as it will be laid out in memory, we still need to get only the svars we care about from the srec,
-          # so additional components for each of the above mesh-related indices is required
-          # this latter step might be able to be simplified since the set of srec-local svar-offsets to be queried for each mesh entity associated with
-          # the srec is identical for object ordering. result ordering complicates things and is why we handle both cases by calculating all the srec-local
-          # memory locations we'll be pulling data from
-
-        else:
-          # case for global values
-          dense_index_of_ordinals_in_srec = np_empty(np.int64)
-          ordinals_in_srec = np_empty(np.int64)
+        # this relates the mesh entities to the srec as it will be laid out in memory, we still need to get only the svars we care about from the srec,
+        # so additional components for each of the above mesh-related indices is required
+        # this latter step might be able to be simplified since the set of srec-local svar-offsets to be queried for each mesh entity associated with
+        # the srec is identical for object ordering. result ordering complicates things and is why we handle both cases by calculating all the srec-local
+        # memory locations we'll be pulling data from
 
         srec_memory_offsets = np.empty( [ dense_index_of_ordinals_in_srec.size, qd_svar_comps.shape[0] ], dtype = np.int64 )
         # we set the first column of the memory offsets we'll be querying for this srec for this query to the dense indices of the mesh entity locations
@@ -989,10 +786,14 @@ class MiliDatabase:
 
     return res
 
-def open_database( base_filename : os.PathLike, procs = [], suppress_parallel = False, experimental = False ):
+def open_database( base : os.PathLike, procs = [], suppress_parallel = False, experimental = False ):
   """
+   Open a database for querying. This opens the database metadata files and does additional processing to optimize query
+   construction and execution. Don't use this to perform database verification, instead prefer AFileIO.parse_database()
+   The object returned by this function will have the same interface as an MiliDatabase object, though will return a list
+   of results from the specified proc files instead of a single result.
   Args:
-   base_file (os.PathLike): the base filename of the mili database (e.g. for 'pltA', just 'plt', for parallel
+   base (os.PathLike): the base filename of the mili database (e.g. for 'pltA', just 'plt', for parallel
                             databases like 'dblplt00A', also exclude the rank-digits, giving 'dblplt')
    procs (Optional[List[int]]) : optionally a list of process-files to open in parallel, default is all
    suppress_parallel (Optional[Bool]) : optionally return a serial database reader object if possible (for serial databases).
@@ -1000,20 +801,20 @@ def open_database( base_filename : os.PathLike, procs = [], suppress_parallel = 
                                         query each processes database files in series.
    experimental (Optional[Bool]) : optional developer-only argument to try experimental parallel features
   """
-  # ensure dir_name is the containing dir and base_filename is only the file name
-  dir_name = os.path.dirname( base_filename )
+  # ensure dir_name is the containing dir and base is only the file name
+  dir_name = os.path.dirname( base )
   if dir_name == '':
     dir_name = os.getcwd()
   if not os.path.isdir( dir_name ):
     raise ValueError( f"Cannot locate mili file directory {dir_name}.")
 
-  base_filename = os.path.basename( base_filename )
-  afiles, afile_re = afiles_by_base( dir_name, base_filename, procs )
+  base = os.path.basename( base )
+  afiles = afiles_by_base( dir_name, base, procs )
 
-  sfiles = [ base_filename + afile_re.match(afile).group(1) for afile in afiles ]
-  dir_names = [ dir_name ] * len(sfiles)
+  proc_bases = [ afile[:-1] for afile in afiles ] # drop the A to get each processes base filename for A,T, and S files
+  dir_names = [ dir_name ] * len(proc_bases)
 
-  proc_pargs = [ [afile,sfile,dir_name] for afile, sfile, dir_name in zip(afiles,sfiles,dir_names) ]
+  proc_pargs = [ [dir_name,base_file]  for dir_name, base_file in zip(dir_names,proc_bases) ]
 
   # Open Mili Database.
   if suppress_parallel or len(proc_pargs) == 1:

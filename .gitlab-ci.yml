@@ -27,7 +27,7 @@ unit_tests:
         - shell
     script:
         - cd src
-        - srun -n1 -p pdebug python3 -m unittest tests.reader_test
+        - srun -n1 -p pdebug python3 -m unittest
 
 coverage:
     stage: test
@@ -37,7 +37,7 @@ coverage:
     script:
         - cd src
         - python3 -m coverage --version
-        - srun -n1 python3 -m coverage run -m unittest tests.reader_test
+        - srun -n1 python3 -m coverage run -m unittest
         # avoid failure if there are not multiple reports
         - python3 -m coverage combine || freturn 0
         - python3 -m coverage xml

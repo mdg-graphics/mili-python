@@ -11,7 +11,7 @@
       "justMyCode": true
     },
     {
-      "name": "mili reader",
+      "name": "reader",
       "type": "python",
       "request": "launch",
       "cwd": "${workspaceFolder}/src",
@@ -19,7 +19,7 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "reader test",
+      "name": "reader_test",
       "type": "python",
       "request": "launch",
       "cwd": "${workspaceFolder}/src",

@@ -53,12 +53,10 @@ class LoopWrapper:
     objs = [ cls_obj( *pargs, **kwargs ) for pargs, kwargs in zip(proc_pargs, proc_kwargs) ]
 
     # ensure all contained objects are the same exact type (no instances, subclasses are not valid)
-    obj_iter = iter(objs)
-    obj_type = type(next(obj_iter))
-    assert( all( type(obj) == obj_type for obj in obj_iter ) )
+    obj_type = type(objs[0])
+    assert( all( type(obj) == obj_type for obj in objs ) )
 
     # right now this is just to retain the objs for debuging, but they are all captured in lambdas so this isn't explicitly required
-    # TODO: this will eventually be the live pool
     self._objs = objs
 
     # Add member functions to this object based on the member functions of the wrapped objects
@@ -88,12 +86,10 @@ class PoolWrapper:
       objs = pool.map( lambda args: cls_obj( *args[0], **args[1] ), list( zip(proc_pargs, proc_kwargs) ) )
 
     # ensure all contained objects are the same exact type (no instances, subclasses are not valid)
-    obj_iter = iter(objs)
-    obj_type = type(next(obj_iter))
-    assert( all( type(obj) == obj_type for obj in obj_iter ) )
+    obj_type = type(objs[0])
+    assert( all( type(obj) == obj_type for obj in objs ) )
 
     # right now this is just to retain the objs for debuging, but they are all captured in lambdas so this isn't explicitly required
-    # TODO: this will eventually be the live pool
     self._objs = objs
 
     # Add member functions to this object based on the member functions of the wrapped objects
@@ -205,3 +201,14 @@ class ServerWrapper:
       for pid in procs:
         result.append( self.__conns[pid].recv() )
     return result, procs
+
+def get_wrapper( suppress_parallel = False, experimental = False ):
+  Wrapper = None
+  if suppress_parallel:
+    Wrapper = LoopWrapper
+  else:
+    if experimental:
+      Wrapper = ServerWrapper
+    else:
+      Wrapper = PoolWrapper
+  return Wrapper

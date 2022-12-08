@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 
 """
-Copyright (c) 2016-2021, Lawrence Livermore National Security, LLC.
- Produced at the Lawrence Livermore National Laboratory. Written by
- William Tobin (tobin6@llnl.hov) and Kevin Durrenberger (durrenberger1@llnl.gov).
+Copyright (c) 2016-present, Lawrence Livermore National Security, LLC.
+ Produced at the Lawrence Livermore National Laboratory. Written by:
+
+ William Tobin (tobin6@llnl.gov),
+ Ryan Hathaway (hathaway6@llnl.gov),
+ Kevin Durrenberger (durrenberger1@llnl.gov).
+
  CODE-OCEC-16-056.
  All rights reserved.
 
@@ -44,71 +48,64 @@ class NonsequentialMOBlocks(unittest.TestCase):
     def test_serial( self ):
         mili = reader.open_database( self.file_name, procs = [7], suppress_parallel = True )
         result = mili.query( 'sx', 'brick', labels = [228], states = [10])
-        self.assertAlmostEqual(result['sx']['data']['7hex_mmsvn_rec'][0][0][0],20.355846, places = 6 )
+        self.assertAlmostEqual(result['sx']['data']['7hex_mmsvn_rec'][0][0][0], 20.355846, delta = 1e-6)
 
     def test_parallel( self ):
         mili = reader.open_database( self.file_name )
         result = mili.query( 'sx', 'brick', labels = [228], states = [10] )
-        self.assertAlmostEqual(result[7]['sx']['data']['7hex_mmsvn_rec'][0][0][0],20.355846, places = 6 )
+        self.assertAlmostEqual(result[7]['sx']['data']['7hex_mmsvn_rec'][0][0][0], 20.355846, delta = 1e-6 )
 
 class NonsequentialMOBlocksTwo(unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super(NonsequentialMOBlocksTwo, self).__init__(*args,**kwargs)
-        self.file_name = os.path.join(dir_path,'data','serial','fdamp1','fdamp1.plt')
+    file_name = os.path.join(dir_path,'data','serial','fdamp1','fdamp1.plt')
+
+    def setUp( self ):
+        self.mili = reader.open_database( NonsequentialMOBlocksTwo.file_name, procs = [7], suppress_parallel = True )
 
     def test_refrcx( self ):
-        mili = reader.open_database( self.file_name, procs = [7], suppress_parallel = True )
-        result = mili.query( 'refrcx', 'node', labels = [6], states = [1,2,3])
-        self.assertAlmostEqual(result['refrcx']['data']['reaction_force'][0][0][0],0.000000, places = 6 )
-        self.assertAlmostEqual(result['refrcx']['data']['reaction_force'][1][0][0],-195.680618, places = 6 )
-        self.assertAlmostEqual(result['refrcx']['data']['reaction_force'][2][0][0],-374.033813, places = 6 )
+        result = self.mili.query( 'refrcx', 'node', labels = [6], states = [1,2,3])
+        self.assertEqual(result['refrcx']['data']['reaction_force'][0][0][0],          0.000000 )
+        self.assertAlmostEqual(result['refrcx']['data']['reaction_force'][1][0][0], -195.680618, delta = 1e-6 )
+        self.assertAlmostEqual(result['refrcx']['data']['reaction_force'][2][0][0], -374.033813, delta = 1e-6 )
 
 class DoublePrecisionNodpos(unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super(DoublePrecisionNodpos, self).__init__(*args,**kwargs)
-        self.file_name = os.path.join(dir_path,'data','serial','beam_udi','beam_udi.plt')
+    file_name = os.path.join(dir_path,'data','serial','beam_udi','beam_udi.plt')
+
+    def setUp( self ):
+        self.mili = reader.open_database( DoublePrecisionNodpos.file_name, suppress_parallel = True )
 
     def test_nodpos( self ):
-        mili = reader.open_database( self.file_name, suppress_parallel = True )
-        result = mili.query( 'nodpos', 'node', labels = [6], states = [3])
-        self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][0],499.867992, places = 5 )
-        self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][1],100.000000, places = 5 )
-        self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][2],198.08432, places = 5 )
+        result = self.mili.query( 'nodpos', 'node', labels = [6], states = [3])
+        self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][0], 499.86799237808793, delta = 1e-6 )
+        self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][1], 100.00000000000000, delta = 1e-6 )
+        self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][2], 198.08431992103525, delta = 1e-6 )
 
 class VectorsInVectorArrays(unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super(VectorsInVectorArrays, self).__init__(*args,**kwargs)
-        self.file_name = os.path.join(dir_path,'data','serial','d3samp4','d3samp4.plt')
+    file_name = os.path.join(dir_path,'data','serial','d3samp4','d3samp4.plt')
+
+    def setUp( self ):
+        self.mili = reader.open_database( VectorsInVectorArrays.file_name, suppress_parallel = True )
 
     def test_query( self ):
-        mili = reader.open_database( self.file_name, suppress_parallel = True )
-        result = mili.query( 'eps', 'shell', labels = [1], states = [2], ips = [1])
-        self.assertAlmostEqual(result['eps']['data']['1shell_mmsvn_rec'][0][0][0], 0.02329357, places = 5 )
-        result = mili.query( 'eps', 'shell', labels = [1], states = [2], ips = [2])
-        self.assertAlmostEqual(result['eps']['data']['1shell_mmsvn_rec'][0][0][0], 0.00712155, places = 5 )
+        result = self.mili.query( 'eps', 'shell', labels = [1], states = [2], ips = [1])
+        self.assertAlmostEqual(result['eps']['data']['1shell_mmsvn_rec'][0][0][0], 2.3293568e-02 )
+        result = self.mili.query( 'eps', 'shell', labels = [1], states = [2], ips = [2])
+        self.assertAlmostEqual(result['eps']['data']['1shell_mmsvn_rec'][0][0][0], 7.1215495e-03 )
 
-'''
-These are tests to assert the correctness of the Mili Reader
-These tests use d3samp6.plt
-'''
+class TestOpenDatabase(unittest.TestCase):
+    def test_open_d3samp6_serial( self ):
+        d3samp6 = os.path.join(dir_path,'data','serial','sstate','d3samp6.plt')
+        reader.open_database( d3samp6 )
+
 class SerialSingleStateFile(unittest.TestCase):
+    file_name = os.path.join(dir_path,'data','serial','sstate','d3samp6.plt')
 
-    def __init__(self, *args, **kwargs):
-        super(SerialSingleStateFile, self).__init__(*args, **kwargs)
-        self.file_name = os.path.join(dir_path,'data','serial','sstate','d3samp6.plt')
-    '''
-    Set up the mili file object
-    '''
     def setUp(self):
-        self.mili = reader.open_database( self.file_name, suppress_parallel = True )
+        self.mili = reader.open_database( SerialSingleStateFile.file_name, suppress_parallel = True )
 
-    def test_read(self):
-        reader.open_database( self.file_name, suppress_parallel = True )
-
-    '''
-    Testing invalid inputs
-    '''
     def test_invalid_inputs(self):
+        '''
+        Testing invalid inputs
+        '''
         with self.assertRaises(ValueError):
             self.mili.query(['nodpos[ux]'], 'node', labels = 4, states = 300)
         with self.assertRaises(ValueError):
@@ -124,10 +121,10 @@ class SerialSingleStateFile(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.mili.query(['nodposss[ux]'], 'node', labels = 4, states = 3, ips = 'cat')
 
-    """
-    Testing the getNodes() method of the Mili class.
-    """
     def test_nodes_getter(self):
+        """
+        Testing the getNodes() method of the Mili class.
+        """
         NUM_NODES = 144
         FIRST_NODE = np.array( (1.0, 0.0, 0.0), np.float32 )
         LAST_NODE = np.array( (-6.556708598282057e-08, 1.5, 3.0), np.float32 )
@@ -235,34 +232,11 @@ class SerialSingleStateFile(unittest.TestCase):
         np.testing.assert_equal(labels['glob'], GLOB_LBLS)
         np.testing.assert_equal(labels['mat'], MATS_LBLS)
 
-    # """
-    # Testing the getMaterials() method of the Mili class.
-    # """
-    # def test_materials_getter(self):
-    #     materials = self.mili.materials()
-    #     MATERIALS = { 1: {'beam': np.array( [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-    #                                19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
-    #                                35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46] ) },
-    #                   2: {'brick': np.array( [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-    #                                 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
-    #                                 35, 36] ) },
-    #                   3: {'shell': np.array( [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] ) },
-    #                   4: {'cseg': np.array( [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] ) },
-    #                   5: {'cseg': np.array( [13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24] ) }
-    #                 }
-    #     for k1, k2 in zip( materials.keys(), MATERIALS.keys() ):
-    #         self.assertEqual( k1, k2 )
-    #         for m1, m2 in zip( materials[k1].keys(), materials[k2].keys() ):
-    #             self.assertEqual( m1, m2 )
-    #             ml1 = materials[k1][m1]
-    #             ml2 = materials[k2][m2]
-    #             np.testing.assert_equal( ml1, ml2 )
 
     def test_reload_state_maps(self):
         """
         Test the reload_state_maps method of the Mili Class.
         """
-        # Just make sure it doesn't cause Exception
         self.mili.reload_state_maps()
         FIRST_STATE = 0.0
         LAST_STATE = 0.0010000000474974513
@@ -452,7 +426,6 @@ class SerialSingleStateFile(unittest.TestCase):
        _, labels = list(answer.items())[0]
        self.assertEqual(labels.size, 12)
        np.testing.assert_equal( labels, np.arange( 1, 13, dtype = np.int32 ) )
-
 
     '''
     Testing what nodes are associated with a material
@@ -677,10 +650,10 @@ class SerialSingleStateFile(unittest.TestCase):
         answer = self.mili.query('stress', 'beam', labels = 5, states = 71, ips = 2, write_data = v1 )
         np.testing.assert_equal( answer['stress']['data']['1beam_mmsvn_rec'], v1['stress']['data']['1beam_mmsvn_rec'] )
 
-    '''
-    Test modifying a vector array component
-    '''
     def test_modify_vector_array_component(self):
+        '''
+        Test modifying a vector array component
+        '''
         v1 = { 'stress[sy]' :
                  { 'layout' :
                     {
@@ -727,10 +700,11 @@ class SerialSingleStateFile(unittest.TestCase):
         answer = self.mili.query("te", "glob", states=[22])
         self.assertAlmostEqual( answer["te"]["data"]["glob"][0,0,0], 1629.718, delta=1e-4)
 
-class SerialMutliStateFile(SerialSingleStateFile):
-    def __init__(self, *args, **kwargs):
-        super(SerialMutliStateFile, self).__init__(*args, **kwargs)
-        self.file_name = os.path.join(dir_path,'data','serial','mstate','d3samp6.plt_c')
+class SerialMutliStateFile(unittest.TestCase):
+    file_name = os.path.join(dir_path,'data','serial','mstate','d3samp6.plt_c')
+
+    def setUp( self ):
+        self.mili = reader.open_database( SerialMutliStateFile.file_name )
 
     def test_statevariables_getter(self):
         """
@@ -1521,11 +1495,11 @@ class ParallelSingleStateFile(unittest.TestCase):
         answer = self.mili.query('stress', 'beam', labels = 5, states = 70, ips = 2 )
         np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'], v1['stress']['data']['1beam_mmsvn_rec'] )
 
-        answer = self.mili.query('stress', 'beam', labels = 5, states = 70, ips = 2, write_data = v2 )
+        answer = self.mili.query('stress', 'beam', labels = 5, states = 70, ips = 2 , write_data = v2 )
         np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'], v2['stress']['data']['1beam_mmsvn_rec'] )
 
         # Back to original
-        answer = self.mili.query('stress', 'beam', labels = 5, states = 70, ips = 2, write_data = v1 )
+        answer = self.mili.query('stress', 'beam', labels = 5, states = 70, ips = 2 , write_data = v1 )
         np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'], v1['stress']['data']['1beam_mmsvn_rec'] )
     '''
     Test modifying a vector array component
@@ -1583,15 +1557,17 @@ class Bugfixes0_2_4(unittest.TestCase):
     Testing labeling bugfixes from 0.2.4
     '''
     file_name = os.path.join(dir_path,'data','serial','labeling','dblplt003')
-    '''
-    Set up the mili file object
-    '''
     def setUp(self):
+        '''
+        Set up the mili file object
+        '''
         self.mili = reader.open_database( Bugfixes0_2_4.file_name, suppress_parallel=True )
 
     def test_nodpres_query(self):
-        # this was erroring on the provided database due to srec scalar svar "coord" lookup,
-        #  so as long as it doesn't throw an exception we're good
+        '''
+        this was erroring on the provided database due to srec scalar svar "coord" lookup,
+        so as long as it doesn't throw an exception we're good
+        '''
         self.mili.query('nodpres','node')
 
     def test_labels_of_material(self):
@@ -1635,7 +1611,7 @@ class Bugfixes0_2_5(unittest.TestCase):
 
     def test_srec_offsets(self):
         '''
-        our vec-array svar size calculation was off resulting in invalide srec offsets, this checks against
+        our vec-array svar size calculation was off resulting in invalid srec offsets, this checks against
         the offsets directly from mili
         '''
         oracle_re = re.compile(r"([\w ]+):\s+Offset:\s+(\d+)\s+[\w\s]+=\s(\w+)")
@@ -1647,6 +1623,7 @@ class Bugfixes0_2_5(unittest.TestCase):
         result = {}
         for srec in self.mili._MiliDatabase__srecs:
             result[ srec.name ] = srec.state_byte_offset
+
         self.assertEqual( result, desired )
 
 if __name__ == "__main__":
