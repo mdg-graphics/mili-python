@@ -461,9 +461,23 @@ class AFileParser:
         ordinal_blocks[1::2] = ordinal_blocks[1::2] + 1 # add one to each STOP to allow inclusive bining during queries..
         ordinal_blocks = ordinal_blocks - 1 # account for 1-indexing used by mili(?)
 
+      ordinal_block_counts = np.concatenate( ( [0], np.diff( ordinal_blocks.reshape(-1,2), axis=1 ).flatten( ) ) ) # sum stop - start + 1 over all blocks
+      ordinal_block_offsets = np.cumsum( ordinal_block_counts )
+
+      # Check that ordinal blocks are monotonically increasing
+      monotonically_increasing = np.all( ordinal_blocks[1:] >= ordinal_blocks[:-1] )
+      if not monotonically_increasing:
+        # Sort ordinal_blocks and ordinal_block offsets together
+        ordinal_blocks = np.reshape( ordinal_blocks, (-1,2) )
+        blocks, offsets = zip( *(sorted( zip(ordinal_blocks, ordinal_block_offsets[:-1]), key=lambda x: x[0][0]) ) )
+        ordinal_blocks = np.array( blocks ).flatten()
+        ordinal_block_offsets = np.array( offsets )
+        # Recalculate ordinal_block_counts
+        ordinal_block_counts = np.concatenate( ( [0], np.diff( ordinal_blocks.reshape(-1,2), axis=1 ).flatten( ) ) ) # sum stop - start + 1 over all blocks
+
       kwargs['ordinal_blocks'] = ordinal_blocks
-      kwargs['ordinal_block_counts'] = np.concatenate( ( [0], np.diff( ordinal_blocks.reshape(-1,2), axis=1 ).flatten( ) ) ) # sum stop - start + 1 over all blocks
-      kwargs['ordinal_block_offsets'] = np.cumsum( kwargs['ordinal_block_counts'] )
+      kwargs['ordinal_block_counts'] = ordinal_block_counts
+      kwargs['ordinal_block_offsets'] = ordinal_block_offsets
       iidx += 2 * block_count
       afile.dirs[dir_decl.dir_type][sname] = self.verify( f'STATE_REC_DATA/{sname}', Subrecord( **kwargs ) )
 

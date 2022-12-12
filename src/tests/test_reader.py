@@ -55,6 +55,16 @@ class NonsequentialMOBlocks(unittest.TestCase):
         result = mili.query( 'sx', 'brick', labels = [228], states = [10] )
         self.assertAlmostEqual(result[7]['sx']['data']['7hex_mmsvn_rec'][0][0][0], 20.355846, delta = 1e-6 )
 
+class NonMonotonicallyIncreasingMOBlocks(unittest.TestCase):
+    def __init__(self, *args, **kwargs):
+        super(NonMonotonicallyIncreasingMOBlocks, self).__init__(*args,**kwargs)
+        self.file_name = os.path.join(dir_path,'data','serial','vrt_BS','vrt_BS.plt')
+
+    def test_query( self ):
+        mili = reader.open_database( self.file_name, suppress_parallel = True )
+        result = mili.query( 'refrcx', 'node', labels = [67], states = [5] )
+        self.assertAlmostEqual(result['refrcx']['data']['reaction_force'][0][0][0], 749.95404, delta = 1e-6 )
+
 class NonsequentialMOBlocksTwo(unittest.TestCase):
     file_name = os.path.join(dir_path,'data','serial','fdamp1','fdamp1.plt')
 
