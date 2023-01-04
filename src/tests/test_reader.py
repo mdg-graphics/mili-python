@@ -387,21 +387,6 @@ class SerialSingleStateFile(unittest.TestCase):
         self.assertEqual(cseg_class.sclass, Superclass.M_QUAD)
         self.assertEqual(cseg_class.elem_qty, 24)
 
-    def test_query_all_classes(self):
-        """
-        Test the query_all_classes method of the Mili Class.
-        """
-        sand_data = self.mili.query_all_classes("sand", states=[10])
-
-        self.assertEqual(set(sand_data.keys()), set(["brick", "shell", "beam"]))
-
-        np.testing.assert_equal( sand_data["brick"]["sand"]["data"]["2hex_sand_rec"][0,:,:],
-                                 np.full((36, 1), 1.0) )
-        np.testing.assert_equal( sand_data["beam"]["sand"]["data"]["1sand_beam_bind"][0,:,:],
-                                 np.full((46, 1), 1.0) )
-        np.testing.assert_equal( sand_data["shell"]["sand"]["data"]["3sand_shell_bind"][0,:,:],
-                                 np.full((12, 1), 1.0) )
-
     def test_statevariables_getter(self):
         """
         Testing state_variables()
@@ -1259,21 +1244,6 @@ class ParallelSingleStateFile(unittest.TestCase):
         self.assertEqual(cseg_class.sclass, Superclass.M_QUAD)
         self.assertEqual(cseg_class.elem_qty, 6)
 
-    def test_query_all_classes(self):
-        """
-        Test the query_all_classes method of the Mili Class.
-        """
-        sand_data = self.mili.query_all_classes("sand", states=[10])
-
-        self.assertEqual(set(sand_data[0].keys()), set(["brick"]))
-        self.assertEqual(set(sand_data[1].keys()), set(["brick"]))
-        self.assertEqual(set(sand_data[2].keys()), set(["brick", "shell", "beam"]))
-        self.assertEqual(set(sand_data[3].keys()), set(["brick", "shell"]))
-        self.assertEqual(set(sand_data[4].keys()), set(["beam"]))
-        self.assertEqual(set(sand_data[5].keys()), set(["brick", "shell", "beam"]))
-        self.assertEqual(set(sand_data[6].keys()), set(["beam"]))
-        self.assertEqual(set(sand_data[7].keys()), set(["beam"]))
-
     """
     Testing the getStateVariables() method of the Mili class.
     """
@@ -1635,6 +1605,742 @@ class Bugfixes0_2_5(unittest.TestCase):
             result[ srec.name ] = srec.state_byte_offset
 
         self.assertEqual( result, desired )
+
+
+'''
+Testing the Experimental parallel Mili file version
+'''
+class ExperimentalParallelSingleStateFile(unittest.TestCase):
+    file_name = file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
+    '''
+    Set up the mili file object
+    '''
+    def setUp(self):
+        self.mili = reader.open_database( ParallelSingleStateFile.file_name, experimental=True )
+    
+    def tearDown(self):
+        self.mili.close()
+
+    def test_parallel_read(self):
+        reader.open_database( ParallelSingleStateFile.file_name, experimental=True )
+
+    """
+    Testing the getNodes() method of the Mili class.
+    """
+    def test_nodes_getter(self):
+        nodes = self.mili.nodes()
+
+        PROC_0_NODE_CNT = 35
+        PROC_1_NODE_CNT = 40
+        PROC_2_NODE_CNT = 26
+        PROC_3_NODE_CNT = 36
+        PROC_4_NODE_CNT = 20
+        PROC_5_NODE_CNT = 27
+        PROC_6_NODE_CNT = 18
+        PROC_7_NODE_CNT = 18
+
+        self.assertEqual(len(nodes[0]), PROC_0_NODE_CNT)
+        self.assertEqual(len(nodes[1]), PROC_1_NODE_CNT)
+        self.assertEqual(len(nodes[2]), PROC_2_NODE_CNT)
+        self.assertEqual(len(nodes[3]), PROC_3_NODE_CNT)
+        self.assertEqual(len(nodes[4]), PROC_4_NODE_CNT)
+        self.assertEqual(len(nodes[5]), PROC_5_NODE_CNT)
+        self.assertEqual(len(nodes[6]), PROC_6_NODE_CNT)
+        self.assertEqual(len(nodes[7]), PROC_7_NODE_CNT)
+
+    def test_statemaps_getter(self):
+        """
+        Testing the getStateMaps() method of the Mili class
+        """
+        state_maps = self.mili.state_maps()
+        FIRST_STATE = 0.0
+        LAST_STATE = 0.0010000000474974513
+        STATE_COUNT = 101
+        PROCS = 8
+        self.assertEqual(len(state_maps), PROCS)  # One entry in list for each processor
+        for state_map in state_maps:
+            self.assertEqual(len(state_map), STATE_COUNT)
+            self.assertEqual(state_map[0].time, FIRST_STATE)
+            self.assertEqual(state_map[-1].time, LAST_STATE)
+
+    def test_times(self):
+        """
+        Testing the times() method of the Mili class
+        """
+        FIRST_STATE = 0.0
+        LAST_STATE = 0.0010000000474974513
+        STATE_COUNT = 101
+        PROCS = 8
+        ptimes = self.mili.times()
+        self.assertEqual(len(ptimes), PROCS)  # One entry in list for each processor
+        for times in ptimes:
+            self.assertEqual(STATE_COUNT, len(times))
+            self.assertEqual(FIRST_STATE, times[0])
+            self.assertEqual(LAST_STATE, times[-1])
+
+
+    """
+    Testing the getLabels() method of the Mili class
+    """
+    def test_labels_getter(self):
+        result = self.mili.labels()
+        goal = [
+             {
+              'brick': np.array([ 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18], dtype=np.int32),
+              'glob': np.array([1], dtype=np.int32),
+              'mat': np.array([1, 2, 3, 4, 5], dtype=np.int32),
+              'node': np.array([ 66,  67,  68,  70,  71,  72,  74,  75,  76,  78,  79,  80,  82, 83,  84,  86,  87,  88,  90,  91,  92,  94,  95,  96,  98,  99, 100, 102, 103, 104, 106, 107, 108, 111, 112], dtype=np.int32)
+             },
+             {
+              'brick': np.array([ 12, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36 ], dtype=np.int32),
+              'glob': np.array([1], dtype=np.int32),
+              'mat': np.array([1, 2, 3, 4, 5], dtype=np.int32),
+              'node': np.array([ 90,  91,  94,  95,  98,  99, 100, 102, 103, 104, 106, 107, 108, 110, 111, 112, 114, 115, 116, 118, 119, 120, 122, 123, 124, 126, 127, 128, 130, 131, 132, 134, 135, 136, 138, 139, 140, 142, 143, 144], dtype=np.int32)
+             },
+             {
+              'beam': np.array([ 5, 6 ], dtype=np.int32),
+              'brick': np.array([ 21, 23, 24 ], dtype=np.int32),
+              'cseg': np.array([ 8, 9, 12, 20, 21, 24 ], dtype=np.int32),
+              'glob': np.array([1], dtype=np.int32),
+              'mat': np.array([1, 2, 3, 4, 5], dtype=np.int32),
+              'node': np.array([  4,   6,  13,  14,  15,  58,  59,  60,  63,  64, 101, 102, 105, 106, 109, 110, 117, 118, 121, 122, 125, 126, 137, 138, 141, 142], dtype=np.int32),
+              'shell': np.array([ 9, 11, 12 ], dtype=np.int32)
+             },
+             {
+              'brick': np.array([1, 2, 3, 4, 5, 6], dtype=np.int32),
+              'cseg': np.array([ 1,  2,  3,  4,  5,  6, 13, 14, 15, 16, 17, 18 ], dtype=np.int32),
+              'glob': np.array([1], dtype=np.int32),
+              'mat': np.array([1, 2, 3, 4, 5], dtype=np.int32),
+              'node': np.array([ 12,  13,  14,  15,  49,  50,  51,  52,  53,  54,  55,  56,  65, 66,  69,  70,  73,  74,  77,  78,  81,  82,  85,  86,  89,  90, 93,  94,  97,  98, 101, 102, 105, 106, 109, 110], dtype=np.int32),
+              'shell': np.array([1, 2, 3, 4, 5, 6], dtype=np.int32)
+             },
+             {
+              'beam': np.array([ 2, 3, 12, 13, 17, 22, 23, 24, 25, 27, 28, 32, 33, 34 ], dtype=np.int32),
+              'glob': np.array([1], dtype=np.int32),
+              'mat': np.array([1, 2, 3, 4, 5], dtype=np.int32),
+              'node': np.array([ 3,  4,  5,  6,  7, 12, 13, 16, 21, 22, 25, 29, 30, 31, 32, 33, 34, 37, 38, 39], dtype=np.int32)
+             },
+             {
+              'beam': np.array([ 1, 4 ], dtype=np.int32),
+              'brick': np.array([ 19, 20, 22 ], dtype=np.int32),
+              'cseg': np.array([ 7, 10, 11, 19, 22, 23 ], dtype=np.int32),
+              'glob': np.array([1], dtype=np.int32),
+              'mat': np.array([1, 2, 3, 4, 5], dtype=np.int32),
+              'node': np.array([  1,   2,   3,  12,  13,  57,  58,  59,  61,  62,  63,  97,  98, 101, 102, 113, 114, 117, 118, 121, 122, 129, 130, 133, 134, 137, 138], dtype=np.int32),
+              'shell': np.array([ 7, 8, 10 ], dtype=np.int32)
+             },
+             {
+              'beam': np.array([ 11, 18, 19, 20, 21, 29, 30, 31, 37, 38, 39, 40, 41, 42 ], dtype=np.int32),
+              'glob': np.array([1], dtype=np.int32),
+              'mat': np.array([1, 2, 3, 4, 5], dtype=np.int32),
+              'node': np.array([ 8, 10, 14, 15, 16, 20, 25, 26, 27, 28, 34, 35, 36, 41, 42, 43, 44, 45], dtype=np.int32)
+             },
+             {
+              'beam': np.array([ 7, 8, 9, 10, 14, 15, 16, 26, 35, 36, 43, 44, 45, 46 ], dtype=np.int32),
+              'glob': np.array([1], dtype=np.int32),
+              'mat': np.array([1, 2, 3, 4, 5], dtype=np.int32),
+              'node': np.array([ 1,  9, 11, 16, 17, 18, 19, 20, 22, 23, 24, 32, 39, 40, 45, 46, 47, 48], dtype=np.int32)
+             }
+            ]
+
+        for pr, gr in zip(result, goal):
+            for sname, labels in pr.items():
+                self.assertTrue( sname in gr.keys( ) )
+                np.testing.assert_equal( labels, gr[sname] )
+
+    # """
+    # Testing the getMaterials() method of the Mili class.
+    # """
+    # def test_materials_getter(self):
+    #     result = self.mili.labels_of_material(2)
+
+    #     goal = [ {2: {'brick': np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], dtype=np.int32)}},
+    #              {2: {'brick': np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], dtype=np.int32)}},
+    #              {1: {'beam': np.array([1, 2], dtype=np.int32)}, 2: {'brick': np.array([1, 2, 3], dtype=np.int32)}, 3: {'shell': np.array([1, 2, 3], dtype=np.int32)}, 4: {'cseg': np.array([1, 2, 3], dtype=np.int32)}, 5: {'cseg': np.array([4, 5, 6], dtype=np.int32)}},
+    #              {2: {'brick': np.array([1, 2, 3, 4, 5, 6], dtype=np.int32)}, 3: {'shell': np.array([1, 2, 3, 4, 5, 6], dtype=np.int32)}, 4: {'cseg': np.array([1, 2, 3, 4, 5, 6], dtype=np.int32)}, 5: {'cseg': np.array([7, 8, 9, 10, 11, 12], dtype=np.int32)}},
+    #              {1: {'beam': np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], dtype=np.int32)}},
+    #              {1: {'beam': np.array([1, 2], dtype=np.int32)}, 2: {'brick': np.array([1, 2, 3], dtype=np.int32)}, 3: {'shell': np.array([1, 2, 3], dtype=np.int32)}, 4: {'cseg': np.array([1, 2, 3], dtype=np.int32)}, 5: {'cseg': np.array([4, 5, 6], dtype=np.int32)}},
+    #              {1: {'beam': np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], dtype=np.int32)}},
+    #              {1: {'beam': np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], dtype=np.int32)}} ]
+
+    #     for pr, gr in zip(result,goal):
+    #         for mat_num, mat in pr.items():
+    #             self.assertTrue( mat_num in gr.keys() )
+    #             for mat_name, labels, in mat.items():
+    #                 self.assertTrue( mat_name in gr[mat_num].keys() )
+    #                 np.testing.assert_equal( labels, gr[mat_num][mat_name])
+
+    def test_reload_state_maps(self):
+        """
+        Test the reload_state_maps method of the Mili Class.
+        """
+        # Just make sure it doesn't cause Exception
+        self.mili.reload_state_maps()
+        state_maps = self.mili.state_maps()
+        FIRST_STATE = 0.0
+        LAST_STATE = 0.0010000000474974513
+        STATE_COUNT = 101
+        PROCS = 8
+        self.assertEqual(len(state_maps), PROCS)  # One entry in list for each processor
+        for state_map in state_maps:
+            self.assertEqual(len(state_map), STATE_COUNT)
+            self.assertEqual(state_map[0].time, FIRST_STATE)
+            self.assertEqual(state_map[-1].time, LAST_STATE)
+
+    def test_material_numbers(self):
+        mat_nums = self.mili.material_numbers()
+        self.assertEqual(mat_nums[0], [2])
+        self.assertEqual(mat_nums[1], [2])
+        self.assertEqual(mat_nums[2], [1,2,3,4,5])
+        self.assertEqual(mat_nums[3], [2,3,4,5])
+        self.assertEqual(mat_nums[4], [1])
+        self.assertEqual(mat_nums[5], [1,2,3,4,5])
+        self.assertEqual(mat_nums[6], [1])
+        self.assertEqual(mat_nums[7], [1])
+
+    def test_classes_of_state_variable(self):
+        sx_classes = self.mili.classes_of_state_variable('sx')
+        self.assertEqual(sx_classes[0], ["brick"])
+        self.assertEqual(sx_classes[1], ["brick"])
+        self.assertEqual(set(sx_classes[2]), set(["beam", "shell", "brick"]))
+        self.assertEqual(set(sx_classes[3]), set(["shell", "brick"]))
+        self.assertEqual(sx_classes[4], ["beam"])
+        self.assertEqual(set(sx_classes[5]), set(["beam", "shell", "brick"]))
+        self.assertEqual(sx_classes[6], ["beam"])
+        self.assertEqual(sx_classes[7], ["beam"])
+
+        uy_classes = self.mili.classes_of_state_variable('uy')
+        self.assertEqual(uy_classes[0], ["node"])
+        self.assertEqual(uy_classes[1], ["node"])
+        self.assertEqual(uy_classes[2], ["node"])
+        self.assertEqual(uy_classes[3], ["node"])
+        self.assertEqual(uy_classes[4], ["node"])
+        self.assertEqual(uy_classes[5], ["node"])
+        self.assertEqual(uy_classes[6], ["node"])
+        self.assertEqual(uy_classes[7], ["node"])
+
+        axf_classes = self.mili.classes_of_state_variable('axf')
+        self.assertEqual(axf_classes[0], [])
+        self.assertEqual(axf_classes[1], [])
+        self.assertEqual(axf_classes[2], ["beam"])
+        self.assertEqual(axf_classes[3], [])
+        self.assertEqual(axf_classes[4], ["beam"])
+        self.assertEqual(axf_classes[5], ["beam"])
+        self.assertEqual(axf_classes[6], ["beam"])
+        self.assertEqual(axf_classes[7], ["beam"])
+
+    def test_materials_of_class_name(self):
+        """
+        Test the materials_of_class_name method of Mili Class.
+        """
+        brick_mats = self.mili.materials_of_class_name("brick")
+        beam_mats = self.mili.materials_of_class_name("beam")
+        shell_mats = self.mili.materials_of_class_name("shell")
+        cseg_mats = self.mili.materials_of_class_name("cseg")
+
+        self.assertEqual( brick_mats[0].size, 11 )
+        self.assertEqual( brick_mats[1].size, 13 )
+        self.assertEqual( brick_mats[2].size, 3 )
+        self.assertEqual( brick_mats[3].size, 6 )
+        self.assertEqual( brick_mats[4].size, 0 )
+        self.assertEqual( brick_mats[5].size, 3 )
+        self.assertEqual( brick_mats[6].size, 0 )
+        self.assertEqual( brick_mats[7].size, 0 )
+        np.testing.assert_equal( np.unique(brick_mats[0]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_mats[1]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_mats[2]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_mats[3]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_mats[5]), np.array([2]) )
+
+        self.assertEqual( beam_mats[0].size, 0 )
+        self.assertEqual( beam_mats[1].size, 0 )
+        self.assertEqual( beam_mats[2].size, 2 )
+        self.assertEqual( beam_mats[3].size, 0 )
+        self.assertEqual( beam_mats[4].size, 14 )
+        self.assertEqual( beam_mats[5].size, 2 )
+        self.assertEqual( beam_mats[6].size, 14 )
+        self.assertEqual( beam_mats[7].size, 14 )
+        np.testing.assert_equal( np.unique(beam_mats[2]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_mats[4]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_mats[5]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_mats[6]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_mats[7]), np.array([1]) )
+
+        self.assertEqual( shell_mats[0].size, 0 )
+        self.assertEqual( shell_mats[1].size, 0 )
+        self.assertEqual( shell_mats[2].size, 3 )
+        self.assertEqual( shell_mats[3].size, 6 )
+        self.assertEqual( shell_mats[4].size, 0 )
+        self.assertEqual( shell_mats[5].size, 3 )
+        self.assertEqual( shell_mats[6].size, 0 )
+        self.assertEqual( shell_mats[7].size, 0 )
+        np.testing.assert_equal( np.unique(shell_mats[2]), np.array([3]) )
+        np.testing.assert_equal( np.unique(shell_mats[3]), np.array([3]) )
+        np.testing.assert_equal( np.unique(shell_mats[5]), np.array([3]) )
+
+        self.assertEqual( cseg_mats[0].size, 0 )
+        self.assertEqual( cseg_mats[1].size, 0 )
+        self.assertEqual( cseg_mats[2].size, 6 )
+        self.assertEqual( cseg_mats[3].size, 12 )
+        self.assertEqual( cseg_mats[4].size, 0 )
+        self.assertEqual( cseg_mats[5].size, 6 )
+        self.assertEqual( cseg_mats[6].size, 0 )
+        self.assertEqual( cseg_mats[7].size, 0 )
+        np.testing.assert_equal( cseg_mats[2], np.array([4, 4, 4, 5, 5, 5]) )
+        np.testing.assert_equal( cseg_mats[3], np.array([4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5]) )
+        np.testing.assert_equal( cseg_mats[5], np.array([4, 4, 4, 5, 5, 5]))
+
+
+    def test_parts_of_class_name(self):
+        """
+        Test the parts_of_class_name method of Mili Class.
+        """
+        brick_parts = self.mili.parts_of_class_name("brick")
+        beam_parts = self.mili.parts_of_class_name("beam")
+        shell_parts = self.mili.parts_of_class_name("shell")
+        cseg_parts = self.mili.parts_of_class_name("cseg")
+
+        self.assertEqual( brick_parts[0].size, 11 )
+        self.assertEqual( brick_parts[1].size, 13 )
+        self.assertEqual( brick_parts[2].size, 3 )
+        self.assertEqual( brick_parts[3].size, 6 )
+        self.assertEqual( brick_parts[4].size, 0 )
+        self.assertEqual( brick_parts[5].size, 3 )
+        self.assertEqual( brick_parts[6].size, 0 )
+        self.assertEqual( brick_parts[7].size, 0 )
+        np.testing.assert_equal( np.unique(brick_parts[0]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_parts[1]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_parts[2]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_parts[3]), np.array([2]) )
+        np.testing.assert_equal( np.unique(brick_parts[5]), np.array([2]) )
+
+        self.assertEqual( beam_parts[0].size, 0 )
+        self.assertEqual( beam_parts[1].size, 0 )
+        self.assertEqual( beam_parts[2].size, 2 )
+        self.assertEqual( beam_parts[3].size, 0 )
+        self.assertEqual( beam_parts[4].size, 14 )
+        self.assertEqual( beam_parts[5].size, 2 )
+        self.assertEqual( beam_parts[6].size, 14 )
+        self.assertEqual( beam_parts[7].size, 14 )
+        np.testing.assert_equal( np.unique(beam_parts[2]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_parts[4]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_parts[5]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_parts[6]), np.array([1]) )
+        np.testing.assert_equal( np.unique(beam_parts[7]), np.array([1]) )
+
+        self.assertEqual( shell_parts[0].size, 0 )
+        self.assertEqual( shell_parts[1].size, 0 )
+        self.assertEqual( shell_parts[2].size, 3 )
+        self.assertEqual( shell_parts[3].size, 6 )
+        self.assertEqual( shell_parts[4].size, 0 )
+        self.assertEqual( shell_parts[5].size, 3 )
+        self.assertEqual( shell_parts[6].size, 0 )
+        self.assertEqual( shell_parts[7].size, 0 )
+        np.testing.assert_equal( np.unique(shell_parts[2]), np.array([3]) )
+        np.testing.assert_equal( np.unique(shell_parts[3]), np.array([3]) )
+        np.testing.assert_equal( np.unique(shell_parts[5]), np.array([3]) )
+
+        self.assertEqual( cseg_parts[0].size, 0 )
+        self.assertEqual( cseg_parts[1].size, 0 )
+        self.assertEqual( cseg_parts[2].size, 6 )
+        self.assertEqual( cseg_parts[3].size, 12 )
+        self.assertEqual( cseg_parts[4].size, 0 )
+        self.assertEqual( cseg_parts[5].size, 6 )
+        self.assertEqual( cseg_parts[6].size, 0 )
+        self.assertEqual( cseg_parts[7].size, 0 )
+        np.testing.assert_equal( np.unique(cseg_parts[2]), np.array([1]) )
+        np.testing.assert_equal( np.unique(cseg_parts[3]), np.array([1]) )
+        np.testing.assert_equal( np.unique(cseg_parts[5]), np.array([1]) )
+
+
+    def test_mesh_object_classes_getter(self):
+        """
+        Test the mesh_object_classes() method of Mili Class.
+        """
+        MO_classes = self.mili.mesh_object_classes()
+
+        # Test 0th processor
+        mo_classes = MO_classes[0]
+
+        # Glob class
+        glob_class = mo_classes["glob"]
+        self.assertEqual(glob_class.mesh_id, 0)
+        self.assertEqual(glob_class.short_name, "glob")
+        self.assertEqual(glob_class.long_name, "Global")
+        self.assertEqual(glob_class.sclass, Superclass.M_MESH)
+        self.assertEqual(glob_class.elem_qty, 1)
+        self.assertEqual(glob_class.idents_exist, True)
+
+        # Mat Class
+        mat_class = mo_classes["mat"]
+        self.assertEqual(mat_class.mesh_id, 0)
+        self.assertEqual(mat_class.short_name, "mat")
+        self.assertEqual(mat_class.long_name, "Material")
+        self.assertEqual(mat_class.sclass, Superclass.M_MAT)
+        self.assertEqual(mat_class.elem_qty, 5)
+        self.assertEqual(mat_class.idents_exist, True)
+
+        # Node class
+        node_class = mo_classes["node"]
+        self.assertEqual(node_class.mesh_id, 0)
+        self.assertEqual(node_class.short_name, "node")
+        self.assertEqual(node_class.long_name, "Node")
+        self.assertEqual(node_class.sclass, Superclass.M_NODE)
+        self.assertEqual(node_class.elem_qty, 35)
+        self.assertEqual(node_class.idents_exist, True)
+
+        # brick class
+        brick_class = mo_classes["brick"]
+        self.assertEqual(brick_class.mesh_id, 0)
+        self.assertEqual(brick_class.short_name, "brick")
+        self.assertEqual(brick_class.long_name, "Bricks")
+        self.assertEqual(brick_class.sclass, Superclass.M_HEX)
+        self.assertEqual(brick_class.elem_qty, 11)
+        self.assertEqual(brick_class.idents_exist, True)
+
+        # Test processor 5
+        mo_classes = MO_classes[5]
+
+        # Glob class
+        glob_class = mo_classes["glob"]
+        self.assertEqual(glob_class.mesh_id, 0)
+        self.assertEqual(glob_class.short_name, "glob")
+        self.assertEqual(glob_class.long_name, "Global")
+        self.assertEqual(glob_class.sclass, Superclass.M_MESH)
+        self.assertEqual(glob_class.elem_qty, 1)
+        self.assertEqual(glob_class.idents_exist, True)
+
+        # Mat Class
+        mat_class = mo_classes["mat"]
+        self.assertEqual(mat_class.mesh_id, 0)
+        self.assertEqual(mat_class.short_name, "mat")
+        self.assertEqual(mat_class.long_name, "Material")
+        self.assertEqual(mat_class.sclass, Superclass.M_MAT)
+        self.assertEqual(mat_class.elem_qty, 5)
+        self.assertEqual(mat_class.idents_exist, True)
+
+        # Node class
+        node_class = mo_classes["node"]
+        self.assertEqual(node_class.mesh_id, 0)
+        self.assertEqual(node_class.short_name, "node")
+        self.assertEqual(node_class.long_name, "Node")
+        self.assertEqual(node_class.sclass, Superclass.M_NODE)
+        self.assertEqual(node_class.elem_qty, 27)
+        self.assertEqual(node_class.idents_exist, True)
+
+        # brick class
+        brick_class = mo_classes["brick"]
+        self.assertEqual(brick_class.mesh_id, 0)
+        self.assertEqual(brick_class.short_name, "brick")
+        self.assertEqual(brick_class.long_name, "Bricks")
+        self.assertEqual(brick_class.sclass, Superclass.M_HEX)
+        self.assertEqual(brick_class.elem_qty, 3)
+        self.assertEqual(brick_class.idents_exist, True)
+
+        # shell class
+        shell_class = mo_classes["shell"]
+        self.assertEqual(shell_class.mesh_id, 0)
+        self.assertEqual(shell_class.short_name, "shell")
+        self.assertEqual(shell_class.long_name, "Shells")
+        self.assertEqual(shell_class.sclass, Superclass.M_QUAD)
+        self.assertEqual(shell_class.elem_qty, 3)
+        self.assertEqual(shell_class.idents_exist, True)
+
+        # cseg class
+        cseg_class = mo_classes["cseg"]
+        self.assertEqual(cseg_class.mesh_id, 0)
+        self.assertEqual(cseg_class.short_name, "cseg")
+        self.assertEqual(cseg_class.long_name, "Contact Segment")
+        self.assertEqual(cseg_class.sclass, Superclass.M_QUAD)
+        self.assertEqual(cseg_class.elem_qty, 6)
+
+    """
+    Testing the getStateVariables() method of the Mili class.
+    """
+    def test_statevariables_getter(self):
+        result = self.mili.state_variables()
+        goal = [159,126,134,134,126,134,126,126]
+        result = [len(rr) for rr in result]
+        self.assertEqual( result, goal )
+
+    '''
+    Testing whether the element numbers associated with a material are correct
+    '''
+    def test_labels_material(self):
+       answer = self.mili.all_labels_of_material('es_13')
+       np.testing.assert_equal(answer[2]['shell'],np.array([9,11,12], dtype=np.int32))
+       np.testing.assert_equal(answer[3]['shell'],np.array([1,2,3,4,5,6], dtype=np.int32))
+       np.testing.assert_equal(answer[5]['shell'],np.array([7,8,10], dtype=np.int32))
+
+
+    '''
+    Testing what nodes are associated with a material
+    '''
+    def test_nodes_material(self):
+        answer = self.mili.nodes_of_material('es_1')
+        node_labels = np.unique( np.concatenate((*answer,)) )
+        np.testing.assert_equal( node_labels, np.arange(1, 49, dtype = np.int32) )
+
+    '''
+    Testing what nodes are associated with a label
+    '''
+    def test_nodes_label(self):
+        answer = self.mili.nodes_of_elems('brick', 1)
+        np.testing.assert_equal( answer[3][0][0,:], np.array([65,81,85,69,66,82,86,70],dtype=np.int32) )
+
+
+    '''
+    Testing accessing a variable at a given state
+    '''
+    def test_state_variable(self):
+        answer = self.mili.query( 'matcgx', 'mat', labels = [1,2], states = 3 )
+        np.testing.assert_equal( answer[0]['matcgx']['data']['mat'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32 ) )
+
+    '''
+    Testing accessing accessing node attributes -> this is a vector component
+    Tests both ways of accessing vector components (using brackets vs not)
+    *Note* this is another case of state variable
+    '''
+    def test_node_attributes(self):
+        answer = self.mili.query( 'nodpos[ux]', 'node', labels = 70, states = 3 )
+        self.assertEqual( answer[3]['nodpos[ux]']['data']['node'][0,0,0], 0.4330127537250519)
+        answer = self.mili.query( 'ux', 'node', labels = 70, states = 3 )
+        self.assertEqual( answer[3]['ux']['data']['node'][0,0,0], 0.4330127537250519)
+
+    '''
+    Testing the accessing of a vector, in this case node position
+    '''
+    def test_state_variable_vector(self):
+        answer = self.mili.query('nodpos', 'node', labels = 70, states = 4 )
+        np.testing.assert_equal(answer[3]['nodpos']['data']['node'][0,0,:], np.array( [0.4330127537250519, 0.2500000596046448, 2.436666965484619], dtype = np.float32 ) )
+
+    '''
+    Test querying by material name and number:
+    '''
+    def test_query_material(self):
+        answer = self.mili.query('sx', 'brick', material = 2, states = 37 )
+        num_labels = sum( pansw['sx']['layout'].get( '2hex_mmsvn_rec', np.empty([0],dtype=np.int32) ).size for pansw in answer )
+        self.assertEqual( num_labels, 36 )
+
+        answer = self.mili.query('sx', 'brick', material = 'es_12', states = 37 )
+        num_labels = sum( pansw['sx']['layout'].get( '2hex_mmsvn_rec', np.empty([0],dtype=np.int32) ).size for pansw in answer )
+        self.assertEqual( num_labels, 36 )
+
+
+    '''
+    Testing the modification of a scalar state variable
+    '''
+    def test_modify_state_variable(self):
+        v1 = { 'matcgx' :
+                { 'layout' :
+                    {
+                      'mat' : np.array( [1], dtype = np.int32 ),
+                      'states' : np.array( [3], dtype = np.int32 )
+                    },
+                  'data' : { 'mat' : np.array([ [ [ 5.5 ] ] ], dtype = np.float32) }
+                }
+             }
+        v2 = { 'matcgx' :
+                { 'layout' :
+                    {
+                      'mat' : np.array( [1], dtype = np.int32 ),
+                      'states' : np.array( [3], dtype = np.int32 )
+                    },
+                  'data' :
+                    { 'mat' : np.array([ [ [ 0.6021666526794434 ] ] ], dtype = np.float32) }
+                }
+             }
+
+        # Original
+        answer = self.mili.query('matcgx', 'mat', labels = 1, states = 3 )
+        self.assertEqual( answer[0]['matcgx']['data']['mat'][0], 0.6021666526794434 )
+
+        # Modified
+        answer = self.mili.query('matcgx', 'mat', labels = 1, states = 3, write_data = v1 )
+        self.assertEqual( answer[0]['matcgx']['data']['mat'][0], 5.5 )
+
+        # Back to original
+        answer = self.mili.query('matcgx', 'mat', labels = 1, states = 3, write_data = v2 )
+        self.assertEqual( answer[0]['matcgx']['data']['mat'][0], 0.6021666526794434 )
+
+    '''
+    Testing the modification of a vector state variable
+    '''
+    def test_modify_vector(self):
+        v1 = { 'nodpos' :
+                { 'layout' :
+                    {
+                        'node' : np.array( [ 70, 71 ], dtype = np.int32 ),
+                        'states' : np.array( [4], dtype = np.int32 )
+                    },
+                  'data' :
+                    { 'node' : np.array( [ [ [ 5.0, 6.0, 9.0 ], [ 5.1, 6.1, 9.1 ] ] ], dtype = np.float32 ) }
+                }
+             }
+        v2 = { 'nodpos' :
+                { 'layout' :
+                    {
+                        'node' : np.array( [ 70, 71 ], dtype = np.int32 ),
+                        'states' : np.array( [4], dtype = np.int32 )
+                    },
+                  'data' :
+                    { 'node' : np.array( [ [ [0.4330127537250519, 0.2500000596046448, 2.436666965484619], [0.4330127239227295, 0.2499999850988388, 2.7033333778381348] ] ], dtype = np.float32 ) }
+                }
+             }
+
+        # Before change
+        answer = self.mili.query('nodpos', 'node', labels = [70, 71], states = 4 )
+        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,0,:], v2['nodpos']['data']['node'][0,0,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,1,:], v2['nodpos']['data']['node'][0,1,:] )
+
+        # After change
+        answer = self.mili.query('nodpos', 'node', labels = [70, 71], states = 4, write_data = v1 )
+        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,0,:], v1['nodpos']['data']['node'][0,0,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,1,:], v1['nodpos']['data']['node'][0,1,:] )
+
+        # Back to original
+        answer = self.mili.query('nodpos', 'node', labels = [70, 71],  states = 4, write_data = v2 )
+        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,0,:], v2['nodpos']['data']['node'][0,0,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,1,:], v2['nodpos']['data']['node'][0,1,:] )
+
+    '''
+    Testing the modification of a vector component
+    '''
+    def test_modify_vector_component(self):
+        v1 = { 'nodpos[uz]' :
+                { 'layout' :
+                    {
+                        'node' : np.array( [70, 71], dtype = np.int32 ),
+                        'states' : np.array( [4], dtype = np.int32 )
+                    },
+                  'data' :
+                    { 'node' : np.array( [ [ [9.0], [9.0] ] ], dtype = np.float32 ) }
+                }
+             }
+        v2 = { 'nodpos[uz]' :
+                { 'layout' :
+                    {
+                        'node' : np.array( [70, 71], dtype = np.int32 ),
+                        'states' : np.array( [4], dtype = np.int32 )
+                    },
+                  'data' :
+                    { 'node' : np.array( [ [ [2.436666965484619], [2.7033333778381348] ] ], dtype = np.float32 ) }
+                }
+             }
+
+        # Before change
+        answer = self.mili.query('nodpos[uz]', 'node', labels = [70, 71], states = 4 )
+        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,0,0], 2.436666965484619)
+        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,1,0], 2.7033333778381348)
+
+        # After change
+        answer = self.mili.query('nodpos[uz]', 'node', labels = [70, 71], states = 4, write_data = v1 )
+        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,0,0], 9.0)
+        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,1,0], 9.0)
+
+        # Back to original
+        answer = self.mili.query('nodpos[uz]', 'node', labels = [70, 71], states = 4, write_data = v2 )
+        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,0,0], 2.436666965484619)
+        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,1,0], 2.7033333778381348)
+
+    '''
+    Test accessing a vector array
+    '''
+    def test_state_variable_vector_array(self):
+        answer = self.mili.query('stress', 'beam', labels = 5, states = [21,22], ips = 2 )
+        np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'][1,:,:], np.array([ [ -1018.4232177734375, -1012.2537231445312, -6.556616085617861e-07, 1015.3384399414062, 0.3263571858406067, -0.32636013627052307] ], dtype = np.float32 ) )
+
+    '''
+    Test accessing a vector array component
+    '''
+    def test_state_variable_vector_array_component(self):
+        answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2 )
+        self.assertEqual(answer[2]['stress[sy]']['data']['1beam_mmsvn_rec'][0,0,0], -5373.53173828125)
+
+    '''
+    Test modifying a vector array
+    '''
+    def test_modify_vector_array(self):
+        v1 = { 'stress' :
+                { 'layout' :
+                    {
+                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'states' : np.array( [70], dtype = np.int32 )
+                    },
+                  'data' :
+                    { '1beam_mmsvn_rec' : np.array([ [ [ -5377.6376953125, -5373.53173828125, -3.930831553589087e-07, 5375.58447265625, 0.6931889057159424, -0.693189263343811 ] ] ], dtype = np.float32 ) }
+                }
+             }
+        v2 = { 'stress' :
+                { 'layout' :
+                    {
+                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'states' : np.array( [70], dtype = np.int32 )
+                    },
+                  'data' :
+                    { '1beam_mmsvn_rec' : np.array([ [ [ 1.0, 2.0, 3.0, 4.0, 5.0, 6.0 ] ] ], dtype = np.float32 ) }
+                }
+             }
+        # Before change
+        answer = self.mili.query('stress', 'beam', labels = 5, states = 70, ips = 2 )
+        np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'], v1['stress']['data']['1beam_mmsvn_rec'] )
+
+        answer = self.mili.query('stress', 'beam', labels = 5, states = 70, ips = 2 , write_data = v2 )
+        np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'], v2['stress']['data']['1beam_mmsvn_rec'] )
+
+        # Back to original
+        answer = self.mili.query('stress', 'beam', labels = 5, states = 70, ips = 2 , write_data = v1 )
+        np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'], v1['stress']['data']['1beam_mmsvn_rec'] )
+    '''
+    Test modifying a vector array component
+    '''
+    def test_modify_vector_array_component(self):
+        v1 = { 'stress[sy]' :
+                 { 'layout' :
+                    {
+                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'states' : np.array( [70], dtype = np.int32 )
+                    },
+                   'data' :
+                    { '1beam_mmsvn_rec' : np.array( [ [ [ -5373.53173828125 ] ] ], dtype = np.float32 ) }
+                 }
+             }
+        v2 = { 'stress[sy]' :
+                 { 'layout' :
+                    {
+                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'states' : np.array( [70], dtype = np.int32 )
+                    },
+                   'data' :
+                    { '1beam_mmsvn_rec' : np.array( [ [ [ 1.5 ] ] ], dtype = np.float32 ) }
+                 }
+             }
+
+        # Before change
+        answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2 )
+        np.testing.assert_equal( answer[2]['stress[sy]']['data']['1beam_mmsvn_rec'], v1['stress[sy]']['data']['1beam_mmsvn_rec'] )
+
+        # After change
+        answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2, write_data = v2 )
+        np.testing.assert_equal( answer[2]['stress[sy]']['data']['1beam_mmsvn_rec'], v2['stress[sy]']['data']['1beam_mmsvn_rec'] )
+
+        # Back to original
+        answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2, write_data = v1 )
+        np.testing.assert_equal( answer[2]['stress[sy]']['data']['1beam_mmsvn_rec'], v1['stress[sy]']['data']['1beam_mmsvn_rec'] )
+
+    def test_query_glob_results(self):
+        """
+        Test querying for results for M_MESH ("glob") element class.
+        """
+        answer = self.mili.query("he", "glob", states=[22])
+        self.assertAlmostEqual( answer[0]["he"]["data"]["glob"][0,0,0], 3.0224223, delta=1e-7)
+
+        answer = self.mili.query("bve", "glob", states=[22])
+        self.assertAlmostEqual( answer[0]["bve"]["data"]["glob"][0,0,0], 2.05536485, delta=1e-7)
+
+        answer = self.mili.query("te", "glob", states=[22])
+        self.assertAlmostEqual( answer[0]["te"]["data"]["glob"][0,0,0], 1629.718, delta=1e-4)
+
 
 if __name__ == "__main__":
     unittest.main()

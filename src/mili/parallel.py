@@ -31,6 +31,9 @@ import dill
 import pathos.multiprocessing as mp
 from functools import partial
 from multiprocessing import Process
+import numpy as np
+import atexit
+import psutil
 
 from typing import *
 
@@ -107,33 +110,63 @@ class PoolWrapper:
 
 # check asyncio module
 
-# generic multiprocessing client/server wrapper
 class ServerWrapper:
+  """Multiprocessing client/server wrapper for reading Mili databases in parallel.
+
+  When more plot files exist than processors, each processor handles multiple file
+  using the same concept as the loop wrapper.
+  """
   class ClientWrapper(Process):
-    def __init__( self, conn, cls_obj : Type, *pargs, **kwargs ):
+    def __init__( self,
+                  conn, 
+                  cls_obj: Type,
+                  proc_pargs: List[List[Any]] = [],
+                  proc_kwargs: List[Mapping[Any,Any]] = [] ):
       super(Process,self).__init__()
+
+      num_pargs = len(proc_pargs)
+      num_kwargs = len(proc_kwargs)
+      if num_pargs > 0 and num_kwargs == 0:
+        proc_kwargs = [ {} ] * num_pargs
+      elif num_kwargs > 0 and num_pargs == 0:
+        proc_pargs = [] * num_kwargs
+      elif num_kwargs != num_pargs:
+        raise ValueError(f'Must supply the same number of pargs ({num_pargs}) and kwargs ({num_kwargs}) to instantiate object list.')
+
       self.__conn = conn
       self.__cls_obj = cls_obj
-      self.__pargs = pargs
-      self.__kwargs = kwargs
+      self.__proc_pargs = proc_pargs
+      self.__proc_kwargs = proc_kwargs
 
     def run( self ):
-      self.__last_result = None
-      self.__wrapped = self.__cls_obj( *self.__pargs, **self.__kwargs )
+      self.__wrapped = [ self.__cls_obj(*pargs, **kwargs) for pargs, kwargs in zip(self.__proc_pargs, self.__proc_kwargs) ]
+
+      # ensure all contained objects are the same exact type (no instances, subclasses are not valid)
+      obj_iter = iter(self.__wrapped)
+      obj_type = type(next(obj_iter))
+      assert( all( type(obj) == obj_type for obj in obj_iter ) )
+
       while True:
         if self.__conn.poll():
           cmd, pargs, kwargs = dill.loads( self.__conn.recv() )
           if cmd == '__exit':
             break
-          elif cmd == '__return':
-            self.__conn.send( dill.dumps( self.__last_result ) )
           else:
-            self.__last_result = getattr( self.__wrapped, cmd )( *pargs, **kwargs )
+            result = [ getattr( self.__cls_obj, cmd )( wrapped, *pargs, **kwargs) for wrapped in self.__wrapped ]
+            self.__conn.send_bytes( dill.dumps(result) )
       return
+  
+  def __divide_pargs_into_groups( self, values, n_groups: int ):
+    if n_groups > len(values):
+      n_groups = len(values)
+    return [ np.reshape( arr, (-1, 2) ).tolist() for arr in np.reshape( values, (n_groups, -1) ) ]
 
-  def __init__( self, cls_obj : Type, proc_pargs : List[List[Any]] = [], proc_kwargs : List[Mapping[Any,Any]] = [], immediate_mode : bool = True ):
-    self.__immediate_mode = immediate_mode
-
+  def __divide_kwargs_into_groups( self, values, n_groups: int ):
+    if n_groups > len(values):
+      n_groups = len(values)
+    return np.reshape( values, (n_groups, -1) ).tolist()
+  
+  def __init__( self, cls_obj : Type, proc_pargs : List[List[Any]] = [], proc_kwargs : List[Mapping[Any,Any]] = [] ):
     # validate parameters
     num_pargs = len(proc_pargs)
     num_kwargs = len(proc_kwargs)
@@ -149,58 +182,62 @@ class ServerWrapper:
     # generate member functions mimicking those in the wrapped class, excluding private and class functions
     for func in ( func for func in dir(cls_obj) if not func.startswith('__') and not func.startswith(f'_{cls_obj.__name__}') and callable(getattr(cls_obj,func)) ):
       setattr( self, func, mem_maker(func) )
+    
+    # Get the number of processors that are available
+    n_cores = int( psutil.cpu_count(logical=False) ) 
+
+    # Break out into groups for each processor available
+    proc_pargs = self.__divide_pargs_into_groups( proc_pargs, n_cores )
+    proc_kwargs = self.__divide_kwargs_into_groups( proc_kwargs, n_cores )
 
     # create a pool of worker processes and supply the constructor arguments to each one
     self.__pool = []
     self.__conns = []
     for pargs, kwargs in zip( proc_pargs, proc_kwargs ):
       c0, c1 = multiprocessing.Pipe()
-      self.__pool.append( ServerWrapper.ClientWrapper( c1, cls_obj, *pargs, **kwargs ) )
+      self.__pool.append( ServerWrapper.ClientWrapper( c1, cls_obj, pargs, kwargs ) )
       self.__conns.append( c0 )
+
+    atexit.register(self.__cleanup_processes)
 
     # spawn the worker processes
     for proc in self.__pool:
       proc.start()
-
-  # TODO : this *really* doesn't seem to be working
-  def __del__( self ):
-    # need to check for attr existence in __del__ to handle partially-constructed failure modes
-    print('Sending exit command to worker processes...')
-    if hasattr( self, '__conns' ):
+  
+  def close(self):
+    """Close the database and end all subprocesses."""
+    atexit.unregister(self.__cleanup_processes)
+    self.__cleanup_processes()
+    
+  # Need this so processes don't hang and close properly
+  def __cleanup_processes(self):
+    if hasattr( self, '_ServerWrapper__conns' ):
       for conn in self.__conns:
         conn.send( dill.dumps( ( '__exit', [], {} ) ) )
-    print('Waiting for worker processes to exit...')
-    if hasattr( self, '__procs'):
-      for proc in self.__procs:
+    self.__conns = []
+    if hasattr( self, '_ServerWrapper__pool'):
+      for proc in self.__pool:
         proc.join( )
-    print('All worker processes terminated.')
+    self.__procs = []
+
+  def __flatten( self, alist: List[Any] ):
+    return [item for sublist in alist for item in sublist]
 
   # called by the generated member functions to send the command (attr name) and function arguments to
   #  each of the processes managed by this server. All arguments are sent to all processes, sending specific
   #  arguments to individual processes is not supported currently.
   def __worker_call(self,attr,*pargs,**kwargs):
+    results = [None] * len(self.__conns)
     data = ( attr, pargs, kwargs )
+
     for conn in self.__conns:
       conn.send( dill.dumps( data ) )
 
-    if self.__immediate_mode:
-      return self.result()
-    return None
+    for idx, conn in enumerate(self.__conns):
+      results[idx] = dill.loads( conn.recv_bytes() )
 
-  # collect the last result from each worker process
-  def result(self, procs : List[int] = None ):
-    result = []
-    if procs == None:
-      for conn in self.__conns:
-        conn.send( dill.dumps( ('__return', [], {}) ) )
-      for conn in self.__conns:
-        result.append( conn.recv() )
-    else:
-      for pid in procs:
-        self.__conns[pid].send( dill.dumps( ('__return', [], {} ) ) )
-      for pid in procs:
-        result.append( self.__conns[pid].recv() )
-    return result, procs
+    return self.__flatten(results)
+
 
 def get_wrapper( suppress_parallel = False, experimental = False ):
   Wrapper = None

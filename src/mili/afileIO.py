@@ -312,14 +312,14 @@ class AFileParser:
       afile.dirs[dir_decl.dir_type][sname] = self.verify( f'MILI_PARAM/{sname}', int.from_bytes(param_data, byteorder = self.__endian_str ) )
     else:
       # default to strings
-      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'MILI_PARAM/{sname}', struct.unpack(f"{dir_decl.length}s", param_data)[0].decode('utf-8').split('\x00') )
+      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'MILI_PARAM/{sname}', struct.unpack(f"{dir_decl.length}s", param_data)[0].decode('utf-8') )
 
   def __parse_app_param( self, afile : AFile, param_data : bytes, dir_decl : DirectoryDecl ):
     sname = dir_decl.strings[0]
-    if sname in [ "state_count", "OPEN_FOR_WRITE", "max size per file" ] :
+    if sname in [ "state_count", "OPEN_FOR_WRITE", "max size per file" ]:
       # single int params
       afile.dirs[dir_decl.dir_type][sname] = self.verify( f'APPLICATION_PARAM/{sname}', int.from_bytes(param_data, byteorder = self.__endian_str ) )
-    elif sname == "title":
+    elif sname in [ "title", "job_id" ]:
       # strings
       param = struct.unpack(f"{dir_decl.length}s", param_data)[0].decode('utf-8')
       afile.dirs[dir_decl.dir_type][sname] = self.verify( f'APPLICATION_PARAM/{sname}', param )
@@ -337,7 +337,7 @@ class AFileParser:
       # float arrays
       param = np.frombuffer( param_data[8:], dtype = np.float32 )
       afile.dirs[dir_decl.dir_type][sname] = self.verify( f'TI_PARAM/{sname}', param )
-    elif sname.startswith('GLOBAL_COUNT') or sname.startswith('LOCAL_COUNT') or sname == "nproc":
+    elif sname.startswith('GLOBAL_COUNT') or sname.startswith('LOCAL_COUNT') or sname in [ "nproc", "particles_on" ]:
       # single int params
       afile.dirs[dir_decl.dir_type][sname] = self.verify( f'TI_PARAM/{sname}', int.from_bytes(param_data, byteorder = self.__endian_str ) )
     else:

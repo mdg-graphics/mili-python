@@ -49,23 +49,9 @@ def open_griz_interface( base_filename : os.PathLike, procs = [], suppress_paral
                                         query each processes database files in series.
    experimental (Optional[Bool]) : optional developer-only argument to try experimental parallel features
   """
-  return GrizInterface(open_database(base_filename, procs, suppress_parallel, experimental))
-
-
-@dataclass
-class GrizDataContainer:
-  """Data class for all data that needs to be returned by each processor."""
-  params: dict
-  smaps: List[StateMap]
-  nodes: list
-  conns: dict
-  labels: dict
-  mo_classes: list
-  materials: dict
-  parts: dict
-  element_sets: dict
-  subrecords: list
-  classes_with_sand: List[str]
+  db = open_database(base_filename, procs, suppress_parallel, experimental)
+  gdb = GrizInterface(db)
+  return gdb
 
 
 @dataclass
@@ -89,11 +75,24 @@ class GrizInterface:
     # Store the Mili Database
     self.db = db
 
-    # Gather data from each processor
-    self.griz_data = db.get_griz_data()
-    self.processor_count = len(self.griz_data)
+    ## Gather data from each processor
+    class_names = db.class_names()
+    self.processor_count = len(class_names)
+    unique_class_names = [item for sublist in class_names for item in sublist]
+    unique_class_names = list(set(unique_class_names))
+
+    self.smaps = db.state_maps()[0]
     self.dimensions = db.mesh_dimensions()[0]
     self.srec_fmt_qty = db.srec_fmt_qty()[0]
+
+    self.nodes = db.nodes()
+    self.connectivity = db.connectivity()
+    self.labels = db.labels()
+    self.mesh_object_classes = db.mesh_object_classes()
+    self.element_sets = db.element_sets()
+    self.subrecords = db.subrecords()
+    self.materials = { cname : db.materials_of_class_name(cname) for cname in unique_class_names}
+    self.parts = { cname : db.parts_of_class_name(cname) for cname in unique_class_names}
 
     # Load in Free Node mass/volume if it exists
     self.free_node_data: FreeNodeData = None
@@ -104,23 +103,16 @@ class GrizInterface:
     self.params = {}
     self.merge_parameters()
 
-    # Statemaps are the same on all processors so just get first processor.
-    self.smaps = self.griz_data[0].smaps
-
-    # Get the names of all element classes with sand flags.
-    self.sand_class_names = set(chain.from_iterable([data.classes_with_sand for data in self.griz_data]))
-
     # Reflection for mili reader functions we need to access
-    for func in ["query_all_classes", "query"]:
+    call_lambda = lambda _cls_obj, _func : lambda *pargs, **kwargs : getattr(_cls_obj, _func)(*pargs, **kwargs)
+    for func in ["query"]:
       if func in dir(self.db):
-        call_lambda = lambda *pargs, **kwargs : getattr(self.db, func)(*pargs, **kwargs)
-        setattr( self, func, call_lambda )
+        setattr( self, func, call_lambda(self.db, func) )
 
   def reload(self) -> None:
     """Reload the state maps for the plot file."""
     self.db.reload_state_maps()
     self.smaps = self.db.state_maps()[0]
-
 
   def load_free_node_data(self) -> None:
     """Get Free Node Mass/Volume if it exists."""
@@ -139,7 +131,6 @@ class GrizInterface:
         fn_vol.append(None)
 
     self.free_node_data = FreeNodeData( fn_mass, fn_vol )
-
 
   def merge_parameters(self) -> None:
     """Merge the parameter dictionaries for each processor into a single dict object."""
@@ -176,24 +167,25 @@ class GrizInterface:
   @dataclass
   class GrizGeomCallData:
     """Dataclass containing all data needed by Griz get_geom call."""
-    nodes: List[Dict]
-    connectivity: List[Dict]
-    labels: List[Dict]
+    nodes: List[int]
+    connectivity: Dict
+    labels: Dict
     mo_classes: List[Dict]
-    materials: List[Dict]
-    parts: List[Dict]
+    materials: Dict
+    parts: Dict
 
 
   def griz_get_geom_call(self):
     """Populate GrizGeomCallData object for each processor."""
-    return [
-      GrizInterface.GrizGeomCallData(
-        data.nodes, data.conns,
-        data.labels, data.mo_classes,
-        data.materials, data.parts
-      ) for data in self.griz_data
-    ]
-
+    return GrizInterface.GrizGeomCallData(
+        self.nodes,
+        self.connectivity,
+        self.labels,
+        self.mesh_object_classes,
+        self.materials,
+        self.parts
+      ) 
+  
   @dataclass
   class GrizStDescriptorsCallData:
     """Dataclass containing all data needed by Griz get_st_descriptors call."""
@@ -202,27 +194,7 @@ class GrizInterface:
 
   def griz_get_st_descriptors_call(self):
     """Populate GrizStDescriptorsCallData object for each processor."""
-    return [
-      GrizInterface.GrizStDescriptorsCallData(
-        data.element_sets,
-        data.subrecords
-      ) for data in self.griz_data
-    ]
-
-  @dataclass
-  class GrizGetStateCallData:
-    """Dataclass containing all data needed by Griz get_state call."""
-    nodpos: dict
-    sand: dict
-
-  def griz_get_state_call(self):
-    """Populate GrizGetStateCallData object for each processor."""
-    node_data = self.db.query("nodpos", "node")
-    if len(self.sand_class_names) == 0:
-      sand_data = {}
-    else:
-      sand_data = self.db.query_all_classes( "sand" )
-    return GrizInterface.GrizGetStateCallData(
-      node_data,
-      sand_data,
-    )
+    return GrizInterface.GrizStDescriptorsCallData(
+        self.element_sets,
+        self.subrecords
+      )

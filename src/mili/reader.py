@@ -76,7 +76,7 @@ class MiliDatabase:
     self.__srecs : List[ Subrecord ] = []
 
     # indexing / index discovery
-    self.__labels = defaultdict( lambda : defaultdict( lambda : np_empty(np.int64)) )
+    self.__labels = defaultdict(lambda : defaultdict( lambda : np_empty(np.int32)) )
     self.__mats = defaultdict(list)
     self.__int_points = defaultdict( lambda : defaultdict( list ) )
 
@@ -84,8 +84,8 @@ class MiliDatabase:
     self.__class_to_sclass = {}
 
     # allow query by material
-    self.__elems_of_mat = defaultdict( lambda : defaultdict( lambda : np_empty(np.int64)) )  # map from material number to dict of class to elems
-    self.__elems_of_part = defaultdict( lambda : defaultdict( lambda : np_empty(np.int64)) )  # map from part number to dict of class to elems
+    self.__elems_of_mat = defaultdict(lambda : defaultdict( lambda : np_empty(np.int32)) )  # map from material number to dict of class to elems
+    self.__elems_of_part = defaultdict(lambda : defaultdict( lambda : np_empty(np.int32)) )  # map from part number to dict of class to elems
 
     # mesh data
     self.__MO_class_data = {}
@@ -120,14 +120,25 @@ class MiliDatabase:
       elif sname.startswith("Element Labels") and not "ElemIds" in sname:
         class_sname = re.search( r'Sname-(\w*)', sname ).group(1)
         if class_sname not in self.__labels.keys():
-          self.__labels[ class_sname ] = np_empty( np.int64 )
+          self.__labels[ class_sname ] = np_empty( np.int32 )
         self.__labels[ class_sname ] = np.concatenate( ( self.__labels[ class_sname ], param ) )
       elif sname.startswith("MAT_NAME"):
         mat_num = int( re.match(r"MAT_NAME_(\d+)", sname).group(1) )
         self.__mats[ param ].append( mat_num )
+        self.__params[f"MAT_NAME_{mat_num}"] = param
       elif sname.startswith('IntLabel_es_'):
         ip_name = sname[ sname.find('es_'): ]
         self.__int_points[ip_name] = param.tolist()
+      elif sname.startswith("SetRGB"):
+        self.__params[sname] = param
+      elif sname == "particles_on":
+        self.__params[sname] = param
+
+    # Add all mili parameters and application parameters to parameters dictionary
+    for sname, param in self.__afile.dirs[DirectoryDecl.Type.MILI_PARAM].items():
+      self.__params[sname] = param
+    for sname, param in self.__afile.dirs[DirectoryDecl.Type.APPLICATION_PARAM].items():
+      self.__params[sname] = param
 
     # setup svar.svars for easier VECTOR svar traversal
     self.__svars = self.__afile.dirs[DirectoryDecl.Type.STATE_VAR_DICT]
@@ -184,7 +195,7 @@ class MiliDatabase:
 
     for sname, elem_conn in self.__afile.dirs[DirectoryDecl.Type.ELEM_CONNS].items():
       if sname not in self.__conns.keys():
-        self.__conns[ sname ] = np.ndarray( (0,elem_conn.shape[1]-2), dtype = np.int64 )
+        self.__conns[ sname ] = np.ndarray( (0,elem_conn.shape[1]-2), dtype = np.int32 )
       # current_elem_count = self.__conns[ sname ].shape[0]
       self.__conns[ sname ] = elem_conn[:,:-2] - 1 # remove the part id and material number and account for fortran indexing
       mats = np.unique( elem_conn[:,-2] )
@@ -198,6 +209,7 @@ class MiliDatabase:
         self.__elems_of_part[ part ][ sname ] = np.concatenate( (self.__elems_of_part[ part ][ sname ], np.nonzero( elem_conn[:,-1] == part)[0] ) )
 
     offset = 0
+    self.__srec_fmt_qty = 1
     for sname, srec in self.__afile.dirs[DirectoryDecl.Type.SREC_DATA].items():
       srec : Subrecord
       # add all svars to srec
@@ -261,23 +273,6 @@ class MiliDatabase:
       logging.error("AFile parsing validation failure!\nPlease inspect your database via afileIO.parse_database() before attempting any queries.")
     self.__smaps = afile.smaps
 
-  def get_griz_data(self):
-    unique_class_names = list(self.__MO_class_data.keys())
-    sand_class_names = [srec.class_name for srec in self.__svars["sand"].srecs] if "sand" in self.__svars else []
-    return griz.GrizDataContainer(
-      self.__params,
-      self.__smaps,
-      self.__nodes,
-      self.__conns,
-      self.__labels,
-      list(self.__MO_class_data.values()),
-      { class_name : self.materials_of_class_name(class_name) for class_name in unique_class_names },
-      { class_name : self.parts_of_class_name(class_name) for class_name in unique_class_names },
-      self.element_sets(),
-      self.__srecs,
-      sand_class_names
-    )
-
   def nodes(self):
     return self.__nodes
 
@@ -291,12 +286,20 @@ class MiliDatabase:
     """Getter for mili parameters dictionary."""
     return self.__params
 
+  def parameter(self, name: str, default: Optional[Any] = None):
+    """Getter for single parameter value."""
+    return self.__params.get(name, default)
+
   def srec_fmt_qty(self):
     return self.__srec_fmt_qty
 
   def mesh_dimensions(self) -> int:
     """Getter for Mesh Dimensions."""
     return self.__mesh_dim
+  
+  def class_names(self):
+    """Get for all class names in the problems."""
+    return list(self.__MO_class_data.keys())
 
   def mesh_object_classes(self) -> Union[dict, List[dict]]:
     """Getter for Mesh Object class data."""
@@ -339,7 +342,9 @@ class MiliDatabase:
           queriable.append( sname )
     return queriable
 
-  def labels(self):
+  def labels(self, class_name: Optional[str] = None):
+    if class_name is not None:
+      return self.__labels.get(class_name, None)
     return self.__labels
 
   def materials(self):
@@ -348,7 +353,9 @@ class MiliDatabase:
   def material_numbers(self):
     return list(self.__elems_of_mat.keys())
 
-  def connectivity(self):
+  def connectivity( self, class_name : Optional[str] = None ):
+    if class_name is not None:
+      return self.__conns.get(class_name, None)
     return self.__conns
 
   def material_classes(self, mat):
@@ -520,9 +527,6 @@ class MiliDatabase:
 
     if type(ips) is not list:
       raise TypeError( 'comp must be an integer or list of integers' )
-
-    if any( sn < 0 for sn in states ) or any( sn > len(self.__smaps) for sn in states ):
-      raise ValueError(f'state numbers outside of range [0,{len(self.__smaps)}] requested but not in database')
 
     if write_data is not None:
       for queried_name in svar_names:
@@ -762,27 +766,6 @@ class MiliDatabase:
                 var_data, _ = srec.extract_ordinals( byte_read_data, srec_offsets )
 
               res[ queried_name ][ "data" ][ srec.name ][ sidx,:,: ] = var_data
-
-    return res
-
-  def query_all_classes( self, svar_name: str, states: Optional[Union[int,List[int]]] = None ):
-    """Helper function to query a state variable for all element classes for which it exists."""
-    if not svar_name in self.__svars.keys():
-      raise ValueError( f"No state variable '{svar_name}' found in database." )
-
-    if states is None:
-      states = np.arange( 1, len(self.__smaps) + 1, dtype = np.int32 )
-    if type(states) is int:
-      states = np.array( [ states ], dtype = np.int32 )
-    elif iterable( states ) and not type( states ) == str:
-      states = np.array( states, dtype = np.int32 )
-
-    class_names = [ srec.class_name for srec in self.__svars[svar_name].srecs ]
-    class_names = set(list(class_names))
-
-    res = {}
-    for class_sname in class_names:
-      res[class_sname] = self.query( svar_name, class_sname, None, None, states, None, None, output_object_labels=False )
 
     return res
 

@@ -7,3 +7,4 @@ coverage >= 4.0.0
 wheel
 setuptools
 GitPython
+psutil
