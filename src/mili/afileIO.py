@@ -183,8 +183,9 @@ class AFileParser:
     Uses the AFileReader to register parsing callbacks for all sections and directories in an A-file.
     This parses ALL information in the AFile, passed via callback for the AFileReader, and populates a new AFile object.
   """
-  def __init__(self, allow_exceptions = False):
+  def __init__(self, allow_exceptions = False, log_validator = True):
     self.__except = allow_exceptions
+    self.__log_validator = log_validator
 
   def parse( self, afile : AFile,  base : os.PathLike, dir_whitelist = None ):
     if dir_whitelist is None:
@@ -239,7 +240,10 @@ class AFileParser:
     is_valid = valid( value )
     if not is_valid:
       self.__all_valid = False
-    log_str = f"{self.afilename}\n{name}\n  validity = {is_valid}\n  value = {value}\n  validator = '{inspect.getsource(valid).strip()}'\n"
+    if not self.__log_validator:
+      log_str = f"{self.afilename}\n{name}\n  validity = {is_valid}\n  value = {value}\n"
+    else:
+      log_str = f"{self.afilename}\n{name}\n  validity = {is_valid}\n  value = {value}\n  validator = '{inspect.getsource(valid).strip()}'\n"
     logging.debug(log_str)
     if not is_valid and self.__except:
       raise MiliAParseError( f"invalid value encounterd:\n  {log_str}" )

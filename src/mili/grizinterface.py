@@ -50,7 +50,11 @@ def open_griz_interface( base_filename : os.PathLike, procs = [], suppress_paral
    experimental (Optional[Bool]) : optional developer-only argument to try experimental parallel features
   """
   db = open_database(base_filename, procs, suppress_parallel, experimental)
-  gdb = GrizInterface(db)
+  if isinstance( db, MiliDatabase ):
+    print("\nError: Attempting to open serial database in parallel. To read serial database please remove the '-pr' flag\n")
+    gdb = None
+  else:
+    gdb = GrizInterface(db)
   return gdb
 
 

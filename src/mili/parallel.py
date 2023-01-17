@@ -156,15 +156,13 @@ class ServerWrapper:
             self.__conn.send_bytes( dill.dumps(result) )
       return
   
-  def __divide_pargs_into_groups( self, values, n_groups: int ):
+  def __divide_into_sequential_groups( self, values, n_groups ):
     if n_groups > len(values):
       n_groups = len(values)
-    return [ np.reshape( arr, (-1, 2) ).tolist() for arr in np.reshape( values, (n_groups, -1) ) ]
-
-  def __divide_kwargs_into_groups( self, values, n_groups: int ):
-    if n_groups > len(values):
-      n_groups = len(values)
-    return np.reshape( values, (n_groups, -1) ).tolist()
+    d, r = divmod( len(values), n_groups )
+    for i in range( n_groups ):
+      si = (d+1)*(i if i < r else r) + d*(0 if i < r else i - r)
+      yield values[si:si+(d+1 if i < r else d)]
   
   def __init__( self, cls_obj : Type, proc_pargs : List[List[Any]] = [], proc_kwargs : List[Mapping[Any,Any]] = [] ):
     # validate parameters
@@ -184,11 +182,11 @@ class ServerWrapper:
       setattr( self, func, mem_maker(func) )
     
     # Get the number of processors that are available
-    n_cores = int( psutil.cpu_count(logical=False) ) 
+    n_cores = int( psutil.cpu_count(logical=False) )
 
     # Break out into groups for each processor available
-    proc_pargs = self.__divide_pargs_into_groups( proc_pargs, n_cores )
-    proc_kwargs = self.__divide_kwargs_into_groups( proc_kwargs, n_cores )
+    proc_pargs = self.__divide_into_sequential_groups( proc_pargs, n_cores )
+    proc_kwargs = self.__divide_into_sequential_groups( proc_kwargs, n_cores )
 
     # create a pool of worker processes and supply the constructor arguments to each one
     self.__pool = []

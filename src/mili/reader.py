@@ -45,7 +45,6 @@ from typing import *
 from mili.datatypes import *
 from mili.afileIO import *
 from mili.parallel import *
-import mili.grizinterface as griz
 
 if sys.version_info < (3, 7):
   raise ImportError(f"This module requires python version >= 3.7!")
@@ -57,7 +56,7 @@ def np_empty(dtype):
 
 class MiliDatabase:
 
-  def __init__( self, dir_name : os.PathLike, base_filename : os.PathLike ):
+  def __init__( self, dir_name : os.PathLike, base_filename : os.PathLike, **kwargs ):
     """
     A Mili database querying object, able to parse a single A-file and query state information
       from the state files described by that A-file.
@@ -98,7 +97,8 @@ class MiliDatabase:
     self.__afile = AFile()
     self.__base_filename = base_filename
     self.__dir_name = dir_name
-    parse_success = AFileParser().parse( self.__afile, os.path.join( dir_name, base_filename ) )
+    log_validator = kwargs.get("log_validator", True)
+    parse_success = AFileParser(log_validator=log_validator).parse( self.__afile, os.path.join( dir_name, base_filename ) )
     if not parse_success:
       logging.error("AFile parsing validation failure!\nPlease inspect your database via afileIO.parse_database() before attempting any queries.")
 
@@ -769,7 +769,7 @@ class MiliDatabase:
 
     return res
 
-def open_database( base : os.PathLike, procs = [], suppress_parallel = False, experimental = False ):
+def open_database( base : os.PathLike, procs = [], suppress_parallel = False, experimental = False, **kwargs ):
   """
    Open a database for querying. This opens the database metadata files and does additional processing to optimize query
    construction and execution. Don't use this to perform database verification, instead prefer AFileIO.parse_database()
@@ -798,16 +798,17 @@ def open_database( base : os.PathLike, procs = [], suppress_parallel = False, ex
   dir_names = [ dir_name ] * len(proc_bases)
 
   proc_pargs = [ [dir_name,base_file]  for dir_name, base_file in zip(dir_names,proc_bases) ]
+  proc_kwargs = [ kwargs.copy() for _ in proc_pargs ]
 
   # Open Mili Database.
   if suppress_parallel or len(proc_pargs) == 1:
     if len(proc_pargs) == 1:
-      mili_database = MiliDatabase( *proc_pargs[0] )
+      mili_database = MiliDatabase( *proc_pargs[0], **proc_kwargs[0] )
     else:
-      mili_database = LoopWrapper( MiliDatabase, proc_pargs )
+      mili_database = LoopWrapper( MiliDatabase, proc_pargs, proc_kwargs )
   else:
     if experimental:
-      mili_database = ServerWrapper( MiliDatabase, proc_pargs )
+      mili_database = ServerWrapper( MiliDatabase, proc_pargs, proc_kwargs )
     else:
-      mili_database = PoolWrapper( MiliDatabase, proc_pargs )
+      mili_database = PoolWrapper( MiliDatabase, proc_pargs, proc_kwargs )
   return mili_database
