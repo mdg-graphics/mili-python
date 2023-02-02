@@ -316,7 +316,7 @@ class AFileParser:
       afile.dirs[dir_decl.dir_type][sname] = self.verify( f'MILI_PARAM/{sname}', int.from_bytes(param_data, byteorder = self.__endian_str ) )
     else:
       # default to strings
-      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'MILI_PARAM/{sname}', struct.unpack(f"{dir_decl.length}s", param_data)[0].decode('utf-8') )
+      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'MILI_PARAM/{sname}', struct.unpack(f"{dir_decl.length}s", param_data)[0].decode('utf-8').split('\x00')[0] )
 
   def __parse_app_param( self, afile : AFile, param_data : bytes, dir_decl : DirectoryDecl ):
     sname = dir_decl.strings[0]
@@ -325,7 +325,7 @@ class AFileParser:
       afile.dirs[dir_decl.dir_type][sname] = self.verify( f'APPLICATION_PARAM/{sname}', int.from_bytes(param_data, byteorder = self.__endian_str ) )
     elif sname in [ "title", "job_id" ]:
       # strings
-      param = struct.unpack(f"{dir_decl.length}s", param_data)[0].decode('utf-8')
+      param = struct.unpack(f"{dir_decl.length}s", param_data)[0].decode('utf-8').split('\x00')[0]
       afile.dirs[dir_decl.dir_type][sname] = self.verify( f'APPLICATION_PARAM/{sname}', param )
     else:
       # default to just byte data
@@ -410,12 +410,12 @@ class AFileParser:
     f = io.BytesIO( nodes_data )
     blocks = np.reshape( np.frombuffer( f.read(8), dtype = np.int32 ), [-1,2] )
     blocks_atoms = np.sum( np.diff( blocks, axis=1 ).flatten( ) + 1 )
-    if sname not in afile.dirs[dir_decl.dir_type]:
-      afile.dirs[dir_decl.dir_type][sname] = np.empty( [0], np.float32 )
-    # append_to = afile.dirs[dir_decl.dir_type][sname]
     mesh_dim = afile.dirs[DirectoryDecl.Type.MILI_PARAM]["mesh dimensions"]
     append = np.reshape( np.frombuffer( f.read( 4 * blocks_atoms * mesh_dim ), dtype = np.float32 ), [-1, mesh_dim] )
-    afile.dirs[dir_decl.dir_type][sname] = self.verify( f'NODES/{sname}', append )
+    if sname not in afile.dirs[dir_decl.dir_type]:
+      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'NODES/{sname}', append )
+    else:
+      afile.dirs[dir_decl.dir_type][sname] = np.append( afile.dirs[dir_decl.dir_type][sname], self.verify( f'NODES/{sname}', append ), axis=0 )
 
   def __parse_elem_conn( self, afile : AFile, conn_data : bytes, dir_decl : DirectoryDecl ):
     f = io.BytesIO( conn_data )
