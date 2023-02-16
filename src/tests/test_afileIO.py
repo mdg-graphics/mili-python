@@ -76,6 +76,7 @@ class AFileReaderV2(unittest.TestCase):
           reader.read_dirs( af, dir_type )
 
 class ParseDatabase(unittest.TestCase):
+  
   def test_v3_serial_single_statefile_parse( self ):
     afiles, rvals = afileIO.parse_database( os.path.join( dir_path,'data','v3','serial_t','d3samp6.plt' ) )
     afile_v3 = afiles[0]
@@ -93,6 +94,12 @@ class ParseDatabase(unittest.TestCase):
 
   def test_v3_parallel_single_statefile_parse( self ):
     afiles, rvals = afileIO.parse_database( os.path.join( dir_path,'data','v3','parallel_t','d3samp6.plt' ) )
+    for afile, rval in zip(afiles,rvals):
+      self.assertTrue( rval )
+      self.assertEqual( afile.file_version, 3 )
+
+  def test_v3_no_statefile_parse( self ):
+    afiles, rvals = afileIO.parse_database( os.path.join( dir_path,'data','v3','no_tfile','d3samp6.plt' ) )
     for afile, rval in zip(afiles,rvals):
       self.assertTrue( rval )
       self.assertEqual( afile.file_version, 3 )

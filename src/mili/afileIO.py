@@ -85,6 +85,7 @@ class AFileReader:
     self.__callbacks = defaultdict(list)
     self.__dir_decls_list = []
     self.__dir_decls = defaultdict(list)
+    self.__has_tfile = True
     self.register( AFile.Section.HEADER, self.__parse_header )
     self.register( AFile.Section.FOOTER, self.__parse_footer )
     self.register( AFile.Section.DIR_DECL, self.__parse_dir )
@@ -136,24 +137,23 @@ class AFileReader:
     self.__callback( AFile.Section.HEADER, header )
     dirs_bytes = 24 if header[5] == 1 else 48
 
-    if self.__mili_file_version > 2:
-      if t is None:
-        raise MiliAParseError(f"Expected T-file for mili file format v{self.__mili_file_version} not found!")
-
+    if t is None:
+    	self.__has_tfile = False
+    	
     f.seek(-16, os.SEEK_END)
     footer = f.read(16)
 
     self.__callback( AFile.Section.FOOTER, footer )
     strings_bytes, _, num_dirs, num_smaps = struct.unpack( '4i', footer )
 
-    if self.__mili_file_version > 2:
+    if self.__mili_file_version > 2 and self.__has_tfile:
       t.seek( 0, os.SEEK_END )
       num_smaps = (t.tell() - 1) // 20 # tmap is an array of smaps plus a trailing '~'
       t.seek( 0, os.SEEK_SET )
       struct.pack('i',int.from_bytes(footer[11:15], byteorder=self.__endian_str))
 
     smap_offset = -16 # footer
-    if self.__mili_file_version > 2:
+    if self.__mili_file_version > 2 and self.__has_tfile:
       self.__read_successive( t, AFile.Section.STATE_MAP, num_smaps, 20 )
       check = t.read(1)
       if check != b'~':
