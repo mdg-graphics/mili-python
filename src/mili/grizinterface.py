@@ -49,12 +49,12 @@ def open_griz_interface( base_filename : os.PathLike, procs = [], suppress_paral
                                         query each processes database files in series.
    experimental (Optional[Bool]) : optional developer-only argument to try experimental parallel features
   """
-  db = open_database(base_filename, procs, suppress_parallel, experimental, log_validator=False)
-  if isinstance( db, MiliDatabase ):
-    print("\nError: Attempting to open serial database in parallel. To read serial database please remove the '-pr' flag\n")
-    gdb = None
-  else:
+  try:
+    db = open_database(base_filename, procs, suppress_parallel, experimental, log_validator=False)
     gdb = GrizInterface(db)
+  except:
+    print(f"Error initializing mili-python Griz interface\n")
+    gdb = None
   return gdb
 
 
@@ -78,6 +78,8 @@ class GrizInterface:
 
     # Store the Mili Database
     self.db = db
+
+    self.__error_flag = False
 
     ## Gather data from each processor
     class_names = db.class_names()
@@ -108,10 +110,21 @@ class GrizInterface:
     self.merge_parameters()
 
     # Reflection for mili reader functions we need to access
-    call_lambda = lambda _cls_obj, _func : lambda *pargs, **kwargs : getattr(_cls_obj, _func)(*pargs, **kwargs)
+    def griz_call_helper( result ):
+      self.__error_flag = False
+      if result == []:
+        self.__error_flag = True
+      return result
+
+    call_lambda = lambda _cls_obj, _func : lambda *pargs, **kwargs : griz_call_helper( getattr(_cls_obj, _func)(*pargs, **kwargs) )
     for func in ["query"]:
       if func in dir(self.db):
         setattr( self, func, call_lambda(self.db, func) )
+
+  def error_check(self):
+    """Check if the error flag is set."""
+    return self.__error_flag
+
 
   def reload(self) -> None:
     """Reload the state maps for the plot file."""

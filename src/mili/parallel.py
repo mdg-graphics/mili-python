@@ -152,7 +152,10 @@ class ServerWrapper:
           if cmd == '__exit':
             break
           else:
-            result = [ getattr( self.__cls_obj, cmd )( wrapped, *pargs, **kwargs) for wrapped in self.__wrapped ]
+            try:
+                result = [ getattr( self.__cls_obj, cmd )( wrapped, *pargs, **kwargs) for wrapped in self.__wrapped ]
+            except:
+                result = []
             self.__conn.send_bytes( dill.dumps(result) )
       return
   
