@@ -488,33 +488,36 @@ class SerialSingleStateFile(unittest.TestCase):
                 { 'layout' :
                     {
                       'mat' : np.array( [1], dtype = np.int32 ),
-                      'states' : np.array( [3], dtype = np.int32 )
+                      'states' : np.array( [3,4], dtype = np.int32 )
                     },
-                  'data' : { 'mat' : np.array([ [ [ 5.5 ] ] ], dtype = np.float32) }
+                  'data' : { 'mat' : np.array([ [ [ 5.5 ] ], [ [ 4.5 ] ] ], dtype = np.float32) }
                 }
              }
         v2 = { 'matcgx' :
                 { 'layout' :
                     {
                       'mat' : np.array( [1], dtype = np.int32 ),
-                      'states' : np.array( [3], dtype = np.int32 )
+                      'states' : np.array( [3,4], dtype = np.int32 )
                     },
                   'data' :
-                    { 'mat' : np.array([ [ [ 0.6021666526794434 ] ] ], dtype = np.float32) }
+                    { 'mat' : np.array([ [ [ 0.6021666526794434 ] ], [ [ 0.6021666526794434 ] ] ], dtype = np.float32) }
                 }
              }
 
         # Original
-        answer = self.mili.query('matcgx', 'mat', labels = 1, states = 3 )
+        answer = self.mili.query('matcgx', 'mat', labels = 1, states = [3,4] )
         self.assertEqual( answer['matcgx']['data']['mat'][0], 0.6021666526794434 )
+        self.assertEqual( answer['matcgx']['data']['mat'][1], 0.6021666526794434 )
 
         # Modified
-        answer = self.mili.query('matcgx', 'mat', labels = 1, states = 3, write_data = v1 )
+        answer = self.mili.query('matcgx', 'mat', labels = 1, states = [3,4], write_data = v1 )
         self.assertEqual( answer['matcgx']['data']['mat'][0], 5.5 )
+        self.assertEqual( answer['matcgx']['data']['mat'][1], 4.5 )
 
         # Back to original
-        answer = self.mili.query('matcgx', 'mat', labels = 1, states = 3, write_data = v2 )
+        answer = self.mili.query('matcgx', 'mat', labels = 1, states = [3,4], write_data = v2 )
         self.assertEqual( answer['matcgx']['data']['mat'][0], 0.6021666526794434 )
+        self.assertEqual( answer['matcgx']['data']['mat'][1], 0.6021666526794434 )
 
     '''
     Testing the modification of a vector state variable

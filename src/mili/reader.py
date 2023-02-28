@@ -530,7 +530,7 @@ class MiliDatabase:
 
     if write_data is not None:
       for queried_name in svar_names:
-        if write_data[queried_name]['layout']['states'] != states:
+        if not np.all( write_data[queried_name]['layout']['states'] == states ):
           raise ValueError( f"When writing data to a database, the write_data must have the same states as the query.")
 
     return svar_names, class_sname, material, labels, states, ips, write_data
