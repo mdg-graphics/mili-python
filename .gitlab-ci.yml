@@ -27,7 +27,7 @@ unit_tests:
         - shell
     script:
         - cd src
-        - srun -n1 -p pdebug python3 -m unittest
+        - srun -N1 -n1 -c8 -p pdebug python3 -m unittest
 
 coverage:
     stage: test
@@ -37,11 +37,11 @@ coverage:
     script:
         - cd src
         - python3 -m coverage --version
-        - srun -n1 python3 -m coverage run -m unittest
+        - srun -N1 -n1 -c8 python3 -m coverage run -m unittest
         # avoid failure if there are not multiple reports
         - python3 -m coverage combine || freturn 0
         - python3 -m coverage xml
-        - python3 -m coverage report --fail-under=$MINIMUM_COVERAGE --omit=mili/grizinterface.py
+        - python3 -m coverage report --fail-under=$MINIMUM_COVERAGE
     artifacts:
         when: always
         paths:

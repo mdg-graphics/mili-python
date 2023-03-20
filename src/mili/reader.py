@@ -789,7 +789,7 @@ def open_database( base : os.PathLike, procs = [], suppress_parallel = False, ex
   if dir_name == '':
     dir_name = os.getcwd()
   if not os.path.isdir( dir_name ):
-    raise ValueError( f"Cannot locate mili file directory {dir_name}.")
+    raise MiliFileNotFoundError( f"Cannot locate mili file directory {dir_name}.")
 
   base = os.path.basename( base )
   afiles = afiles_by_base( dir_name, base, procs )

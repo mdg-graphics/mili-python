@@ -35,6 +35,7 @@ from itertools import chain
 from mili.datatypes import *
 from mili.reader import *
 import numpy.typing as npt
+import traceback
 
 
 def open_griz_interface( base_filename : os.PathLike, procs = [], suppress_parallel = False, experimental = False ):
@@ -52,8 +53,17 @@ def open_griz_interface( base_filename : os.PathLike, procs = [], suppress_paral
   try:
     db = open_database(base_filename, procs, suppress_parallel, experimental, log_validator=False)
     gdb = GrizInterface(db)
-  except:
-    print(f"Error initializing mili-python Griz interface\n")
+  except MiliAParseError as e:
+    print(f"\nMili AFile Parsing Error: {str(e)}")
+    gdb = None
+  except MiliFileNotFoundError as e:
+    print(f"\nMili File Error: {str(e)}")
+    gdb = None
+  except Exception:
+    print(f"\nError initializing mili-python Griz interface. See traceback below:\n")
+    print("======================================================================\n")
+    traceback.print_exc()
+    print("======================================================================\n")
     gdb = None
   return gdb
 
@@ -124,7 +134,6 @@ class GrizInterface:
   def error_check(self):
     """Check if the error flag is set."""
     return self.__error_flag
-
 
   def reload(self) -> None:
     """Reload the state maps for the plot file."""

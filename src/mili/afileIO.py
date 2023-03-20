@@ -47,6 +47,13 @@ from mili.parallel import *
 def getdatamembers( cls ):
   return [ member for member in inspect.getmembers(cls) if not ( inspect.ismethod(member) or member[0].startswith('__') ) ]
 
+class MiliFileNotFoundError(Exception):
+  pass
+
+class MiliAParseError(Exception):
+  pass
+
+
 def afiles_by_base( dir_name, base_filename, proc_whitelist = [] ):
   file_re = re.compile( re.escape(base_filename) + r"(\d*)A$" )
   files = list(filter(file_re.match,os.listdir(dir_name)))
@@ -67,11 +74,8 @@ def afiles_by_base( dir_name, base_filename, proc_whitelist = [] ):
   files = [ file for file in files if proc_from_file(file) not in to_drop ]
 
   if len(files) == 0:
-    raise ValueError(f"No A-files for procs '{', '.join(proc_whitelist)}' with base name '{base_filename}' discovered in {dir_name}!")
+    raise MiliFileNotFoundError(f"No A-files for procs '{', '.join(proc_whitelist)}' with base name '{base_filename}' discovered in {dir_name}!")
   return files
-
-class MiliAParseError(Exception):
-  pass
 
 
 class AFileReader:
@@ -515,7 +519,7 @@ def parse_database( base : os.PathLike, procs = [], suppress_parallel = False, e
   if dir_name == '':
     dir_name = os.getcwd()
   if not os.path.isdir( dir_name ):
-    raise ValueError( f"Cannot locate mili file directory {dir_name}.")
+    raise MiliFileNotFoundError( f"Cannot locate mili file directory {dir_name}.")
   base = os.path.basename( base )
   afiles = afiles_by_base( dir_name, base, procs )
   proc_bases = [ afile[:-1] for afile in afiles ] # drop the A to get each processes base filename for A,T, and S files
