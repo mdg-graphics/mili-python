@@ -95,11 +95,54 @@ class VectorsInVectorArrays(unittest.TestCase):
     def setUp( self ):
         self.mili = reader.open_database( VectorsInVectorArrays.file_name, suppress_parallel = True )
 
-    def test_query( self ):
+    def test_query_scalar_in_vec_array(self):
+        """
+        Tests when the vector array has form [stress(vector), eps(scalar)].
+        Verifies that the scalar can be correctly queried
+        """
         result = self.mili.query( 'eps', 'shell', labels = [1], states = [2], ips = [1])
         self.assertAlmostEqual(result['eps']['data']['1shell_mmsvn_rec'][0][0][0], 2.3293568e-02 )
         result = self.mili.query( 'eps', 'shell', labels = [1], states = [2], ips = [2])
         self.assertAlmostEqual(result['eps']['data']['1shell_mmsvn_rec'][0][0][0], 7.1215495e-03 )
+    
+    def test_query_vector_in_vec_array(self):
+        """
+        Tests that the scalar components of a vector can be queried inside a vector array.
+        """
+        result = self.mili.query( 'sy', 'shell', labels = [24], states = [10], ips = [1])
+        self.assertAlmostEqual(result['sy']['data']['1shell_mmsvn_rec'][0][0][0], -2.20756815e-03 )
+
+        result = self.mili.query( 'sy', 'shell', labels = [24], states = [10], ips = [2])
+        self.assertAlmostEqual(result['sy']['data']['1shell_mmsvn_rec'][0][0][0], 1.47148373e-03 )
+
+        result = self.mili.query( 'sy', 'shell', labels = [24], states = [10])
+        self.assertAlmostEqual(result['sy']['data']['1shell_mmsvn_rec'][0][0][0], -2.20756815e-03 )
+        self.assertAlmostEqual(result['sy']['data']['1shell_mmsvn_rec'][0][0][1], 1.47148373e-03 )
+
+        result = self.mili.query( 'syz', 'shell', labels = [24], states = [10], ips = [1])
+        self.assertAlmostEqual(result['syz']['data']['1shell_mmsvn_rec'][0][0][0], -4.79422946e-04 )
+
+        result = self.mili.query( 'syz', 'shell', labels = [24], states = [10], ips = [2])
+        self.assertAlmostEqual(result['syz']['data']['1shell_mmsvn_rec'][0][0][0], 2.56596337e-04 )
+
+        result = self.mili.query( 'syz', 'shell', labels = [24], states = [10])
+        self.assertAlmostEqual(result['syz']['data']['1shell_mmsvn_rec'][0][0][0], -4.79422946e-04 )
+        self.assertAlmostEqual(result['syz']['data']['1shell_mmsvn_rec'][0][0][1], 2.56596337e-04 )
+
+        result = self.mili.query('stress', 'shell', labels = [15], states = [10], ips = 1)
+        STRESS = np.array([ [ -2.1037722472e-03,
+                              -2.4459683336e-03,
+                              1.1138570699e-05,
+                              2.3842934752e-04,
+                              -4.1395323933e-05,
+                              2.2738018743e-05 ] ], dtype = np.float32 )
+        np.testing.assert_equal( result['stress']['data']['1shell_mmsvn_rec'][0,:,:], STRESS )
+
+        # Test to make sure these run without exceptions
+        result = self.mili.query('stress', 'shell', labels = [15], states = [10], ips = 2)
+        result = self.mili.query('stress', 'shell', labels = [15], states = [10])
+        result = self.mili.query('stress[sx]', 'shell', labels = [15], states = [10])
+        result = self.mili.query('stress[syz]', 'shell', labels = [15], states = [10])
 
 class TestOpenDatabase(unittest.TestCase):
     def test_open_d3samp6_serial( self ):

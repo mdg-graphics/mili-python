@@ -206,6 +206,7 @@ class Subrecord:
   svar_ordinal_offsets : np.ndarray = np.empty([0], dtype = np.int64)
   svar_byte_offsets : np.ndarray = np.empty([0], dtype = np.int64)
   srec_fmt_id: int = 0
+  svar_depth: int = 1
 
   # def __repr__( self ) -> str:
   #   r = reprlib.Repr()
@@ -214,11 +215,103 @@ class Subrecord:
 
   def scalar_svar_coords( self, aggregate_match, scalar_svar_name ):
     coords = []
+
     for idx, (svar_name, svar_comps) in enumerate( zip(self.svar_names, self.svar_comp_layout) ):
-      matches = [ ( idx, self.svar_comp_offsets[idx][jdx] ) for jdx, svar in enumerate(svar_comps) if svar == scalar_svar_name ]
+      matches = [ ( idx, self.svar_comp_offsets[idx][jdx], 0 ) for jdx, svar in enumerate(svar_comps) if svar == scalar_svar_name ]
       if ( svar_name == aggregate_match or aggregate_match == "" ) and len( matches ) > 0:
         coords.append( matches )
+
+      # Handle vectors inside vector arrays
+      if self.svar_depth > 2:
+        temp_coords = []
+        for jdx, comp_svar_name in enumerate(svar_comps):
+          comp_svar_idx = self.svars[idx].comp_names.index( comp_svar_name )
+          comp_svar = self.svars[idx].svars[comp_svar_idx]
+          matches = [ ( idx, self.svar_comp_offsets[idx][jdx], kdx ) for kdx, svar in enumerate(comp_svar.comp_names) if svar == scalar_svar_name ]
+          if ( comp_svar_name == aggregate_match or aggregate_match == "" ) and len( matches ) > 0:
+            temp_coords.append( matches )
+        if len(temp_coords) > 0:
+          # Flatten list of tuples and add to coords
+          coords.append([coord for sublist in temp_coords for coord in sublist])
+
     return np.array( *coords )
+  
+  def calculate_memory_offsets( self, match_aggregate_svar: str, svars_to_query: List[str], ordinals: npt.ArrayLike, matching_int_points: dict ):
+    """Calculate the memory offsets into the subrecord for the passed in ordinals"""
+    #  determine if any of the queried svar components are in the StateRecord.. and extract only the comps we're querying for
+    # col 0 is supposed to be the svar, col 2 is supposed to be the comp in the svar for agg svars
+    # TODO: technically we can arbitrarily nest svars, this really only accounts for a two-deep nesting, same with the srec.svar_comp_layout...
+    #        also we're searching by svar sname which isn't technically incorrect, but could become slow if many svars are in subrecs
+    qd_svar_comps = np.empty([0,3],dtype=np.int64)
+    # TODO : remove special stress/strain handling when dyna/diablo aggregate them appropriately
+    match_aggregate_svar = '' if match_aggregate_svar in ('stress','strain') else match_aggregate_svar
+    for svar in svars_to_query:
+      svar_coords = self.scalar_svar_coords( match_aggregate_svar, svar.name )
+      ipts = matching_int_points.get( svar.name, [] )
+      if len( ipts ) > 0:
+        svar_coords = svar_coords[ ipts ]
+      qd_svar_comps = np.concatenate( ( qd_svar_comps, svar_coords ), axis = 0 )
+
+    # at this point we use the StateRecord mo_blocks to find which block each label belongs to using a bining algorithym from numpy
+    #   we have [start1, stop1, start2, stop2, etc], but digitize operates as [ start1, start2, start3, etc...] where start2 = stop1
+    #   can't just ::2 the blocks and use that to digitize, since we need to exclude labels falling OUTSIDE the upper limit
+    # this is currently where basically ALL the time cost for calculating labels/indices for a query
+    #   and there isn't much to do to improve performance at the python level unless there is a better numpy/pandas algo to apply
+    #   all labels will be in bins, but only odd # bins are actual bins, even bins are between the block ranges so mask to only grab rows with odd bins
+
+    # *** THE ORDINAL BLOCKS MUST BE MONOTONICALLY INCREASING FOR THIS TO WORK ***
+    #  since they denote local ordinals and define the srec label layout this *should* always be the case
+    # ... and yes this things falling into the first bin return index 1, essentially they return the first index greater than them
+    blocks_of_ordinals = np.digitize( ordinals, self.ordinal_blocks )
+
+    # for each ordinal we have, which block does that ordinal fall into from the set of blocks the srec has
+    # a mask that is true only for odd-index blocks, which are those defining the ranges of ordinals that belong to the srec
+    # this is the same size as srec_ordinal_bins and ordinals
+    in_srec = ( blocks_of_ordinals & 0x1 ).astype( bool )
+
+    # each ordinal for queried labels that is in the subrecord, using these
+    #  to index the label set for the class should give the correct set of labels, in the correct order
+    #  for the result
+    ordinals_in_srec = ordinals[ in_srec ]
+
+    # for each ordinal that is in the subrecord, which block is it in
+    # this gives the index into the list of blocks (for the current srec) that the lower bound of the block range is located at
+    indices_of_blocks_of_ordinals_in_srec = blocks_of_ordinals[ in_srec ] - 1 # subtract one to get the index of the starting ordinal of the block instead of ending ordinal
+
+    # for each ordinal in the srec, subtract starting range of that block
+    # for each ordinal this gives the location of that ordinal in the block that it lies in
+    block_local_indices_of_ordinals_in_srec = (ordinals_in_srec - self.ordinal_blocks[ indices_of_blocks_of_ordinals_in_srec ])
+
+    # take the location of each ordinal relative to the block it lies in and add the cumsum of the block counts of all previous blocks in the srec
+    # to give the location of the ordinal when the blocks are densely-packed to form the srec
+    dense_index_of_ordinals_in_srec = block_local_indices_of_ordinals_in_srec + self.ordinal_block_offsets[ (indices_of_blocks_of_ordinals_in_srec // 2) ]
+
+    # this relates the mesh entities to the srec as it will be laid out in memory, we still need to get only the svars we care about from the srec,
+    # so additional components for each of the above mesh-related indices is required
+    # this latter step might be able to be simplified since the set of srec-local svar-offsets to be queried for each mesh entity associated with
+    # the srec is identical for object ordering. result ordering complicates things and is why we handle both cases by calculating all the srec-local
+    # memory locations we'll be pulling data from
+
+    srec_memory_offsets = np.empty( [ dense_index_of_ordinals_in_srec.size, qd_svar_comps.shape[0] ], dtype = np.int64 )
+    # we set the first column of the memory offsets we'll be querying for this srec for this query to the dense indices of the mesh entity locations
+    srec_memory_offsets[:,:] = 0
+    srec_memory_offsets[:,0] = dense_index_of_ordinals_in_srec
+
+    # we then loop backward over the set of individual memory locations (where we pull the atomic values from, often scalars but also can be arrays, regardless
+    #  they're the smallest unit we deal with in the database, hence "atoms"), calculating the atom offsets from the base label offset
+    #  this is easier to understand in the object-ordered case, where the mesh-entity dense location is multiplied by the total size of the srec svars for each label
+    #  that gives us the actual memory offset of the data for this particular mesh-entity, then we add the offset for the specific state-variable, and
+    #  finally for the specific term in that state variable ( for aggregate state variables, otherwise that last offset is 0 ( for all scalar terms especially ))
+
+    # we work from the last column / svar to the first the first contains the ordinal info needed to compute the rest (in the RESULT organization case.. so we just do the same in both cases)
+    if self.organization == Subrecord.Org.OBJECT:
+      for idx_col, comp in zip( srec_memory_offsets.T[::-1,:], qd_svar_comps[::-1,:]):
+        idx_col[:] = srec_memory_offsets[:,0] * self.atoms_per_label + self.svar_atom_offsets[ comp[0] ] + comp[1] + comp[2]
+    elif self.organization == Subrecord.Org.RESULT:
+      for idx_col, comp in zip( srec_memory_offsets.T[::-1,:], qd_svar_comps[::-1,:]):
+        idx_col[:] = self.svar_atom_offsets[ comp[0] ] * self.total_ordinal_count + self.svar_atom_lengths[ comp[0] ] * srec_memory_offsets[:,0] + comp[1]
+  
+    return srec_memory_offsets, ordinals_in_srec
 
   # right now we're assuming we have the ordinals, we could add bounds checking as a debug version, or auto-filter for parallel versions
   # we're also assuming the write_data is filtered appropriately so that only the data being written out to this procs database is included
