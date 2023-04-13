@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: (MIT)
 import re
 import toml
 from setuptools import setup, find_packages

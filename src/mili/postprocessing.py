@@ -1,29 +1,5 @@
 """
-Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
- Produced at the Lawrence Livermore National Laboratory. Written by
- William Tobin (tobin6@llnl.hov), Kevin Durrenberger (durrenberger1@llnl.gov),
- and Ryan Hathaway (hathaway6@llnl.gov).
- CODE-OCEC-16-056.
- All rights reserved.
-
- This file is part of Mili. For details, see
- https://rzlc.llnl.gov/gitlab/mdg/mili/mili-python/. For read access to this repo
- please contact the authors listed above.
-
- Our Notice and GNU Lesser General Public License.
-
- This program is free software; you can redistribute it and/or modify
- it under the terms of the GNU General Public License (as published by
- the Free Software Foundation) version 2.1 dated February 1999.
-
- This program is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the IMPLIED WARRANTY OF
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the terms
- and conditions of the GNU General Public License for more details.
-
- You should have received a copy of the GNU Lesser General Public License
- along with this program; if not, write to the Free Software Foundation,
- Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+SPDX-License-Identifier: (MIT)
 """
 
 from typing import *

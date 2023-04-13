@@ -670,3 +670,16 @@ array([ 65,  69,  73,  77,  81,  85,  89,  93,  97, 101, 105, 109, 113,
 ```
 
 # Development Notes
+
+# License
+----------------
+
+Mili Python Reader is distributed under the terms of both the MIT license. 
+
+All new contributions must be made under both the MIT license.
+
+See [LICENSE-MIT](https://github.com/mdg/mili-python/LICENSE)
+
+SPDX-License-Identifier: (Apache-2.0 OR MIT)
+
+LLNL-CODE-838121
