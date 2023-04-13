@@ -221,33 +221,21 @@ class MiliDatabase:
       srec : Subrecord
       # add all svars to srec
       srec.svars = [ self.__afile.dirs[DirectoryDecl.Type.STATE_VAR_DICT][svar_name] for svar_name in srec.svar_names ]
-      # add srec to list of srecs for reach svar and comp_svar and comp_comp_svar in the srec
+
+      # For each svar in this subrecord add all nested svars to subrecord and initialize layout of component svars
+      srec.svar_comp_layout = []
       for svar in srec.svars:
-        svar.srecs.append(srec)
-        if len(svar.svars) > 0:
-          srec.svar_depth = 2
-          for comp_svar in svar.svars:
-            comp_svar.srecs.append(srec)
-            if len(comp_svar.svars) > 0:
-              srec.svar_depth = 3
-              for comp_comp_svar in comp_svar.svars:
-                comp_comp_svar.srecs.append(srec)
+        # nested svars
+        nested_svars = svar.recursive_svars
+        for nested_svar in nested_svars:
+          nested_svar.srecs.append(srec)
+        # component svars
+        srec.svar_comp_layout += svar.comp_layout
+
       srec.svar_atom_lengths = np.fromiter( (svar.atom_qty for svar in srec.svars), dtype = np.int64 )
       srec.svar_atom_offsets = np.zeros( srec.svar_atom_lengths.size, dtype = np.int64 )
       srec.svar_atom_offsets[1:] = srec.svar_atom_lengths.cumsum()[:-1]
       srec.atoms_per_label = sum( srec.svar_atom_lengths )
-
-      svar_comp_layout = []
-      for svar in srec.svars:
-        if svar.agg_type == StateVariable.Aggregation.SCALAR:
-          svar_comp_layout.append( [ svar.name ] )
-        elif svar.agg_type == StateVariable.Aggregation.ARRAY:
-          svar_comp_layout.append( [ svar.name ] * np.prod(svar.dims) )
-        elif svar.agg_type == StateVariable.Aggregation.VECTOR:
-          svar_comp_layout.append( svar.comp_names )
-        else:
-          svar_comp_layout.append( svar.comp_names * np.prod(svar.dims) )
-      srec.svar_comp_layout = svar_comp_layout
 
       srec.svar_comp_offsets = []
       for svar_comp in srec.svar_comp_layout:

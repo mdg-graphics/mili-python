@@ -45,6 +45,26 @@ from numpy.core.fromnumeric import prod
 # * imports
 from typing import *
 
+def flatten( iterable ):
+  """Helper function to flatten lists and tuples.
+
+  NOTE: Will not flatten a dictionary. Only list, tuple, and set.
+  NOTE: Will recur only to the depth limit set by the environment.
+  """
+  result = []
+  for item in iterable:
+    if isinstance(item, (list,tuple,set)):
+      result.extend(flatten(item))
+    elif isinstance(item, str):
+      result.append(item)
+    else:
+      try:
+        iterator = iter(item)
+        result.extend(flatten(iter))
+      except TypeError:
+        result.append(item)
+  return result
+
 class MiliType(IntEnum):
   M_INVALID = 0
   M_STRING = 1
@@ -157,6 +177,30 @@ class StateVariable:
   #   return r.repr(self)
 
   @property
+  def recursive_names(self):
+    """Recusively gather the names of all svars all the way down"""
+    return [self.name] + flatten([sv.recursive_names for sv in self.svars])
+
+  @property
+  def recursive_svars(self):
+    """Recusively gather the nested svars all the way down"""
+    return [self] + flatten([sv.recursive_svars for sv in self.svars])
+  
+  @property
+  def comp_layout(self):
+    """Get layout of component state variables for this svar."""
+    comp_layout = []
+    if self.agg_type == StateVariable.Aggregation.SCALAR:
+      comp_layout.append( [self.name] )
+    elif self.agg_type == StateVariable.Aggregation.ARRAY:
+      comp_layout.append( [self.name] * np.prod(self.dims) )
+    elif self.agg_type == StateVariable.Aggregation.VECTOR:
+      comp_layout.append( flatten([sv.comp_layout for sv in self.svars if sv != self]) )
+    else:
+      comp_layout.append( flatten([sv.comp_layout for sv in self.svars if sv != self] * np.prod(self.dims)) )
+    return comp_layout
+
+  @property
   def comp_titles( self ):
     return [ ssvar.title for ssvar in self.svars ]
 
@@ -206,7 +250,6 @@ class Subrecord:
   svar_ordinal_offsets : np.ndarray = np.empty([0], dtype = np.int64)
   svar_byte_offsets : np.ndarray = np.empty([0], dtype = np.int64)
   srec_fmt_id: int = 0
-  svar_depth: int = 1
 
   # def __repr__( self ) -> str:
   #   r = reprlib.Repr()
@@ -215,34 +258,17 @@ class Subrecord:
 
   def scalar_svar_coords( self, aggregate_match, scalar_svar_name ):
     coords = []
-
     for idx, (svar_name, svar_comps) in enumerate( zip(self.svar_names, self.svar_comp_layout) ):
-      matches = [ ( idx, self.svar_comp_offsets[idx][jdx], 0 ) for jdx, svar in enumerate(svar_comps) if svar == scalar_svar_name ]
+      matches = [ ( idx, self.svar_comp_offsets[idx][jdx] ) for jdx, svar in enumerate(svar_comps) if svar == scalar_svar_name ]
       if ( svar_name == aggregate_match or aggregate_match == "" ) and len( matches ) > 0:
         coords.append( matches )
-
-      # Handle vectors inside vector arrays
-      if self.svar_depth > 2:
-        temp_coords = []
-        for jdx, comp_svar_name in enumerate(svar_comps):
-          comp_svar_idx = self.svars[idx].comp_names.index( comp_svar_name )
-          comp_svar = self.svars[idx].svars[comp_svar_idx]
-          matches = [ ( idx, self.svar_comp_offsets[idx][jdx], kdx ) for kdx, svar in enumerate(comp_svar.comp_names) if svar == scalar_svar_name ]
-          if ( comp_svar_name == aggregate_match or aggregate_match == "" ) and len( matches ) > 0:
-            temp_coords.append( matches )
-        if len(temp_coords) > 0:
-          # Flatten list of tuples and add to coords
-          coords.append([coord for sublist in temp_coords for coord in sublist])
-
     return np.array( *coords )
   
   def calculate_memory_offsets( self, match_aggregate_svar: str, svars_to_query: List[str], ordinals: npt.ArrayLike, matching_int_points: dict ):
     """Calculate the memory offsets into the subrecord for the passed in ordinals"""
     #  determine if any of the queried svar components are in the StateRecord.. and extract only the comps we're querying for
     # col 0 is supposed to be the svar, col 2 is supposed to be the comp in the svar for agg svars
-    # TODO: technically we can arbitrarily nest svars, this really only accounts for a two-deep nesting, same with the srec.svar_comp_layout...
-    #        also we're searching by svar sname which isn't technically incorrect, but could become slow if many svars are in subrecs
-    qd_svar_comps = np.empty([0,3],dtype=np.int64)
+    qd_svar_comps = np.empty([0,2],dtype=np.int64)
     # TODO : remove special stress/strain handling when dyna/diablo aggregate them appropriately
     match_aggregate_svar = '' if match_aggregate_svar in ('stress','strain') else match_aggregate_svar
     for svar in svars_to_query:
@@ -306,7 +332,7 @@ class Subrecord:
     # we work from the last column / svar to the first the first contains the ordinal info needed to compute the rest (in the RESULT organization case.. so we just do the same in both cases)
     if self.organization == Subrecord.Org.OBJECT:
       for idx_col, comp in zip( srec_memory_offsets.T[::-1,:], qd_svar_comps[::-1,:]):
-        idx_col[:] = srec_memory_offsets[:,0] * self.atoms_per_label + self.svar_atom_offsets[ comp[0] ] + comp[1] + comp[2]
+        idx_col[:] = srec_memory_offsets[:,0] * self.atoms_per_label + self.svar_atom_offsets[ comp[0] ] + comp[1]
     elif self.organization == Subrecord.Org.RESULT:
       for idx_col, comp in zip( srec_memory_offsets.T[::-1,:], qd_svar_comps[::-1,:]):
         idx_col[:] = self.svar_atom_offsets[ comp[0] ] * self.total_ordinal_count + self.svar_atom_lengths[ comp[0] ] * srec_memory_offsets[:,0] + comp[1]
