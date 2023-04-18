@@ -215,30 +215,26 @@ result = db.query('nodpos[ux]', 'node')
 
 The return format for the above examples is:
 ```python
-result = { 'nodpos[ux]' : 
-           { 'layout' : { 'state' : <numpy_array_of_states>
-                          <srec_with_nodpos> : <numpy_array_of_labels>,
-                          ...
-                          <srec_with_nodpos> : <numpy_array_of_labels> } 
-           },
-           { 'data' : { <srec_with_nodpos> : <numpy_multidim_array_of_data>,
-                         ...
-                        <srec_with_nodpos> : <numpy_multidim_array_of_data> }
-           }
-         }
+result = {
+    'nodpos[ux]' : {
+        'layout' : {
+            'states'  : <numpy_array_of_states>
+            'labels' : <numpy_array_of_labels>
+        }
+        'data': <numpy_multidim_array_of_data>
+    },
+}
 ```
 **Note:** for parallel databases, the result data for each rank is contained in a top-level list.
-
-**Note:** often only a single `<srec>` will be returned, but since mili allows multiple subrecords to contain the same state variables, we return all which match the given query criteria.
 
 ##### Getting data out of the result dictionary
 
 The data array is indexed with tuples of the form `(state_index, label_index, scalar_index)`. To be clear the `state_index` and `label_index` are the indices of the state and label in the list of states and list of labels passed to query function call, which is why these are also returned in the 'layout' data since those query arguments are optional. Thus to find the indices for state `T` and node label `N`, we need to:
 ```python
-sidx = np.where(T == result['nodpos[ux]']['layout']['state'])
-nidx = np.where(N == result['noppos[ux]']['layout'][<srec>])
+sidx = np.where(T == result['nodpos[ux]']['layout']['states'])
+nidx = np.where(N == result['noppos[ux]']['layout']['labels])
 # the above return size-1 numpy arrays (assuming they succeed)
-N_data_at_T = result['nodpos[ux]']['data'][<srec>][sidx[0], nidx[0],:]
+N_data_at_T = result['nodpos[ux]']['data'][sidx[0], nidx[0],:]
 ```
 **Note**: if you only need data for a single node or for single state, format the query so only that data is returned rather than querying large amounts of data and indexing into it as above.
 

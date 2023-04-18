@@ -272,7 +272,7 @@ class MiliDatabase:
   def mesh_dimensions(self) -> int:
     """Getter for Mesh Dimensions."""
     return self.__mesh_dim
-  
+
   def class_names(self):
     """Get for all class names in the problems."""
     return list(self.__MO_class_data.keys())
@@ -535,7 +535,6 @@ class MiliDatabase:
     : param write_data : optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
                    then modify the values desired, then query again with the modified result in this param
     '''
-
     # normalize arguments to expected types / default values
     svar_names, class_sname, material, labels, states, ips, write_data = self.__init_query_parameters( svar_names, class_sname, material, labels, states, ips, write_data )
 
@@ -545,7 +544,7 @@ class MiliDatabase:
 
     res = dict.fromkeys( svar_names )
     for ikey in res.keys():
-      res[ikey] = { 'data' : {}, 'layout' : { 'states' : states } }
+      res[ikey] = { 'data' : {}, 'layout' : { 'states' : states,  'labels' : np_empty( np.int32 ) } }
 
     # for parallel operation it will often be the case a specific file doesn't have any labels
     labels_of_class = self.__labels.get( class_sname, np_empty(np.int32) )
@@ -594,11 +593,10 @@ class MiliDatabase:
       if write_data is not None and ordinals.size != labels.size:
         # if we don't have all the labels queried and we're writing data, we potentially need
         #  to filter for the subset of the labels we *do* have locally
-        for srec in srecs_to_query:
-          local_write_labels = labels_of_class[ ordinals ]
-          rows_to_write = np.where( np.isin( local_write_labels,  filtered_write_data[queried_name]['layout'][srec.name] ) )[0]
-          filtered_write_data[queried_name]['layout'][srec.name] = local_write_labels
-          filtered_write_data[queried_name]['data'][srec.name] = filtered_write_data[queried_name]['data'][srec.name][ :, rows_to_write, : ]
+        local_write_labels = labels_of_class[ ordinals ]
+        rows_to_write = np.where( np.isin( local_write_labels,  filtered_write_data[queried_name]['layout']['labels'] ) )[0]
+        filtered_write_data[queried_name]['layout']['labels'] = local_write_labels
+        filtered_write_data[queried_name]['data'] = filtered_write_data[queried_name]['data'][ :, rows_to_write, : ]
 
         # if we're looking for ip data determine which int_points we can get for each svar in each subrec
       matching_int_points = dict()
@@ -621,11 +619,18 @@ class MiliDatabase:
 
         if len( ordinals_in_srec ) > 0:
           if output_object_labels:
-            res[queried_name]['layout'][srec.name] = self.__labels[ class_sname ][ ordinals_in_srec ]
+            res[queried_name]['layout']['labels'] = np.concatenate( ( res[queried_name]['layout']['labels'], self.__labels[ class_sname ][ ordinals_in_srec ] ) )
           else:
-            res[queried_name]['layout'][srec.name] = ordinals_in_srec
+            res[queried_name]['layout']['labels'] = ordinals_in_srec
 
         srec_internal_offsets[srec.name] = srec_memory_offsets
+
+      # Check for any duplcate labels for the result.
+      unique_labels, counts = np.unique( res[queried_name]['layout']['labels'], return_counts=True )
+      if np.any( counts > 1 ):
+        duplicate_labels = unique_labels[ counts > 1 ]
+        raise ValueError((f'Invalid database: The following labels appear in multiple subrecords for the result "{queried_name}\n"'
+                          f'Labels = {duplicate_labels}'))
 
       # filter out any subrecords we have no labels for
       srecs_to_query = [ srec for srec in srecs_to_query if srec_internal_offsets[srec.name].size != 0 ]
@@ -635,7 +640,7 @@ class MiliDatabase:
       # initialize the results structure for this queried name
       svar_np_dtype = self.__svars[queried_svar_name].data_type.numpy_dtype()
       for srec in srecs_to_query:
-        res[queried_name]['data'][srec.name] = np.empty( [ len(states), *srec_internal_offsets[srec.name].shape ], dtype = svar_np_dtype )
+        res[queried_name]['data'] = np.empty( [ len(states), *srec_internal_offsets[srec.name].shape ], dtype = svar_np_dtype )
 
       # Determine which states (of those requested) appear in each of the state files.
       # This way we can open each file only once and process all the states that appear in it
@@ -656,19 +661,24 @@ class MiliDatabase:
             sidx = np.where(states == state)[0][0]
             state_offset = self.__smaps[state-1].file_offset + 8
 
+            # Shape of the result array: Tuple with form (state_cnt, label_cnt, comp_cnt)
+            # We want to use comp_cnt to initialize var data so that numpy can concatenate arrays
+            result_shape = res[queried_name]['data'].shape
+            var_data = np.empty( [ 0, result_shape[2] ] , svar_np_dtype)
             for srec in srecs_to_query:
               srec_offsets = srec_internal_offsets[srec.name]
               state_file.seek( state_offset + srec.state_byte_offset )
               byte_read_data = state_file.read( srec.byte_size )
 
               if filtered_write_data is not None:
-                var_data, byte_write_data = srec.extract_ordinals( byte_read_data, srec_offsets, write_data = filtered_write_data[ queried_name ][ 'data' ][ srec.name ][ sidx,:,: ] )
+                srec_var_data, byte_write_data = srec.extract_ordinals( byte_read_data, srec_offsets, write_data = filtered_write_data[ queried_name ][ 'data' ][ sidx,:,: ] )
                 state_file.seek( state_offset + srec.state_byte_offset )
                 state_file.write( byte_write_data )
               else:
-                var_data, _ = srec.extract_ordinals( byte_read_data, srec_offsets )
+                srec_var_data, _ = srec.extract_ordinals( byte_read_data, srec_offsets )
+            var_data = np.concatenate( ( var_data, srec_var_data ), axis=0 )
 
-              res[ queried_name ][ "data" ][ srec.name ][ sidx,:,: ] = var_data
+            res[ queried_name ][ "data" ][ sidx, :, : ] = var_data
 
     return res
 

@@ -20,12 +20,12 @@ class NonsequentialMOBlocks(unittest.TestCase):
     def test_serial( self ):
         mili = reader.open_database( self.file_name, procs = [7], suppress_parallel = True )
         result = mili.query( 'sx', 'brick', labels = [228], states = [10])
-        self.assertAlmostEqual(result['sx']['data']['7hex_mmsvn_rec'][0][0][0], 20.355846, delta = 1e-6)
+        self.assertAlmostEqual(result['sx']['data'][0][0][0], 20.355846, delta = 1e-6)
 
     def test_parallel( self ):
         mili = reader.open_database( self.file_name )
         result = mili.query( 'sx', 'brick', labels = [228], states = [10] )
-        self.assertAlmostEqual(result[7]['sx']['data']['7hex_mmsvn_rec'][0][0][0], 20.355846, delta = 1e-6 )
+        self.assertAlmostEqual(result[7]['sx']['data'][0][0][0], 20.355846, delta = 1e-6 )
 
 class NonMonotonicallyIncreasingMOBlocks(unittest.TestCase):
     def __init__(self, *args, **kwargs):
@@ -35,7 +35,7 @@ class NonMonotonicallyIncreasingMOBlocks(unittest.TestCase):
     def test_query( self ):
         mili = reader.open_database( self.file_name, suppress_parallel = True )
         result = mili.query( 'refrcx', 'node', labels = [67], states = [5] )
-        self.assertAlmostEqual(result['refrcx']['data']['reaction_force'][0][0][0], 749.95404, delta = 1e-6 )
+        self.assertAlmostEqual(result['refrcx']['data'][0][0][0], 749.95404, delta = 1e-6 )
 
 class NonsequentialMOBlocksTwo(unittest.TestCase):
     file_name = os.path.join(dir_path,'data','serial','fdamp1','fdamp1.plt')
@@ -45,9 +45,9 @@ class NonsequentialMOBlocksTwo(unittest.TestCase):
 
     def test_refrcx( self ):
         result = self.mili.query( 'refrcx', 'node', labels = [6], states = [1,2,3])
-        self.assertEqual(result['refrcx']['data']['reaction_force'][0][0][0],          0.000000 )
-        self.assertAlmostEqual(result['refrcx']['data']['reaction_force'][1][0][0], -195.680618, delta = 1e-6 )
-        self.assertAlmostEqual(result['refrcx']['data']['reaction_force'][2][0][0], -374.033813, delta = 1e-6 )
+        self.assertEqual(result['refrcx']['data'][0][0][0],          0.000000 )
+        self.assertAlmostEqual(result['refrcx']['data'][1][0][0], -195.680618, delta = 1e-6 )
+        self.assertAlmostEqual(result['refrcx']['data'][2][0][0], -374.033813, delta = 1e-6 )
 
 class DoublePrecisionNodpos(unittest.TestCase):
     file_name = os.path.join(dir_path,'data','serial','beam_udi','beam_udi.plt')
@@ -57,9 +57,9 @@ class DoublePrecisionNodpos(unittest.TestCase):
 
     def test_nodpos( self ):
         result = self.mili.query( 'nodpos', 'node', labels = [6], states = [3])
-        self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][0], 499.86799237808793, delta = 1e-6 )
-        self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][1], 100.00000000000000, delta = 1e-6 )
-        self.assertAlmostEqual(result['nodpos']['data']['node'][0][0][2], 198.08431992103525, delta = 1e-6 )
+        self.assertAlmostEqual(result['nodpos']['data'][0][0][0], 499.86799237808793, delta = 1e-6 )
+        self.assertAlmostEqual(result['nodpos']['data'][0][0][1], 100.00000000000000, delta = 1e-6 )
+        self.assertAlmostEqual(result['nodpos']['data'][0][0][2], 198.08431992103525, delta = 1e-6 )
 
 class VectorsInVectorArrays(unittest.TestCase):
     file_name = os.path.join(dir_path,'data','serial','d3samp4','d3samp4.plt')
@@ -73,33 +73,33 @@ class VectorsInVectorArrays(unittest.TestCase):
         Verifies that the scalar can be correctly queried
         """
         result = self.mili.query( 'eps', 'shell', labels = [1], states = [2], ips = [1])
-        self.assertAlmostEqual(result['eps']['data']['1shell_mmsvn_rec'][0][0][0], 2.3293568e-02 )
+        self.assertAlmostEqual(result['eps']['data'][0][0][0], 2.3293568e-02 )
         result = self.mili.query( 'eps', 'shell', labels = [1], states = [2], ips = [2])
-        self.assertAlmostEqual(result['eps']['data']['1shell_mmsvn_rec'][0][0][0], 7.1215495e-03 )
+        self.assertAlmostEqual(result['eps']['data'][0][0][0], 7.1215495e-03 )
     
     def test_query_vector_in_vec_array(self):
         """
         Tests that the scalar components of a vector can be queried inside a vector array.
         """
         result = self.mili.query( 'sy', 'shell', labels = [24], states = [10], ips = [1])
-        self.assertAlmostEqual(result['sy']['data']['1shell_mmsvn_rec'][0][0][0], -2.20756815e-03 )
+        self.assertAlmostEqual(result['sy']['data'][0][0][0], -2.20756815e-03 )
 
         result = self.mili.query( 'sy', 'shell', labels = [24], states = [10], ips = [2])
-        self.assertAlmostEqual(result['sy']['data']['1shell_mmsvn_rec'][0][0][0], 1.47148373e-03 )
+        self.assertAlmostEqual(result['sy']['data'][0][0][0], 1.47148373e-03 )
 
         result = self.mili.query( 'sy', 'shell', labels = [24], states = [10])
-        self.assertAlmostEqual(result['sy']['data']['1shell_mmsvn_rec'][0][0][0], -2.20756815e-03 )
-        self.assertAlmostEqual(result['sy']['data']['1shell_mmsvn_rec'][0][0][1], 1.47148373e-03 )
+        self.assertAlmostEqual(result['sy']['data'][0][0][0], -2.20756815e-03 )
+        self.assertAlmostEqual(result['sy']['data'][0][0][1], 1.47148373e-03 )
 
         result = self.mili.query( 'syz', 'shell', labels = [24], states = [10], ips = [1])
-        self.assertAlmostEqual(result['syz']['data']['1shell_mmsvn_rec'][0][0][0], -4.79422946e-04 )
+        self.assertAlmostEqual(result['syz']['data'][0][0][0], -4.79422946e-04 )
 
         result = self.mili.query( 'syz', 'shell', labels = [24], states = [10], ips = [2])
-        self.assertAlmostEqual(result['syz']['data']['1shell_mmsvn_rec'][0][0][0], 2.56596337e-04 )
+        self.assertAlmostEqual(result['syz']['data'][0][0][0], 2.56596337e-04 )
 
         result = self.mili.query( 'syz', 'shell', labels = [24], states = [10])
-        self.assertAlmostEqual(result['syz']['data']['1shell_mmsvn_rec'][0][0][0], -4.79422946e-04 )
-        self.assertAlmostEqual(result['syz']['data']['1shell_mmsvn_rec'][0][0][1], 2.56596337e-04 )
+        self.assertAlmostEqual(result['syz']['data'][0][0][0], -4.79422946e-04 )
+        self.assertAlmostEqual(result['syz']['data'][0][0][1], 2.56596337e-04 )
 
         result = self.mili.query('stress', 'shell', labels = [15], states = [10], ips = 1)
         STRESS = np.array([ [ -2.1037722472e-03,
@@ -108,7 +108,7 @@ class VectorsInVectorArrays(unittest.TestCase):
                               2.3842934752e-04,
                               -4.1395323933e-05,
                               2.2738018743e-05 ] ], dtype = np.float32 )
-        np.testing.assert_equal( result['stress']['data']['1shell_mmsvn_rec'][0,:,:], STRESS )
+        np.testing.assert_equal( result['stress']['data'][0,:,:], STRESS )
 
         # Test to make sure these run without exceptions
         result = self.mili.query('stress', 'shell', labels = [15], states = [10], ips = 2)
@@ -461,8 +461,8 @@ class SerialSingleStateFile(unittest.TestCase):
         answer = self.mili.query('matcgx', 'mat', labels = [1,2], states = 3 )
         self.assertEqual(answer['matcgx']['layout']['states'][0], 3)
         self.assertEqual(list(answer.keys()), ['matcgx'] )
-        np.testing.assert_equal( answer['matcgx']['layout']['mat'], np.array( [ 1, 2 ], dtype = np.int32) )
-        np.testing.assert_equal( answer['matcgx']['data']['mat'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32) )
+        np.testing.assert_equal( answer['matcgx']['layout']['labels'], np.array( [ 1, 2 ], dtype = np.int32) )
+        np.testing.assert_equal( answer['matcgx']['data'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32) )
 
     '''
     Testing accessing accessing node attributes -> this is a vector component
@@ -471,29 +471,29 @@ class SerialSingleStateFile(unittest.TestCase):
     '''
     def test_node_attributes(self):
         answer = self.mili.query('nodpos[ux]', 'node', labels = 70, states = 3 )
-        self.assertEqual(answer['nodpos[ux]']['layout']['node'][0], 70)
-        self.assertEqual(answer['nodpos[ux]']['data']['node'][0], 0.4330127537250519 )
+        self.assertEqual(answer['nodpos[ux]']['layout']['labels'][0], 70)
+        self.assertEqual(answer['nodpos[ux]']['data'][0], 0.4330127537250519 )
 
         answer = self.mili.query('ux', 'node', labels = 70, states = 3 )
-        self.assertEqual(answer['ux']['layout']['node'][0], 70)
-        self.assertEqual(answer['ux']['data']['node'][0], 0.4330127537250519)
+        self.assertEqual(answer['ux']['layout']['labels'][0], 70)
+        self.assertEqual(answer['ux']['data'][0], 0.4330127537250519)
 
     '''
     Test querying by material name and number:
     '''
     def test_query_material(self):
         answer = self.mili.query('sx', 'brick', material = 2, states = 37 )
-        self.assertEqual(answer['sx']['layout']['2hex_mmsvn_rec'].size, 36)
+        self.assertEqual(answer['sx']['layout']['labels'].size, 36)
 
         answer = self.mili.query('sx', 'brick', material = 'es_12', states = 37 )
-        self.assertEqual(answer['sx']['layout']['2hex_mmsvn_rec'].size, 36)
+        self.assertEqual(answer['sx']['layout']['labels'].size, 36)
 
     '''
     Testing the accessing of a vector, in this case node position
     '''
     def test_state_variable_vector(self):
         answer = self.mili.query('nodpos', 'node', labels = 70, states = 4 )
-        np.testing.assert_equal( answer['nodpos']['data']['node'][0,:,:], np.array( [ [ 0.4330127537250519, 0.2500000596046448, 2.436666965484619 ] ], dtype = np.float32 ) )
+        np.testing.assert_equal( answer['nodpos']['data'][0,:,:], np.array( [ [ 0.4330127537250519, 0.2500000596046448, 2.436666965484619 ] ], dtype = np.float32 ) )
 
     '''
     Testing the modification of a scalar state variable
@@ -502,37 +502,36 @@ class SerialSingleStateFile(unittest.TestCase):
         v1 = { 'matcgx' :
                 { 'layout' :
                     {
-                      'mat' : np.array( [1], dtype = np.int32 ),
+                      'labels' : np.array( [1], dtype = np.int32 ),
                       'states' : np.array( [3,4], dtype = np.int32 )
                     },
-                  'data' : { 'mat' : np.array([ [ [ 5.5 ] ], [ [ 4.5 ] ] ], dtype = np.float32) }
+                  'data' : np.array([ [ [ 5.5 ] ], [ [ 4.5 ] ] ], dtype = np.float32)
                 }
              }
         v2 = { 'matcgx' :
                 { 'layout' :
                     {
-                      'mat' : np.array( [1], dtype = np.int32 ),
+                      'labels' : np.array( [1], dtype = np.int32 ),
                       'states' : np.array( [3,4], dtype = np.int32 )
                     },
-                  'data' :
-                    { 'mat' : np.array([ [ [ 0.6021666526794434 ] ], [ [ 0.6021666526794434 ] ] ], dtype = np.float32) }
+                  'data' :  np.array([ [ [ 0.6021666526794434 ] ], [ [ 0.6021666526794434 ] ] ], dtype = np.float32)
                 }
              }
 
         # Original
         answer = self.mili.query('matcgx', 'mat', labels = 1, states = [3,4] )
-        self.assertEqual( answer['matcgx']['data']['mat'][0], 0.6021666526794434 )
-        self.assertEqual( answer['matcgx']['data']['mat'][1], 0.6021666526794434 )
+        self.assertEqual( answer['matcgx']['data'][0], 0.6021666526794434 )
+        self.assertEqual( answer['matcgx']['data'][1], 0.6021666526794434 )
 
         # Modified
         answer = self.mili.query('matcgx', 'mat', labels = 1, states = [3,4], write_data = v1 )
-        self.assertEqual( answer['matcgx']['data']['mat'][0], 5.5 )
-        self.assertEqual( answer['matcgx']['data']['mat'][1], 4.5 )
+        self.assertEqual( answer['matcgx']['data'][0], 5.5 )
+        self.assertEqual( answer['matcgx']['data'][1], 4.5 )
 
         # Back to original
         answer = self.mili.query('matcgx', 'mat', labels = 1, states = [3,4], write_data = v2 )
-        self.assertEqual( answer['matcgx']['data']['mat'][0], 0.6021666526794434 )
-        self.assertEqual( answer['matcgx']['data']['mat'][1], 0.6021666526794434 )
+        self.assertEqual( answer['matcgx']['data'][0], 0.6021666526794434 )
+        self.assertEqual( answer['matcgx']['data'][1], 0.6021666526794434 )
 
     '''
     Testing the modification of a vector state variable
@@ -541,38 +540,36 @@ class SerialSingleStateFile(unittest.TestCase):
         v1 = { 'nodpos' :
                 { 'layout' :
                     {
-                        'node' : np.array( [ 70, 71 ], dtype = np.int32 ),
+                        'labels' : np.array( [ 70, 71 ], dtype = np.int32 ),
                         'states' : np.array( [4], dtype = np.int32 )
                     },
-                  'data' :
-                    { 'node' : np.array( [ [ [ 5.0, 6.0, 9.0 ], [ 5.1, 6.1, 9.1 ] ] ], dtype = np.float32 ) }
+                  'data' : np.array( [ [ [ 5.0, 6.0, 9.0 ], [ 5.1, 6.1, 9.1 ] ] ], dtype = np.float32 )
                 }
              }
         v2 = { 'nodpos' :
                 { 'layout' :
                     {
-                        'node' : np.array( [ 70, 71 ], dtype = np.int32 ),
+                        'labels' : np.array( [ 70, 71 ], dtype = np.int32 ),
                         'states' : np.array( [4], dtype = np.int32 )
                     },
-                  'data' :
-                    { 'node' : np.array( [ [ [0.4330127537250519, 0.2500000596046448, 2.436666965484619], [0.4330127239227295, 0.2499999850988388, 2.7033333778381348] ] ], dtype = np.float32 ) }
+                  'data' : np.array( [ [ [0.4330127537250519, 0.2500000596046448, 2.436666965484619], [0.4330127239227295, 0.2499999850988388, 2.7033333778381348] ] ], dtype = np.float32 )
                 }
              }
 
         # Before change
         answer = self.mili.query('nodpos', 'node', labels = [70, 71], states = 4 )
-        np.testing.assert_equal( answer['nodpos']['data']['node'][0,0,:], v2['nodpos']['data']['node'][0,0,:] )
-        np.testing.assert_equal( answer['nodpos']['data']['node'][0,1,:], v2['nodpos']['data']['node'][0,1,:] )
+        np.testing.assert_equal( answer['nodpos']['data'][0,0,:], v2['nodpos']['data'][0,0,:] )
+        np.testing.assert_equal( answer['nodpos']['data'][0,1,:], v2['nodpos']['data'][0,1,:] )
 
         # After change
         answer = self.mili.query('nodpos', 'node', labels = [70, 71], states = 4, write_data = v1 )
-        np.testing.assert_equal( answer['nodpos']['data']['node'][0,0,:], v1['nodpos']['data']['node'][0,0,:] )
-        np.testing.assert_equal( answer['nodpos']['data']['node'][0,1,:], v1['nodpos']['data']['node'][0,1,:] )
+        np.testing.assert_equal( answer['nodpos']['data'][0,0,:], v1['nodpos']['data'][0,0,:] )
+        np.testing.assert_equal( answer['nodpos']['data'][0,1,:], v1['nodpos']['data'][0,1,:] )
 
         # Back to original
         answer = self.mili.query('nodpos', 'node', labels = [70, 71],  states = 4, write_data = v2 )
-        np.testing.assert_equal( answer['nodpos']['data']['node'][0,0,:], v2['nodpos']['data']['node'][0,0,:] )
-        np.testing.assert_equal( answer['nodpos']['data']['node'][0,1,:], v2['nodpos']['data']['node'][0,1,:] )
+        np.testing.assert_equal( answer['nodpos']['data'][0,0,:], v2['nodpos']['data'][0,0,:] )
+        np.testing.assert_equal( answer['nodpos']['data'][0,1,:], v2['nodpos']['data'][0,1,:] )
 
     '''
     Testing the modification of a vector component
@@ -581,52 +578,50 @@ class SerialSingleStateFile(unittest.TestCase):
         v1 = { 'nodpos[uz]' :
                 { 'layout' :
                     {
-                        'node' : np.array( [70, 71], dtype = np.int32 ),
+                        'labels' : np.array( [70, 71], dtype = np.int32 ),
                         'states' : np.array( [4], dtype = np.int32 )
                     },
-                  'data' :
-                    { 'node' : np.array( [ [ [9.0], [9.0] ] ], dtype = np.float32 ) }
+                  'data' : np.array( [ [ [9.0], [9.0] ] ], dtype = np.float32 )
                 }
              }
         v2 = { 'nodpos[uz]' :
                 { 'layout' :
                     {
-                        'node' : np.array( [70, 71], dtype = np.int32 ),
+                        'labels' : np.array( [70, 71], dtype = np.int32 ),
                         'states' : np.array( [4], dtype = np.int32 )
                     },
-                  'data' :
-                    { 'node' : np.array( [ [ [2.436666965484619], [2.7033333778381348] ] ], dtype = np.float32 ) }
+                  'data' : np.array( [ [ [2.436666965484619], [2.7033333778381348] ] ], dtype = np.float32 )
                 }
              }
 
         # Before change
         answer = self.mili.query('nodpos[uz]', 'node', labels = [70, 71], states = 4 )
-        self.assertEqual(answer['nodpos[uz]']['data']['node'][0,0,0], 2.436666965484619)
-        self.assertEqual(answer['nodpos[uz]']['data']['node'][0,1,0], 2.7033333778381348)
+        self.assertEqual(answer['nodpos[uz]']['data'][0,0,0], 2.436666965484619)
+        self.assertEqual(answer['nodpos[uz]']['data'][0,1,0], 2.7033333778381348)
 
         # After change
         answer = self.mili.query('nodpos[uz]', 'node', labels = [70, 71], states = 4, write_data = v1 )
-        self.assertEqual(answer['nodpos[uz]']['data']['node'][0,0,0], 9.0)
-        self.assertEqual(answer['nodpos[uz]']['data']['node'][0,1,0], 9.0)
+        self.assertEqual(answer['nodpos[uz]']['data'][0,0,0], 9.0)
+        self.assertEqual(answer['nodpos[uz]']['data'][0,1,0], 9.0)
 
         # Back to original
         answer = self.mili.query('nodpos[uz]', 'node', labels = [70, 71], states = 4, write_data = v2 )
-        self.assertEqual(answer['nodpos[uz]']['data']['node'][0,0,0], 2.436666965484619)
-        self.assertEqual(answer['nodpos[uz]']['data']['node'][0,1,0], 2.7033333778381348)
+        self.assertEqual(answer['nodpos[uz]']['data'][0,0,0], 2.436666965484619)
+        self.assertEqual(answer['nodpos[uz]']['data'][0,1,0], 2.7033333778381348)
 
     '''
     Test accessing a vector array
     '''
     def test_state_variable_vector_array(self):
         answer = self.mili.query('stress', 'beam', labels = 5, states = [21,22], ips = 2 )
-        np.testing.assert_equal( answer['stress']['data']['1beam_mmsvn_rec'][1,:,:], np.array([ [ -1018.4232177734375, -1012.2537231445312, -6.556616085617861e-07, 1015.3384399414062, 0.3263571858406067, -0.32636013627052307 ] ], dtype = np.float32 ) )
+        np.testing.assert_equal( answer['stress']['data'][1,:,:], np.array([ [ -1018.4232177734375, -1012.2537231445312, -6.556616085617861e-07, 1015.3384399414062, 0.3263571858406067, -0.32636013627052307 ] ], dtype = np.float32 ) )
 
     '''
     Test accessing a vector array component
     '''
     def test_state_variable_vector_array_component(self):
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 71, ips = 2 )
-        self.assertEqual(answer['stress[sy]']['data']['1beam_mmsvn_rec'][0,0,0], -5545.70751953125)
+        self.assertEqual(answer['stress[sy]']['data'][0,0,0], -5545.70751953125)
 
     def test_modify_vector_array(self):
         '''
@@ -635,33 +630,31 @@ class SerialSingleStateFile(unittest.TestCase):
         v1 = { 'stress' :
                 { 'layout' :
                     {
-                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'labels' : np.array( [5], dtype = np.int32 ),
                         'states' : np.array( [71], dtype = np.int32 )
                     },
-                  'data' :
-                    { '1beam_mmsvn_rec' : np.array([ [ [ -5547.1025390625, -5545.70751953125, -3.736035978363361e-07, 5546.4052734375, 0.4126972556114197, -0.412697434425354 ] ] ], dtype = np.float32 ) }
+                  'data' : np.array([ [ [ -5547.1025390625, -5545.70751953125, -3.736035978363361e-07, 5546.4052734375, 0.4126972556114197, -0.412697434425354 ] ] ], dtype = np.float32 )
                 }
              }
         v2 = { 'stress' :
                 { 'layout' :
                     {
-                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'labels' : np.array( [5], dtype = np.int32 ),
                         'states' : np.array( [71], dtype = np.int32 )
                     },
-                  'data' :
-                    { '1beam_mmsvn_rec' : np.array([ [ [ 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ] ] ], dtype = np.float32 ) }
+                  'data' : np.array([ [ [ 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ] ] ], dtype = np.float32 )
                 }
              }
         # Before change
         answer = self.mili.query('stress', 'beam', labels = 5, states = 71, ips = 2 )
-        np.testing.assert_equal( answer['stress']['data']['1beam_mmsvn_rec'], v1['stress']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer['stress']['data'], v1['stress']['data'] )
 
         answer = self.mili.query('stress', 'beam', labels = 5, states = 71, ips = 2, write_data = v2 )
-        np.testing.assert_equal( answer['stress']['data']['1beam_mmsvn_rec'], v2['stress']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer['stress']['data'], v2['stress']['data'] )
 
         # Back to original
         answer = self.mili.query('stress', 'beam', labels = 5, states = 71, ips = 2, write_data = v1 )
-        np.testing.assert_equal( answer['stress']['data']['1beam_mmsvn_rec'], v1['stress']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer['stress']['data'], v1['stress']['data'] )
 
     def test_modify_vector_array_component(self):
         '''
@@ -673,45 +666,43 @@ class SerialSingleStateFile(unittest.TestCase):
                         '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
                         'states' : np.array( [71], dtype = np.int32 )
                     },
-                   'data' :
-                    { '1beam_mmsvn_rec' : np.array( [ [ [ -5545.70751953125 ] ] ], dtype = np.float32 ) }
+                   'data' : np.array( [ [ [ -5545.70751953125 ] ] ], dtype = np.float32 )
                  }
              }
         v2 = { 'stress[sy]' :
                  { 'layout' :
                     {
-                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'labels' : np.array( [5], dtype = np.int32 ),
                         'states' : np.array( [71], dtype = np.int32 )
                     },
-                   'data' :
-                    { '1beam_mmsvn_rec' : np.array( [ [ [ 12.0 ] ] ], dtype = np.float32 ) }
+                   'data' : np.array( [ [ [ 12.0 ] ] ], dtype = np.float32 )
                  }
              }
 
         # Before change
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 71, ips = 2 )
-        np.testing.assert_equal( answer['stress[sy]']['data']['1beam_mmsvn_rec'], v1['stress[sy]']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer['stress[sy]']['data'], v1['stress[sy]']['data'] )
 
         # After change
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 71, ips = 2, write_data = v2 )
-        np.testing.assert_equal( answer['stress[sy]']['data']['1beam_mmsvn_rec'], v2['stress[sy]']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer['stress[sy]']['data'], v2['stress[sy]']['data'] )
 
         # Back to original
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 71, ips = 2, write_data = v1 )
-        np.testing.assert_equal( answer['stress[sy]']['data']['1beam_mmsvn_rec'], v1['stress[sy]']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer['stress[sy]']['data'], v1['stress[sy]']['data'] )
 
     def test_query_glob_results(self):
         """
         Test querying for results for M_MESH ("glob") element class.
         """
         answer = self.mili.query("he", "glob", states=[22])
-        self.assertAlmostEqual( answer["he"]["data"]["glob"][0,0,0], 3.0224223, delta=1e-7)
+        self.assertAlmostEqual( answer["he"]["data"][0,0,0], 3.0224223, delta=1e-7)
 
         answer = self.mili.query("bve", "glob", states=[22])
-        self.assertAlmostEqual( answer["bve"]["data"]["glob"][0,0,0], 2.05536485, delta=1e-7)
+        self.assertAlmostEqual( answer["bve"]["data"][0,0,0], 2.05536485, delta=1e-7)
 
         answer = self.mili.query("te", "glob", states=[22])
-        self.assertAlmostEqual( answer["te"]["data"]["glob"][0,0,0], 1629.718, delta=1e-4)
+        self.assertAlmostEqual( answer["te"]["data"][0,0,0], 1629.718, delta=1e-4)
 
 class SerialMutliStateFile(unittest.TestCase):
     file_name = os.path.join(dir_path,'data','serial','mstate','d3samp6.plt_c')
@@ -750,22 +741,21 @@ class SerialMutliStateFile(unittest.TestCase):
         v2 = { 'stress' :
                 { 'layout' :
                     {
-                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'labels' : np.array( [5], dtype = np.int32 ),
                         'states' : np.array( [71], dtype = np.int32 )
                     },
-                  'data' :
-                    { '1beam_mmsvn_rec' : np.array([ [ [ 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ] ] ], dtype = np.float32 ) }
+                  'data' : np.array([ [ [ 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ] ] ], dtype = np.float32 )
                 }
              }
         # Before change
         v1 = self.mili.query('stress', 'beam', labels = 5, states = 71, ips = 2 )
 
         answer = self.mili.query('stress', 'beam', labels = 5, states = 71, ips = 2, write_data = v2 )
-        np.testing.assert_equal( answer['stress']['data']['1beam_mmsvn_rec'], v2['stress']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer['stress']['data'], v2['stress']['data'] )
 
         # Back to original
         answer = self.mili.query('stress', 'beam', labels = 5, states = 71, ips = 2, write_data = v1 )
-        np.testing.assert_equal( answer['stress']['data']['1beam_mmsvn_rec'], v1['stress']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer['stress']['data'], v1['stress']['data'] )
 
     def test_modify_vector_array_component(self):
         '''
@@ -774,11 +764,10 @@ class SerialMutliStateFile(unittest.TestCase):
         v2 = { 'stress[sy]' :
                  { 'layout' :
                     {
-                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'labels' : np.array( [5], dtype = np.int32 ),
                         'states' : np.array( [71], dtype = np.int32 )
                     },
-                   'data' :
-                    { '1beam_mmsvn_rec' : np.array( [ [ [ 12.0 ] ] ], dtype = np.float32 ) }
+                   'data' : np.array( [ [ [ 12.0 ] ] ], dtype = np.float32 )
                  }
              }
 
@@ -787,16 +776,16 @@ class SerialMutliStateFile(unittest.TestCase):
 
         # After change
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 71, ips = 2, write_data = v2 )
-        np.testing.assert_equal( answer['stress[sy]']['data']['1beam_mmsvn_rec'], v2['stress[sy]']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer['stress[sy]']['data'], v2['stress[sy]']['data'] )
 
         # Back to original
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 71, ips = 2, write_data = v1 )
-        np.testing.assert_equal( answer['stress[sy]']['data']['1beam_mmsvn_rec'], v1['stress[sy]']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer['stress[sy]']['data'], v1['stress[sy]']['data'] )
 
     def test_state_variable_vector_array_component(self):
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2 )
         # almost equal, just down to float vs decimal repr
-        self.assertAlmostEqual(answer['stress[sy]']['data']['1beam_mmsvn_rec'][0,0,0], -5373.5317, delta = 1e-4)
+        self.assertAlmostEqual(answer['stress[sy]']['data'][0,0,0], -5373.5317, delta = 1e-4)
 
 '''
 Testing the parallel Mili file version
@@ -1302,7 +1291,7 @@ class ParallelSingleStateFile(unittest.TestCase):
     '''
     def test_state_variable(self):
         answer = self.mili.query( 'matcgx', 'mat', labels = [1,2], states = 3 )
-        np.testing.assert_equal( answer[0]['matcgx']['data']['mat'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32 ) )
+        np.testing.assert_equal( answer[0]['matcgx']['data'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32 ) )
 
     '''
     Testing accessing accessing node attributes -> this is a vector component
@@ -1311,27 +1300,27 @@ class ParallelSingleStateFile(unittest.TestCase):
     '''
     def test_node_attributes(self):
         answer = self.mili.query( 'nodpos[ux]', 'node', labels = 70, states = 3 )
-        self.assertEqual( answer[3]['nodpos[ux]']['data']['node'][0,0,0], 0.4330127537250519)
+        self.assertEqual( answer[3]['nodpos[ux]']['data'][0,0,0], 0.4330127537250519)
         answer = self.mili.query( 'ux', 'node', labels = 70, states = 3 )
-        self.assertEqual( answer[3]['ux']['data']['node'][0,0,0], 0.4330127537250519)
+        self.assertEqual( answer[3]['ux']['data'][0,0,0], 0.4330127537250519)
 
     '''
     Testing the accessing of a vector, in this case node position
     '''
     def test_state_variable_vector(self):
         answer = self.mili.query('nodpos', 'node', labels = 70, states = 4 )
-        np.testing.assert_equal(answer[3]['nodpos']['data']['node'][0,0,:], np.array( [0.4330127537250519, 0.2500000596046448, 2.436666965484619], dtype = np.float32 ) )
+        np.testing.assert_equal(answer[3]['nodpos']['data'][0,0,:], np.array( [0.4330127537250519, 0.2500000596046448, 2.436666965484619], dtype = np.float32 ) )
 
     '''
     Test querying by material name and number:
     '''
     def test_query_material(self):
         answer = self.mili.query('sx', 'brick', material = 2, states = 37 )
-        num_labels = sum( pansw['sx']['layout'].get( '2hex_mmsvn_rec', np.empty([0],dtype=np.int32) ).size for pansw in answer )
+        num_labels = sum( pansw['sx']['layout'].get( 'labels', np.empty([0],dtype=np.int32) ).size for pansw in answer )
         self.assertEqual( num_labels, 36 )
 
         answer = self.mili.query('sx', 'brick', material = 'es_12', states = 37 )
-        num_labels = sum( pansw['sx']['layout'].get( '2hex_mmsvn_rec', np.empty([0],dtype=np.int32) ).size for pansw in answer )
+        num_labels = sum( pansw['sx']['layout'].get( 'labels', np.empty([0],dtype=np.int32) ).size for pansw in answer )
         self.assertEqual( num_labels, 36 )
 
 
@@ -1342,34 +1331,33 @@ class ParallelSingleStateFile(unittest.TestCase):
         v1 = { 'matcgx' :
                 { 'layout' :
                     {
-                      'mat' : np.array( [1], dtype = np.int32 ),
+                      'labels' : np.array( [1], dtype = np.int32 ),
                       'states' : np.array( [3], dtype = np.int32 )
                     },
-                  'data' : { 'mat' : np.array([ [ [ 5.5 ] ] ], dtype = np.float32) }
+                  'data' : np.array([ [ [ 5.5 ] ] ], dtype = np.float32)
                 }
              }
         v2 = { 'matcgx' :
                 { 'layout' :
                     {
-                      'mat' : np.array( [1], dtype = np.int32 ),
+                      'labels' : np.array( [1], dtype = np.int32 ),
                       'states' : np.array( [3], dtype = np.int32 )
                     },
-                  'data' :
-                    { 'mat' : np.array([ [ [ 0.6021666526794434 ] ] ], dtype = np.float32) }
+                  'data' : np.array([ [ [ 0.6021666526794434 ] ] ], dtype = np.float32)
                 }
              }
 
         # Original
         answer = self.mili.query('matcgx', 'mat', labels = 1, states = 3 )
-        self.assertEqual( answer[0]['matcgx']['data']['mat'][0], 0.6021666526794434 )
+        self.assertEqual( answer[0]['matcgx']['data'][0], 0.6021666526794434 )
 
         # Modified
         answer = self.mili.query('matcgx', 'mat', labels = 1, states = 3, write_data = v1 )
-        self.assertEqual( answer[0]['matcgx']['data']['mat'][0], 5.5 )
+        self.assertEqual( answer[0]['matcgx']['data'][0], 5.5 )
 
         # Back to original
         answer = self.mili.query('matcgx', 'mat', labels = 1, states = 3, write_data = v2 )
-        self.assertEqual( answer[0]['matcgx']['data']['mat'][0], 0.6021666526794434 )
+        self.assertEqual( answer[0]['matcgx']['data'][0], 0.6021666526794434 )
 
     '''
     Testing the modification of a vector state variable
@@ -1378,38 +1366,36 @@ class ParallelSingleStateFile(unittest.TestCase):
         v1 = { 'nodpos' :
                 { 'layout' :
                     {
-                        'node' : np.array( [ 70, 71 ], dtype = np.int32 ),
+                        'labels' : np.array( [ 70, 71 ], dtype = np.int32 ),
                         'states' : np.array( [4], dtype = np.int32 )
                     },
-                  'data' :
-                    { 'node' : np.array( [ [ [ 5.0, 6.0, 9.0 ], [ 5.1, 6.1, 9.1 ] ] ], dtype = np.float32 ) }
+                  'data' : np.array( [ [ [ 5.0, 6.0, 9.0 ], [ 5.1, 6.1, 9.1 ] ] ], dtype = np.float32 )
                 }
              }
         v2 = { 'nodpos' :
                 { 'layout' :
                     {
-                        'node' : np.array( [ 70, 71 ], dtype = np.int32 ),
+                        'labels' : np.array( [ 70, 71 ], dtype = np.int32 ),
                         'states' : np.array( [4], dtype = np.int32 )
                     },
-                  'data' :
-                    { 'node' : np.array( [ [ [0.4330127537250519, 0.2500000596046448, 2.436666965484619], [0.4330127239227295, 0.2499999850988388, 2.7033333778381348] ] ], dtype = np.float32 ) }
+                  'data' : np.array( [ [ [0.4330127537250519, 0.2500000596046448, 2.436666965484619], [0.4330127239227295, 0.2499999850988388, 2.7033333778381348] ] ], dtype = np.float32 )
                 }
              }
 
         # Before change
         answer = self.mili.query('nodpos', 'node', labels = [70, 71], states = 4 )
-        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,0,:], v2['nodpos']['data']['node'][0,0,:] )
-        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,1,:], v2['nodpos']['data']['node'][0,1,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,0,:], v2['nodpos']['data'][0,0,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,1,:], v2['nodpos']['data'][0,1,:] )
 
         # After change
         answer = self.mili.query('nodpos', 'node', labels = [70, 71], states = 4, write_data = v1 )
-        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,0,:], v1['nodpos']['data']['node'][0,0,:] )
-        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,1,:], v1['nodpos']['data']['node'][0,1,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,0,:], v1['nodpos']['data'][0,0,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,1,:], v1['nodpos']['data'][0,1,:] )
 
         # Back to original
         answer = self.mili.query('nodpos', 'node', labels = [70, 71],  states = 4, write_data = v2 )
-        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,0,:], v2['nodpos']['data']['node'][0,0,:] )
-        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,1,:], v2['nodpos']['data']['node'][0,1,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,0,:], v2['nodpos']['data'][0,0,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,1,:], v2['nodpos']['data'][0,1,:] )
 
     '''
     Testing the modification of a vector component
@@ -1418,52 +1404,50 @@ class ParallelSingleStateFile(unittest.TestCase):
         v1 = { 'nodpos[uz]' :
                 { 'layout' :
                     {
-                        'node' : np.array( [70, 71], dtype = np.int32 ),
+                        'labels' : np.array( [70, 71], dtype = np.int32 ),
                         'states' : np.array( [4], dtype = np.int32 )
                     },
-                  'data' :
-                    { 'node' : np.array( [ [ [9.0], [9.0] ] ], dtype = np.float32 ) }
+                  'data' : np.array( [ [ [9.0], [9.0] ] ], dtype = np.float32 )
                 }
              }
         v2 = { 'nodpos[uz]' :
                 { 'layout' :
                     {
-                        'node' : np.array( [70, 71], dtype = np.int32 ),
+                        'labels' : np.array( [70, 71], dtype = np.int32 ),
                         'states' : np.array( [4], dtype = np.int32 )
                     },
-                  'data' :
-                    { 'node' : np.array( [ [ [2.436666965484619], [2.7033333778381348] ] ], dtype = np.float32 ) }
+                  'data' : np.array( [ [ [2.436666965484619], [2.7033333778381348] ] ], dtype = np.float32 )
                 }
              }
 
         # Before change
         answer = self.mili.query('nodpos[uz]', 'node', labels = [70, 71], states = 4 )
-        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,0,0], 2.436666965484619)
-        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,1,0], 2.7033333778381348)
+        self.assertEqual(answer[0]['nodpos[uz]']['data'][0,0,0], 2.436666965484619)
+        self.assertEqual(answer[0]['nodpos[uz]']['data'][0,1,0], 2.7033333778381348)
 
         # After change
         answer = self.mili.query('nodpos[uz]', 'node', labels = [70, 71], states = 4, write_data = v1 )
-        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,0,0], 9.0)
-        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,1,0], 9.0)
+        self.assertEqual(answer[0]['nodpos[uz]']['data'][0,0,0], 9.0)
+        self.assertEqual(answer[0]['nodpos[uz]']['data'][0,1,0], 9.0)
 
         # Back to original
         answer = self.mili.query('nodpos[uz]', 'node', labels = [70, 71], states = 4, write_data = v2 )
-        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,0,0], 2.436666965484619)
-        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,1,0], 2.7033333778381348)
+        self.assertEqual(answer[0]['nodpos[uz]']['data'][0,0,0], 2.436666965484619)
+        self.assertEqual(answer[0]['nodpos[uz]']['data'][0,1,0], 2.7033333778381348)
 
     '''
     Test accessing a vector array
     '''
     def test_state_variable_vector_array(self):
         answer = self.mili.query('stress', 'beam', labels = 5, states = [21,22], ips = 2 )
-        np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'][1,:,:], np.array([ [ -1018.4232177734375, -1012.2537231445312, -6.556616085617861e-07, 1015.3384399414062, 0.3263571858406067, -0.32636013627052307] ], dtype = np.float32 ) )
+        np.testing.assert_equal( answer[2]['stress']['data'][1,:,:], np.array([ [ -1018.4232177734375, -1012.2537231445312, -6.556616085617861e-07, 1015.3384399414062, 0.3263571858406067, -0.32636013627052307] ], dtype = np.float32 ) )
 
     '''
     Test accessing a vector array component
     '''
     def test_state_variable_vector_array_component(self):
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2 )
-        self.assertEqual(answer[2]['stress[sy]']['data']['1beam_mmsvn_rec'][0,0,0], -5373.53173828125)
+        self.assertEqual(answer[2]['stress[sy]']['data'][0,0,0], -5373.53173828125)
 
     '''
     Test modifying a vector array
@@ -1472,33 +1456,31 @@ class ParallelSingleStateFile(unittest.TestCase):
         v1 = { 'stress' :
                 { 'layout' :
                     {
-                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'labels' : np.array( [5], dtype = np.int32 ),
                         'states' : np.array( [70], dtype = np.int32 )
                     },
-                  'data' :
-                    { '1beam_mmsvn_rec' : np.array([ [ [ -5377.6376953125, -5373.53173828125, -3.930831553589087e-07, 5375.58447265625, 0.6931889057159424, -0.693189263343811 ] ] ], dtype = np.float32 ) }
+                  'data' : np.array([ [ [ -5377.6376953125, -5373.53173828125, -3.930831553589087e-07, 5375.58447265625, 0.6931889057159424, -0.693189263343811 ] ] ], dtype = np.float32 )
                 }
              }
         v2 = { 'stress' :
                 { 'layout' :
                     {
-                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'labels' : np.array( [5], dtype = np.int32 ),
                         'states' : np.array( [70], dtype = np.int32 )
                     },
-                  'data' :
-                    { '1beam_mmsvn_rec' : np.array([ [ [ 1.0, 2.0, 3.0, 4.0, 5.0, 6.0 ] ] ], dtype = np.float32 ) }
+                  'data' : np.array([ [ [ 1.0, 2.0, 3.0, 4.0, 5.0, 6.0 ] ] ], dtype = np.float32 )
                 }
              }
         # Before change
         answer = self.mili.query('stress', 'beam', labels = 5, states = 70, ips = 2 )
-        np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'], v1['stress']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer[2]['stress']['data'], v1['stress']['data'] )
 
         answer = self.mili.query('stress', 'beam', labels = 5, states = 70, ips = 2 , write_data = v2 )
-        np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'], v2['stress']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer[2]['stress']['data'], v2['stress']['data'] )
 
         # Back to original
         answer = self.mili.query('stress', 'beam', labels = 5, states = 70, ips = 2 , write_data = v1 )
-        np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'], v1['stress']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer[2]['stress']['data'], v1['stress']['data'] )
     '''
     Test modifying a vector array component
     '''
@@ -1506,48 +1488,46 @@ class ParallelSingleStateFile(unittest.TestCase):
         v1 = { 'stress[sy]' :
                  { 'layout' :
                     {
-                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'labels' : np.array( [5], dtype = np.int32 ),
                         'states' : np.array( [70], dtype = np.int32 )
                     },
-                   'data' :
-                    { '1beam_mmsvn_rec' : np.array( [ [ [ -5373.53173828125 ] ] ], dtype = np.float32 ) }
+                   'data' : np.array( [ [ [ -5373.53173828125 ] ] ], dtype = np.float32 )
                  }
              }
         v2 = { 'stress[sy]' :
                  { 'layout' :
                     {
-                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'labels' : np.array( [5], dtype = np.int32 ),
                         'states' : np.array( [70], dtype = np.int32 )
                     },
-                   'data' :
-                    { '1beam_mmsvn_rec' : np.array( [ [ [ 1.5 ] ] ], dtype = np.float32 ) }
+                   'data' : np.array( [ [ [ 1.5 ] ] ], dtype = np.float32 )
                  }
              }
 
         # Before change
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2 )
-        np.testing.assert_equal( answer[2]['stress[sy]']['data']['1beam_mmsvn_rec'], v1['stress[sy]']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer[2]['stress[sy]']['data'], v1['stress[sy]']['data'] )
 
         # After change
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2, write_data = v2 )
-        np.testing.assert_equal( answer[2]['stress[sy]']['data']['1beam_mmsvn_rec'], v2['stress[sy]']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer[2]['stress[sy]']['data'], v2['stress[sy]']['data'] )
 
         # Back to original
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2, write_data = v1 )
-        np.testing.assert_equal( answer[2]['stress[sy]']['data']['1beam_mmsvn_rec'], v1['stress[sy]']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer[2]['stress[sy]']['data'], v1['stress[sy]']['data'] )
 
     def test_query_glob_results(self):
         """
         Test querying for results for M_MESH ("glob") element class.
         """
         answer = self.mili.query("he", "glob", states=[22])
-        self.assertAlmostEqual( answer[0]["he"]["data"]["glob"][0,0,0], 3.0224223, delta=1e-7)
+        self.assertAlmostEqual( answer[0]["he"]["data"][0,0,0], 3.0224223, delta=1e-7)
 
         answer = self.mili.query("bve", "glob", states=[22])
-        self.assertAlmostEqual( answer[0]["bve"]["data"]["glob"][0,0,0], 2.05536485, delta=1e-7)
+        self.assertAlmostEqual( answer[0]["bve"]["data"][0,0,0], 2.05536485, delta=1e-7)
 
         answer = self.mili.query("te", "glob", states=[22])
-        self.assertAlmostEqual( answer[0]["te"]["data"]["glob"][0,0,0], 1629.718, delta=1e-4)
+        self.assertAlmostEqual( answer[0]["te"]["data"][0,0,0], 1629.718, delta=1e-4)
 
 
 class Bugfixes0_2_4(unittest.TestCase):
@@ -1600,8 +1580,8 @@ class Bugfixes0_2_5(unittest.TestCase):
     def test_strain_query(self):
         ''' prior to the 0.2.5 bugfixes, this returned 0,0,1e10,0,1e10,0 due to an srec offset error '''
         desired = { 'strain' :
-                    { 'data' : { '1shell_str_def_rec' : np.array([[[0., 0., 0., 0., 0., 0.]]], dtype=np.float32)},
-                      'layout': { 'states': np.array([1], dtype=np.int32), '1shell_str_def_rec': np.array([1], dtype=np.int32) }
+                    { 'data' : np.array([[[0., 0., 0., 0., 0., 0.]]], dtype=np.float32),
+                      'layout': { 'states': np.array([1], dtype=np.int32), 'labels': np.array([1], dtype=np.int32) }
                     }
                   }
         answer = self.mili.query('strain','shell',labels=1,states=1)
@@ -1635,7 +1615,7 @@ class ExperimentalParallelSingleStateFile(unittest.TestCase):
     '''
     def setUp(self):
         self.mili = reader.open_database( ParallelSingleStateFile.file_name, experimental=True )
-    
+
     def tearDown(self):
         self.mili.close()
 
@@ -2112,7 +2092,7 @@ class ExperimentalParallelSingleStateFile(unittest.TestCase):
     '''
     def test_state_variable(self):
         answer = self.mili.query( 'matcgx', 'mat', labels = [1,2], states = 3 )
-        np.testing.assert_equal( answer[0]['matcgx']['data']['mat'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32 ) )
+        np.testing.assert_equal( answer[0]['matcgx']['data'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32 ) )
 
     '''
     Testing accessing accessing node attributes -> this is a vector component
@@ -2121,27 +2101,27 @@ class ExperimentalParallelSingleStateFile(unittest.TestCase):
     '''
     def test_node_attributes(self):
         answer = self.mili.query( 'nodpos[ux]', 'node', labels = 70, states = 3 )
-        self.assertEqual( answer[3]['nodpos[ux]']['data']['node'][0,0,0], 0.4330127537250519)
+        self.assertEqual( answer[3]['nodpos[ux]']['data'][0,0,0], 0.4330127537250519)
         answer = self.mili.query( 'ux', 'node', labels = 70, states = 3 )
-        self.assertEqual( answer[3]['ux']['data']['node'][0,0,0], 0.4330127537250519)
+        self.assertEqual( answer[3]['ux']['data'][0,0,0], 0.4330127537250519)
 
     '''
     Testing the accessing of a vector, in this case node position
     '''
     def test_state_variable_vector(self):
         answer = self.mili.query('nodpos', 'node', labels = 70, states = 4 )
-        np.testing.assert_equal(answer[3]['nodpos']['data']['node'][0,0,:], np.array( [0.4330127537250519, 0.2500000596046448, 2.436666965484619], dtype = np.float32 ) )
+        np.testing.assert_equal(answer[3]['nodpos']['data'][0,0,:], np.array( [0.4330127537250519, 0.2500000596046448, 2.436666965484619], dtype = np.float32 ) )
 
     '''
     Test querying by material name and number:
     '''
     def test_query_material(self):
         answer = self.mili.query('sx', 'brick', material = 2, states = 37 )
-        num_labels = sum( pansw['sx']['layout'].get( '2hex_mmsvn_rec', np.empty([0],dtype=np.int32) ).size for pansw in answer )
+        num_labels = sum( pansw['sx']['layout'].get( 'labels', np.empty([0],dtype=np.int32) ).size for pansw in answer )
         self.assertEqual( num_labels, 36 )
 
         answer = self.mili.query('sx', 'brick', material = 'es_12', states = 37 )
-        num_labels = sum( pansw['sx']['layout'].get( '2hex_mmsvn_rec', np.empty([0],dtype=np.int32) ).size for pansw in answer )
+        num_labels = sum( pansw['sx']['layout'].get( 'labels', np.empty([0],dtype=np.int32) ).size for pansw in answer )
         self.assertEqual( num_labels, 36 )
 
 
@@ -2152,34 +2132,33 @@ class ExperimentalParallelSingleStateFile(unittest.TestCase):
         v1 = { 'matcgx' :
                 { 'layout' :
                     {
-                      'mat' : np.array( [1], dtype = np.int32 ),
+                      'labels' : np.array( [1], dtype = np.int32 ),
                       'states' : np.array( [3], dtype = np.int32 )
                     },
-                  'data' : { 'mat' : np.array([ [ [ 5.5 ] ] ], dtype = np.float32) }
+                  'data' : np.array([ [ [ 5.5 ] ] ], dtype = np.float32)
                 }
              }
         v2 = { 'matcgx' :
                 { 'layout' :
                     {
-                      'mat' : np.array( [1], dtype = np.int32 ),
+                      'labels' : np.array( [1], dtype = np.int32 ),
                       'states' : np.array( [3], dtype = np.int32 )
                     },
-                  'data' :
-                    { 'mat' : np.array([ [ [ 0.6021666526794434 ] ] ], dtype = np.float32) }
+                  'data' : np.array([ [ [ 0.6021666526794434 ] ] ], dtype = np.float32) 
                 }
              }
 
         # Original
         answer = self.mili.query('matcgx', 'mat', labels = 1, states = 3 )
-        self.assertEqual( answer[0]['matcgx']['data']['mat'][0], 0.6021666526794434 )
+        self.assertEqual( answer[0]['matcgx']['data'][0], 0.6021666526794434 )
 
         # Modified
         answer = self.mili.query('matcgx', 'mat', labels = 1, states = 3, write_data = v1 )
-        self.assertEqual( answer[0]['matcgx']['data']['mat'][0], 5.5 )
+        self.assertEqual( answer[0]['matcgx']['data'][0], 5.5 )
 
         # Back to original
         answer = self.mili.query('matcgx', 'mat', labels = 1, states = 3, write_data = v2 )
-        self.assertEqual( answer[0]['matcgx']['data']['mat'][0], 0.6021666526794434 )
+        self.assertEqual( answer[0]['matcgx']['data'][0], 0.6021666526794434 )
 
     '''
     Testing the modification of a vector state variable
@@ -2188,38 +2167,36 @@ class ExperimentalParallelSingleStateFile(unittest.TestCase):
         v1 = { 'nodpos' :
                 { 'layout' :
                     {
-                        'node' : np.array( [ 70, 71 ], dtype = np.int32 ),
+                        'labels' : np.array( [ 70, 71 ], dtype = np.int32 ),
                         'states' : np.array( [4], dtype = np.int32 )
                     },
-                  'data' :
-                    { 'node' : np.array( [ [ [ 5.0, 6.0, 9.0 ], [ 5.1, 6.1, 9.1 ] ] ], dtype = np.float32 ) }
+                  'data' : np.array( [ [ [ 5.0, 6.0, 9.0 ], [ 5.1, 6.1, 9.1 ] ] ], dtype = np.float32 )
                 }
              }
         v2 = { 'nodpos' :
                 { 'layout' :
                     {
-                        'node' : np.array( [ 70, 71 ], dtype = np.int32 ),
+                        'labels' : np.array( [ 70, 71 ], dtype = np.int32 ),
                         'states' : np.array( [4], dtype = np.int32 )
                     },
-                  'data' :
-                    { 'node' : np.array( [ [ [0.4330127537250519, 0.2500000596046448, 2.436666965484619], [0.4330127239227295, 0.2499999850988388, 2.7033333778381348] ] ], dtype = np.float32 ) }
+                  'data' : np.array( [ [ [0.4330127537250519, 0.2500000596046448, 2.436666965484619], [0.4330127239227295, 0.2499999850988388, 2.7033333778381348] ] ], dtype = np.float32 )
                 }
              }
 
         # Before change
         answer = self.mili.query('nodpos', 'node', labels = [70, 71], states = 4 )
-        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,0,:], v2['nodpos']['data']['node'][0,0,:] )
-        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,1,:], v2['nodpos']['data']['node'][0,1,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,0,:], v2['nodpos']['data'][0,0,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,1,:], v2['nodpos']['data'][0,1,:] )
 
         # After change
         answer = self.mili.query('nodpos', 'node', labels = [70, 71], states = 4, write_data = v1 )
-        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,0,:], v1['nodpos']['data']['node'][0,0,:] )
-        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,1,:], v1['nodpos']['data']['node'][0,1,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,0,:], v1['nodpos']['data'][0,0,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,1,:], v1['nodpos']['data'][0,1,:] )
 
         # Back to original
         answer = self.mili.query('nodpos', 'node', labels = [70, 71],  states = 4, write_data = v2 )
-        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,0,:], v2['nodpos']['data']['node'][0,0,:] )
-        np.testing.assert_equal( answer[0]['nodpos']['data']['node'][0,1,:], v2['nodpos']['data']['node'][0,1,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,0,:], v2['nodpos']['data'][0,0,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,1,:], v2['nodpos']['data'][0,1,:] )
 
     '''
     Testing the modification of a vector component
@@ -2228,52 +2205,50 @@ class ExperimentalParallelSingleStateFile(unittest.TestCase):
         v1 = { 'nodpos[uz]' :
                 { 'layout' :
                     {
-                        'node' : np.array( [70, 71], dtype = np.int32 ),
+                        'labels' : np.array( [70, 71], dtype = np.int32 ),
                         'states' : np.array( [4], dtype = np.int32 )
                     },
-                  'data' :
-                    { 'node' : np.array( [ [ [9.0], [9.0] ] ], dtype = np.float32 ) }
+                  'data' : np.array( [ [ [9.0], [9.0] ] ], dtype = np.float32 )
                 }
              }
         v2 = { 'nodpos[uz]' :
                 { 'layout' :
                     {
-                        'node' : np.array( [70, 71], dtype = np.int32 ),
+                        'labels' : np.array( [70, 71], dtype = np.int32 ),
                         'states' : np.array( [4], dtype = np.int32 )
                     },
-                  'data' :
-                    { 'node' : np.array( [ [ [2.436666965484619], [2.7033333778381348] ] ], dtype = np.float32 ) }
+                  'data' : np.array( [ [ [2.436666965484619], [2.7033333778381348] ] ], dtype = np.float32 )
                 }
              }
 
         # Before change
         answer = self.mili.query('nodpos[uz]', 'node', labels = [70, 71], states = 4 )
-        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,0,0], 2.436666965484619)
-        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,1,0], 2.7033333778381348)
+        self.assertEqual(answer[0]['nodpos[uz]']['data'][0,0,0], 2.436666965484619)
+        self.assertEqual(answer[0]['nodpos[uz]']['data'][0,1,0], 2.7033333778381348)
 
         # After change
         answer = self.mili.query('nodpos[uz]', 'node', labels = [70, 71], states = 4, write_data = v1 )
-        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,0,0], 9.0)
-        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,1,0], 9.0)
+        self.assertEqual(answer[0]['nodpos[uz]']['data'][0,0,0], 9.0)
+        self.assertEqual(answer[0]['nodpos[uz]']['data'][0,1,0], 9.0)
 
         # Back to original
         answer = self.mili.query('nodpos[uz]', 'node', labels = [70, 71], states = 4, write_data = v2 )
-        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,0,0], 2.436666965484619)
-        self.assertEqual(answer[0]['nodpos[uz]']['data']['node'][0,1,0], 2.7033333778381348)
+        self.assertEqual(answer[0]['nodpos[uz]']['data'][0,0,0], 2.436666965484619)
+        self.assertEqual(answer[0]['nodpos[uz]']['data'][0,1,0], 2.7033333778381348)
 
     '''
     Test accessing a vector array
     '''
     def test_state_variable_vector_array(self):
         answer = self.mili.query('stress', 'beam', labels = 5, states = [21,22], ips = 2 )
-        np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'][1,:,:], np.array([ [ -1018.4232177734375, -1012.2537231445312, -6.556616085617861e-07, 1015.3384399414062, 0.3263571858406067, -0.32636013627052307] ], dtype = np.float32 ) )
+        np.testing.assert_equal( answer[2]['stress']['data'][1,:,:], np.array([ [ -1018.4232177734375, -1012.2537231445312, -6.556616085617861e-07, 1015.3384399414062, 0.3263571858406067, -0.32636013627052307] ], dtype = np.float32 ) )
 
     '''
     Test accessing a vector array component
     '''
     def test_state_variable_vector_array_component(self):
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2 )
-        self.assertEqual(answer[2]['stress[sy]']['data']['1beam_mmsvn_rec'][0,0,0], -5373.53173828125)
+        self.assertEqual(answer[2]['stress[sy]']['data'][0,0,0], -5373.53173828125)
 
     '''
     Test modifying a vector array
@@ -2282,33 +2257,31 @@ class ExperimentalParallelSingleStateFile(unittest.TestCase):
         v1 = { 'stress' :
                 { 'layout' :
                     {
-                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'labels' : np.array( [5], dtype = np.int32 ),
                         'states' : np.array( [70], dtype = np.int32 )
                     },
-                  'data' :
-                    { '1beam_mmsvn_rec' : np.array([ [ [ -5377.6376953125, -5373.53173828125, -3.930831553589087e-07, 5375.58447265625, 0.6931889057159424, -0.693189263343811 ] ] ], dtype = np.float32 ) }
+                  'data' : np.array([ [ [ -5377.6376953125, -5373.53173828125, -3.930831553589087e-07, 5375.58447265625, 0.6931889057159424, -0.693189263343811 ] ] ], dtype = np.float32 )
                 }
              }
         v2 = { 'stress' :
                 { 'layout' :
                     {
-                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'labels' : np.array( [5], dtype = np.int32 ),
                         'states' : np.array( [70], dtype = np.int32 )
                     },
-                  'data' :
-                    { '1beam_mmsvn_rec' : np.array([ [ [ 1.0, 2.0, 3.0, 4.0, 5.0, 6.0 ] ] ], dtype = np.float32 ) }
+                  'data' : np.array([ [ [ 1.0, 2.0, 3.0, 4.0, 5.0, 6.0 ] ] ], dtype = np.float32 )
                 }
              }
         # Before change
         answer = self.mili.query('stress', 'beam', labels = 5, states = 70, ips = 2 )
-        np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'], v1['stress']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer[2]['stress']['data'], v1['stress']['data'] )
 
         answer = self.mili.query('stress', 'beam', labels = 5, states = 70, ips = 2 , write_data = v2 )
-        np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'], v2['stress']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer[2]['stress']['data'], v2['stress']['data'] )
 
         # Back to original
         answer = self.mili.query('stress', 'beam', labels = 5, states = 70, ips = 2 , write_data = v1 )
-        np.testing.assert_equal( answer[2]['stress']['data']['1beam_mmsvn_rec'], v1['stress']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer[2]['stress']['data'], v1['stress']['data'] )
     '''
     Test modifying a vector array component
     '''
@@ -2316,48 +2289,46 @@ class ExperimentalParallelSingleStateFile(unittest.TestCase):
         v1 = { 'stress[sy]' :
                  { 'layout' :
                     {
-                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'labels' : np.array( [5], dtype = np.int32 ),
                         'states' : np.array( [70], dtype = np.int32 )
                     },
-                   'data' :
-                    { '1beam_mmsvn_rec' : np.array( [ [ [ -5373.53173828125 ] ] ], dtype = np.float32 ) }
+                   'data' : np.array( [ [ [ -5373.53173828125 ] ] ], dtype = np.float32 )
                  }
              }
         v2 = { 'stress[sy]' :
                  { 'layout' :
                     {
-                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'labels' : np.array( [5], dtype = np.int32 ),
                         'states' : np.array( [70], dtype = np.int32 )
                     },
-                   'data' :
-                    { '1beam_mmsvn_rec' : np.array( [ [ [ 1.5 ] ] ], dtype = np.float32 ) }
+                   'data' : np.array( [ [ [ 1.5 ] ] ], dtype = np.float32 )
                  }
              }
 
         # Before change
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2 )
-        np.testing.assert_equal( answer[2]['stress[sy]']['data']['1beam_mmsvn_rec'], v1['stress[sy]']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer[2]['stress[sy]']['data'], v1['stress[sy]']['data'] )
 
         # After change
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2, write_data = v2 )
-        np.testing.assert_equal( answer[2]['stress[sy]']['data']['1beam_mmsvn_rec'], v2['stress[sy]']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer[2]['stress[sy]']['data'], v2['stress[sy]']['data'] )
 
         # Back to original
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2, write_data = v1 )
-        np.testing.assert_equal( answer[2]['stress[sy]']['data']['1beam_mmsvn_rec'], v1['stress[sy]']['data']['1beam_mmsvn_rec'] )
+        np.testing.assert_equal( answer[2]['stress[sy]']['data'], v1['stress[sy]']['data'] )
 
     def test_query_glob_results(self):
         """
         Test querying for results for M_MESH ("glob") element class.
         """
         answer = self.mili.query("he", "glob", states=[22])
-        self.assertAlmostEqual( answer[0]["he"]["data"]["glob"][0,0,0], 3.0224223, delta=1e-7)
+        self.assertAlmostEqual( answer[0]["he"]["data"][0,0,0], 3.0224223, delta=1e-7)
 
         answer = self.mili.query("bve", "glob", states=[22])
-        self.assertAlmostEqual( answer[0]["bve"]["data"]["glob"][0,0,0], 2.05536485, delta=1e-7)
+        self.assertAlmostEqual( answer[0]["bve"]["data"][0,0,0], 2.05536485, delta=1e-7)
 
         answer = self.mili.query("te", "glob", states=[22])
-        self.assertAlmostEqual( answer[0]["te"]["data"]["glob"][0,0,0], 1629.718, delta=1e-4)
+        self.assertAlmostEqual( answer[0]["te"]["data"][0,0,0], 1629.718, delta=1e-4)
 
 
 if __name__ == "__main__":
