@@ -10,6 +10,7 @@
 - [Opening a Database](#opening-a-database)
 - [Parallel vs. Serial Database Results](#parallel-vs-serial-database-results)
 - [Querying Results](#querying-results)
+- [Derived Variables](#derived-variables)
 - [Modifying Results](#modifying-results)
 - [MiliDatabase Member Functions](#milidatabase-class-member-functions)
     - [mesh_dimensions](#mesh_dimensions)
@@ -69,8 +70,8 @@ pip install --upgrade --no-cache --find-links=https://www-lc.llnl.gov/python/whe
 - Upgrade pip (numpy > 1.20.0 will fail to build with the base RZ pip):
 - Install the mili python package into the local venv from the LC wheelhouse:
 
-**Note:** Using `--find-links=<url>` will pull dependencies from the LC python wheelhouse, which should contain sufficient requirements to install mili-python and should be available on OCF and SCF.
-**Note:** Using `--upgrade` will upgrade any already-installed copies of the mili module in the venv.
+> **Note:** Using `--find-links=<url>` will pull dependencies from the LC python wheelhouse, which should contain sufficient requirements to install mili-python and should be available on OCF and SCF.  
+> **Note:** Using `--upgrade` will upgrade any already-installed copies of the mili module in the venv.
 
 If you want to install the packages into your ~/.local/ python cache so the module is usable with the system python install, try instead not creating and activating a virtual environment and instead (untested and may not work):
 ``` 
@@ -232,7 +233,7 @@ result = {
 The data array is indexed with tuples of the form `(state_index, label_index, scalar_index)`. To be clear the `state_index` and `label_index` are the indices of the state and label in the list of states and list of labels passed to query function call, which is why these are also returned in the 'layout' data since those query arguments are optional. Thus to find the indices for state `T` and node label `N`, we need to:
 ```python
 sidx = np.where(T == result['nodpos[ux]']['layout']['states'])
-nidx = np.where(N == result['noppos[ux]']['layout']['labels])
+nidx = np.where(N == result['noppos[ux]']['layout']['labels'])
 # the above return size-1 numpy arrays (assuming they succeed)
 N_data_at_T = result['nodpos[ux]']['data'][sidx[0], nidx[0],:]
 ```
@@ -243,9 +244,40 @@ N_data_at_T = result['nodpos[ux]']['data'][sidx[0], nidx[0],:]
 
   - Mixed-data subrecords (subrecords containing more than 1 datatype (e.g. mixed double/float, int/double, etc)) are functional but have received less testing and performance evaluation, so some performance degredation is expected when querying variables from these subrecords.
 
+# Derived Variables
+
+mili-python supports many derived variables that can be queried using the `query` method. To see the derived variables that are supported in mili-python use the function `supported_derived_variables` as show below:
+
+```python
+print( db.supported_derived_variables() )
+```
+
+> **NOTE**: Not all of these variables are necessarily able to be calculated for every database. This list contains all the derived variables that mili-python can calculate if the required primal variables exist for your specific database.
+
+Querying these derived variables works the same as querying any primal variable. The following are several examples of queries for derived results.
+
+```python
+result = db.query('disp_x', 'node')
+
+# Query the pressure for the brick element class.
+result = db.query( 'pressure', 'brick', labels = [228], states = [10])
+
+# Query the result disp_mag for the node element class
+result = db.mili.query( 'disp_mag', 'node', labels = [6,7,8], states = [1,2,3])
+
+# Query the 1st principle stress for the shell element class.
+result = db.query( 'prin_stress1', 'shell', labels = [1], states = [2], ips = [1])
+```
+
+> **NOTE**: When calculating rate-based results, numerical difference methods are used to approximate the time derivatives of primal variables. These results include nodal velocity, nodal acceleration, and effective plastic strain rate. There are a few limitations and assumptions for these results: 
+>- The accuracy of the results is highly dependent on the size of the time step. Smaller time steps provide more accurate results. 
+>- The calculations assume that the time step is the same on each side of the calculation time ( t^(n-1) and t^(n+1) ).  Significant differences in dt will result in more error.
+>- Results for the first and last states use forward and backward difference methods, which are less accurate than the central difference method used for the other states.  The exception is that nodal velocity uses backward difference for all states (except state 1), which is consistent with the griz calculation.  The nodal velocity at state 1 is set to zero.
+>- When possible, have the analysis code output primal variables for rates instead of calculating derived variables.  They will almost always be more accurate, and will never be less accurate.
+
 # Modifying Results
 
-```
+```python
 db = reader.open_database( 'base_filename', suppress_parallel = True )
 nodpos_ux = db.query( 'nodpos[ux]', 'node' )
 # modify nodpos_ux
@@ -254,10 +286,9 @@ nodpos_ux = db.query( 'nodpos[ux]', 'node', write_data = nodpos_ux )
 
 Will write modified data back to the database. The `write_data` must have the same format as the result data for an identical query. In practice it is best to simply process a query, modify the results, and then submit the same query supplying the modified results as the `write_data` argument.
 
-**Note:** in parallel, the result format has an additonal top-level list. This is not currently accounted for in write-mode. A user must currently produce a `write_data` argument that contains the union of the set of data to be written to the parallel database. Thus if some data was queried from rank 0 databases and some from rank 1, the results dictionaries for the first two top-level results in the list must be merged appropriately to allow the opertional to succeed. This is cumbersome and not reccomended. Opening individual parallel databases in serial mode is supported, and may present a cleaner solution until development accomodates this use-case.
+> **Note:** in parallel, the result format has an additonal top-level list. This is not currently accounted for in write-mode. A user must currently produce a `write_data` argument that contains the union of the set of data to be written to the parallel database. Thus if some data was queried from rank 0 databases and some from rank 1, the results dictionaries for the first two top-level results in the list must be merged appropriately to allow the opertional to succeed. This is cumbersome and not reccomended. Opening individual parallel databases in serial mode is supported, and may present a cleaner solution until development accomodates this use-case.
 
-**Note:** minimal enforcement/checking of the `write_data` structure is currently done and malformed `write_data` *could* possibly (unlikely) cause database corruption, use at your own discretion. Create backups, test on smaller databases first, etc. A python expection is the most likely outcome here, but caution is best.
-
+> **Note:** minimal enforcement/checking of the `write_data` structure is currently done and malformed `write_data` *could* possibly (unlikely) cause database corruption, use at your own discretion. Create backups, test on smaller databases first, etc. A python expection is the most likely outcome here, but caution is best.
 
 # MiliDatabase Class member functions
 
@@ -265,7 +296,7 @@ Will write modified data back to the database. The `write_data` must have the sa
 ```python
 def mesh_dimensions(self) -> int
 ```
-**Description**: Get the mesh dimensions
+**Description**: Get the mesh dimensions  
 **Arguments**:  
     - `None`  
 **Returns**:  
@@ -281,7 +312,7 @@ dims = db.mesh_dimensions()
 ```python
 def state_maps(self) -> List[StateMap]
 ```
-**Description**: Getter for the state maps
+**Description**: Getter for the state maps  
 **Arguments**:  
     - `None`  
 **Returns**:  

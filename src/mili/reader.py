@@ -20,6 +20,7 @@ from typing import *
 from mili.datatypes import *
 from mili.afileIO import *
 from mili.parallel import *
+from mili.derived import *
 
 if sys.version_info < (3, 7):
   raise ImportError(f"This module requires python version >= 3.7!")
@@ -241,6 +242,9 @@ class MiliDatabase:
       else:
         self.__MO_class_data[class_sname].elem_qty = self.__labels[class_sname].size
 
+    # Create instance of wrapper class to handle derived queries
+    self.__derived = DerivedExpressions( self )
+
   def reload_state_maps(self):
     """Reload the state maps."""
     afile = AFile()
@@ -317,6 +321,9 @@ class MiliDatabase:
         if not vector_only:
           queriable.append( sname )
     return queriable
+  
+  def supported_derived_variables(self):
+    return self.__derived.supported_variables()
 
   def labels(self, class_name: Optional[str] = None):
     if class_name is not None:
@@ -428,9 +435,10 @@ class MiliDatabase:
       node_labels = np.append( node_labels, self.nodes_of_elems( class_name, class_labels )[0] )
     return np.unique( node_labels )
 
-  def __parse_query_name( self, svar_query_input ):
+  def __parse_query_name_and_source( self, svar_query_input, requested_result_source ):
     """
     Parse the svar name from a query input into a base svar and component svar list
+    and determine the result source we are going to return 'primal' or 'derived'
     """
     comp_start_idx = svar_query_input.find('[')
     if comp_start_idx != -1:
@@ -439,7 +447,36 @@ class MiliDatabase:
     else:
       svar_name = svar_query_input
       svar_comps = []
-    return svar_name, svar_comps
+
+    # Determine if this result exists as a primal or a derived, or both
+    primal_exists = False
+    derived_exists = False
+    if svar_name in self.__svars.keys():
+      primal_exists = True
+    if not all([comp_svar_name in self.__svars.keys() for comp_svar_name in svar_comps]):
+      primal_exists = True
+    if svar_name in self.__derived.supported_variables():
+      derived_exists = True
+
+    # Get the result source we are goint to return
+    actual_result_source = ''
+    # Preferred result source is primals
+    if requested_result_source == 'primal':
+      if primal_exists:
+        actual_result_source = 'primal'
+      # If primal doesn't exist, but derived does, calculate derived.
+      if not primal_exists and derived_exists:
+        actual_result_source = 'derived'
+    # Preferred sourec is derived
+    elif requested_result_source == 'derived':
+      # If derived exists, calculate derived
+      if derived_exists:
+        actual_result_source = 'derived'
+      # If derived doesn't exist, but primal does, load primal result.
+      if not derived_exists and primal_exists:
+        actual_result_source = 'primal'
+
+    return svar_name, svar_comps, actual_result_source
 
   def __init_query_parameters( self,
                                svar_names : Union[List[str],str],
@@ -463,7 +500,7 @@ class MiliDatabase:
     if type(states) is int:
       states = np.array( [ states ], dtype = np.int32 )
     elif iterable( states ) and not type( states ) == str:
-      states = np.array( states, dtype = np.int32 )
+      states = np.unique( np.array( states, dtype = np.int32 ) )
     # Check for any states that are out of bounds
     if np.any( states < min_st ) or np.any( states > max_st ):
         raise ValueError((f"Attempting to query states that do not exist. "
@@ -473,7 +510,7 @@ class MiliDatabase:
       raise TypeError( f"'states' must be None, an integer, or a list of integers" )
 
     if iterable( labels ):
-      labels = np.array( labels, dtype = np.int32 )
+      labels = np.unique( np.array( labels, dtype = np.int32 ) )
     elif labels is not None:
       labels = np.array( [ labels ], dtype = np.int32 )
 
@@ -489,7 +526,7 @@ class MiliDatabase:
       labels = self.__labels.get( class_sname, np.empty([0],np.int32) )
 
     if type( svar_names ) is not str and iterable(svar_names):
-      svar_names = list( svar_names )
+      svar_names = list(set(svar_names))
     elif type( svar_names ) is str:
       svar_names = [ svar_names ]
 
@@ -503,6 +540,8 @@ class MiliDatabase:
 
     if type(ips) is not list:
       raise TypeError( 'comp must be an integer or list of integers' )
+    # Ensure not duplicate integration points
+    ips = list(set(ips))
 
     if write_data is not None:
       for queried_name in svar_names:
@@ -541,10 +580,11 @@ class MiliDatabase:
     # handle possible hidden keyword arguments
     output_object_labels = kwargs.get("output_object_labels", True)
     subrec = kwargs.get("subrec", None)
+    requested_result_source = kwargs.get('source', 'primal')
 
     res = dict.fromkeys( svar_names )
     for ikey in res.keys():
-      res[ikey] = { 'data' : {}, 'layout' : { 'states' : states,  'labels' : np_empty( np.int32 ) } }
+      res[ikey] = { 'data' : {}, 'layout' : { 'states' : states,  'labels' : np_empty( np.int32 ) }, 'source': '' }
 
     # for parallel operation it will often be the case a specific file doesn't have any labels
     labels_of_class = self.__labels.get( class_sname, np_empty(np.int32) )
@@ -553,12 +593,14 @@ class MiliDatabase:
       return res
 
     for queried_name in svar_names:
-      queried_svar_name, comp_svar_names = self.__parse_query_name( queried_name )
+      queried_svar_name, comp_svar_names, actual_result_source = self.__parse_query_name_and_source( queried_name, requested_result_source )
 
-      if not queried_svar_name in self.__svars.keys():
+      res[queried_name]['source'] = actual_result_source
+      if actual_result_source in ('', 'derived'):
+        if actual_result_source == 'derived':
+          res[queried_name] = self.__derived.query(queried_name, class_sname, material, labels, states, ips, **kwargs)[queried_name]
         continue
-      if not all([comp_svar_name in self.__svars.keys() for comp_svar_name in comp_svar_names]):
-        continue
+      # NOTE: else the actual_result_source is "primal" and we keep going
 
       match_aggregate_svar = ""
       if self.__svars[queried_svar_name].agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:

@@ -1581,7 +1581,8 @@ class Bugfixes0_2_5(unittest.TestCase):
         ''' prior to the 0.2.5 bugfixes, this returned 0,0,1e10,0,1e10,0 due to an srec offset error '''
         desired = { 'strain' :
                     { 'data' : np.array([[[0., 0., 0., 0., 0., 0.]]], dtype=np.float32),
-                      'layout': { 'states': np.array([1], dtype=np.int32), 'labels': np.array([1], dtype=np.int32) }
+                      'layout': { 'states': np.array([1], dtype=np.int32), 'labels': np.array([1], dtype=np.int32) },
+                      'source': 'primal'
                     }
                   }
         answer = self.mili.query('strain','shell',labels=1,states=1)
