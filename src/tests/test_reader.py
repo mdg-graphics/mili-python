@@ -61,6 +61,51 @@ class DoublePrecisionNodpos(unittest.TestCase):
         self.assertAlmostEqual(result['nodpos']['data'][0][0][1], 100.00000000000000, delta = 1e-6 )
         self.assertAlmostEqual(result['nodpos']['data'][0][0][2], 198.08431992103525, delta = 1e-6 )
 
+class QueryResultFromMultipleSubrecords(unittest.TestCase):
+    file_name = os.path.join(dir_path,'data','serial','d3samp4','d3samp4.plt')
+
+    def setUp( self ):
+        self.mili = reader.open_database( VectorsInVectorArrays.file_name, suppress_parallel = True )
+    
+    def query_across_multiple_subrecords(self):
+        """
+        Tests bug in v0.4.0 where data array was created with incorrect size due to results
+        being split over multiple subrecords
+        """
+        result = self.mili.query("mxx", "shell", states=[1])
+        data_len = len(result['mxx']['data'][0])
+        label_len = len(result['mxx']['layout']['labels'])
+        self.assertEqual(data_len, label_len)
+
+        # Elements 949 and 1431 are material 1, elements 4507 and 4518 are material 2,
+        # and the results for mxx for each are stored in separate subrecords
+        result = self.mili.query("mxx", "shell", states=[4], labels=[949, 1431, 4507, 4518])
+        EXPECTED = [7.20788921E-06, 4.15517337E-04, -2.95172485E-05, -2.25825679E-05]
+        self.assertAlmostEqual(result['mxx']['data'][0][0][0], EXPECTED[0], delta=2.0e-15)
+        self.assertAlmostEqual(result['mxx']['data'][0][1][0], EXPECTED[1], delta=4.0e-13)
+        self.assertAlmostEqual(result['mxx']['data'][0][2][0], EXPECTED[2], delta=5.0e-14)
+        self.assertAlmostEqual(result['mxx']['data'][0][3][0], EXPECTED[3], delta=9.0e-15)
+
+class InconsistantIntPointsForElementClassResult(unittest.TestCase):
+    file_name = os.path.join(dir_path,'data','serial','basic1','basic1.plt')
+
+    def setUp( self ):
+        self.mili = reader.open_database( InconsistantIntPointsForElementClassResult.file_name )
+
+    def query_inconsistant_int_points(self):
+        """
+        Test query for a result that has a different number of integration points in different subrecords.
+        Material 5 has 8 int points
+        Material 7 has 9 int points
+        """
+        with self.assertRaises(ValueError):
+            result = self.mili.query("sx", "brick", states=[101], labels=[144,212])
+
+        result = self.mili.query("sx", "brick", states=[101], labels=[144,212], ips=4)
+        EXPECTED = [3.36948112e-02, 3.36948000e-02]
+        self.assertAlmostEqual(result['sx']['data'][0][0][0], EXPECTED[0], delta=4.0e-11)
+        self.assertAlmostEqual(result['sx']['data'][0][1][0], EXPECTED[1], delta=2.0e-11)
+
 class VectorsInVectorArrays(unittest.TestCase):
     file_name = os.path.join(dir_path,'data','serial','d3samp4','d3samp4.plt')
 

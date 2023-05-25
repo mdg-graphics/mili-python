@@ -247,7 +247,7 @@ class Subrecord:
     match_aggregate_svar = '' if match_aggregate_svar in ('stress','strain') else match_aggregate_svar
     for svar in svars_to_query:
       svar_coords = self.scalar_svar_coords( match_aggregate_svar, svar.name )
-      ipts = matching_int_points.get( svar.name, [] )
+      ipts = matching_int_points.get( svar.name, {} ).get( self.name, [] )
       if len( ipts ) > 0:
         svar_coords = svar_coords[ ipts ]
       qd_svar_comps = np.concatenate( ( qd_svar_comps, svar_coords ), axis = 0 )

@@ -650,15 +650,17 @@ class MiliDatabase:
             candidate_srecs = self.__svars[ candidate ].srecs
             for srec in candidate_srecs:
               if srec.class_name == class_sname:
-                matching_int_points[ comp_svar_name ] = [ self.__int_points[comp_svar_name][candidate].index(ip) for ip in ips ]
+                if comp_svar_name not in matching_int_points:
+                  matching_int_points[ comp_svar_name ] = {}
+                matching_int_points[ comp_svar_name ][ srec.name ] = [ self.__int_points[comp_svar_name][candidate].index(ip) for ip in ips ]
 
       # For each subrecord, determine which elements (labels) appear in that subrecord
       # and create a dictionary entry for each subrecord that contains the labels in that
       # subrecord and the indexes at which the data for that label appears in the subrecord
+      srec_element_ordinals = {}
       srec_internal_offsets = {} # { subrecord name --> [ label_cols, index_cols... ] }
       for srec in srecs_to_query:
         srec_memory_offsets, ordinals_in_srec = srec.calculate_memory_offsets( match_aggregate_svar, svars_to_query, ordinals, matching_int_points )
-
         if len( ordinals_in_srec ) > 0:
           if output_object_labels:
             res[queried_name]['layout']['labels'] = np.concatenate( ( res[queried_name]['layout']['labels'], self.__labels[ class_sname ][ ordinals_in_srec ] ) )
@@ -666,6 +668,7 @@ class MiliDatabase:
             res[queried_name]['layout']['labels'] = ordinals_in_srec
 
         srec_internal_offsets[srec.name] = srec_memory_offsets
+        srec_element_ordinals[srec.name] = ordinals_in_srec
 
       # Check for any duplcate labels for the result.
       unique_labels, counts = np.unique( res[queried_name]['layout']['labels'], return_counts=True )
@@ -681,8 +684,27 @@ class MiliDatabase:
 
       # initialize the results structure for this queried name
       svar_np_dtype = self.__svars[queried_svar_name].data_type.numpy_dtype()
+      qty_states = len(states) # dim 1 is number of states
+      qty_elems = 0
+      comp_qtys = []
+      # Loop over subrecords to get the total number of elements and components for each subrecord
       for srec in srecs_to_query:
-        res[queried_name]['data'] = np.empty( [ len(states), *srec_internal_offsets[srec.name].shape ], dtype = svar_np_dtype )
+        srec_result_shape = srec_internal_offsets[srec.name].shape
+        qty_elems += srec_result_shape[0]
+        comp_qtys.append( srec_result_shape[1] )
+
+      # Verify that number of components is consistants across all elements/materials/srecs that we are querying
+      if len(list(set(comp_qtys))) != 1:
+        debug_str = "Integration points by Labels:\n"
+        for srec, comp_qty in zip(srecs_to_query, comp_qtys):
+          srec_labels_in_query = self.__labels[srec.class_name][srec_element_ordinals[srec.name]]
+          debug_str += f"\tElements {srec_labels_in_query} have {comp_qty} integration points.\n"
+        raise ValueError(("Integration points not consistant across all elements/materials being queried. "
+                          "Please use the argument 'ips' to provide a specific integration point or "
+                          "to specify a set of integration points that exist for all the elements being queried\n"
+                          f"{debug_str}"))
+      qty_comps = comp_qtys[0]
+      res[queried_name]['data'] = np.empty( [ qty_states, qty_elems, qty_comps ], dtype = svar_np_dtype )
 
       # Determine which states (of those requested) appear in each of the state files.
       # This way we can open each file only once and process all the states that appear in it
@@ -706,7 +728,7 @@ class MiliDatabase:
             # Shape of the result array: Tuple with form (state_cnt, label_cnt, comp_cnt)
             # We want to use comp_cnt to initialize var data so that numpy can concatenate arrays
             result_shape = res[queried_name]['data'].shape
-            var_data = np.empty( [ 0, result_shape[2] ] , svar_np_dtype)
+            var_data = np.empty( [ 0, result_shape[2] ], svar_np_dtype)
             for srec in srecs_to_query:
               srec_offsets = srec_internal_offsets[srec.name]
               state_file.seek( state_offset + srec.state_byte_offset )
@@ -718,7 +740,7 @@ class MiliDatabase:
                 state_file.write( byte_write_data )
               else:
                 srec_var_data, _ = srec.extract_ordinals( byte_read_data, srec_offsets )
-            var_data = np.concatenate( ( var_data, srec_var_data ), axis=0 )
+              var_data = np.concatenate( ( var_data, srec_var_data ), axis=0 )
 
             res[ queried_name ][ "data" ][ sidx, :, : ] = var_data
 
