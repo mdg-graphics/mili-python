@@ -20,5 +20,11 @@
   requires = ["setuptools", "wheel", "toml", "GitPython"]
   build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+  where = ["src"]
+  include = [
+    "mili*",
+  ]
+
 [tool.setuptools.package-data]
-  mymodule = ["*py.typed"]
+  mili = ["py.typed"]
