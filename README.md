@@ -52,6 +52,36 @@ This will create a virtual environment called `.venv-mili-python-3.7.2` with all
 
 To run the test suite locally, cd into the directory `mili-python/src` and run: `python3 -m unittest discover tests`
 
+### Deployment
+
+The mili-python reader is distributed through the WCI Nexus repository.
+
+Nexus documentation:
+- Link to nexus docs: https://wci-svc-doc.llnl.gov/repo/nexus/
+- Setup for python: https://wci-svc-doc.llnl.gov/repo/setup_proxy/#python-pypi
+- Publishing python packages: https://wci-svc-doc.llnl.gov/repo/publishing/#python-pypi
+
+Before continuing take a look at the above documentation and perform the steps described in the `Setup for python` link.
+
+To generate the python `whl` file that is distributed run the following:
+```
+cd mili-python/
+version=$(cat src/mili/__init__.py | grep 'version' | grep -Eo "[[:digit:]]+,[[:digit:]]+,[[:digit:]]+" | tr , . )
+git tag -a v${version} -m "version $version"
+git push origin v${version}
+pip3 install --upgrade build
+python3 -m build
+```
+
+This will generate a directory in the top level of the `mili-python` repository that contains the `whl` file.
+
+To upload the `whl` file to the nexus repository you will need to use twine as shown below:
+```
+pip3 install twine
+python3 -m twine upload -r pypi-wci <whl-file>
+```
+> **NOTE**: The password requested is your AD password.
+
 # Installation
 
 There are currently two methods of installing the mili-python module. The recommeded method is installing from LC's python wheel house. However, if this does not work user may also install from source using the Git repository.
