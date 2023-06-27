@@ -56,7 +56,7 @@ class SerialDerivedExpressions(unittest.TestCase):
                     'prin_dev_strain1_alt', 'prin_dev_strain2_alt', 'prin_dev_strain3_alt',
                     'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure',
                     'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress',
-                    'eps_rate'
+                    'triaxiality', 'eps_rate'
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
@@ -661,6 +661,34 @@ class SerialDerivedExpressions(unittest.TestCase):
         MAX_SHEAR_STRESS = np.array([ [1.26454219e+04, 2.01934336e+04, 1.99482969e+04, 1.24009092e+04] ])
         np.testing.assert_allclose( result['max_shear_stress']['data'][0,:,:], MAX_SHEAR_STRESS, rtol=2.0E-07)
 
+    def test_triaxiality(self):
+        """Triaxiality"""
+        # Answers are based on hand calculations using griz results for pressure and seff.
+        result = self.mili.query("triaxiality", "brick", states=[2,44,86], labels=[10, 20])
+        self.assertEqual(result['triaxiality']['source'], 'derived')
+        # State 2, labels 10, 20
+        self.assertAlmostEqual( result['triaxiality']['data'][0][0][0], -3.83957754/3.88536481, delta=1.0E-08)
+        self.assertAlmostEqual( result['triaxiality']['data'][0][1][0], +7.58286600/7.60721042, delta=1.0E-06)
+        # State 44, labels 10, 20
+        self.assertAlmostEqual( result['triaxiality']['data'][1][0][0], -9.14670837e+02/1.88665918e+03, delta=1.0E-8)
+        self.assertAlmostEqual( result['triaxiality']['data'][1][1][0], -1.33453210e+03/9.77912305e+03, delta=1.0E-8)
+        # State 86, labels 10, 20
+        self.assertAlmostEqual( result['triaxiality']['data'][2][0][0], -1.01330109e+03/1.09058093e+03, delta=7.0E-8)
+        self.assertAlmostEqual( result['triaxiality']['data'][2][1][0], -1.97040161e+02/1.22841052e+03, delta=5.5E-8)
+
+        # Test derived equation for a single integration point
+        result = self.mili.query("triaxiality", "beam", labels=[20], states=[44], ips=[2])
+        self.assertEqual(result['triaxiality']['source'], 'derived')
+        self.assertAlmostEqual( result['triaxiality']['data'][0][0][0], -1.23563398e+04/3.95834883e+04, delta=1.0E-08)
+
+        # Test derived equation when there are multiple integration points
+        result = self.mili.query("triaxiality", "beam", labels=[20], states=[44], ips=[1,2,3,4])
+        self.assertEqual(result['triaxiality']['source'], 'derived')
+        PRESSURE = np.array([ [7.60622900e+03, 1.23563398e+04, 1.21421602e+04, 7.38469482e+03] ])
+        SEFF = np.array([ [2.46960137e+04, 3.95834883e+04, 3.90579766e+04, 2.41670957e+04] ])
+        TRIAXIALITY = -PRESSURE/SEFF
+        np.testing.assert_allclose( result['triaxiality']['data'][0,:,:], TRIAXIALITY, rtol=1.0E-07)
+
     def test_eps_rate(self):
         """Effective Plastic Strain Rate"""
         # Use a different database that has plastic strain (eps)
@@ -1146,3 +1174,29 @@ class ParallelDerivedExpressions(unittest.TestCase):
         result = self.mili.query("max_shear_stress", "beam", labels=[20], states=[44], ips=[1,2,3,4])
         MAX_SHEAR_STRESS = np.array([ [1.26454219e+04, 2.01934336e+04, 1.99482969e+04, 1.24009092e+04] ])
         np.testing.assert_allclose( result[6]['max_shear_stress']['data'][0,:,:], MAX_SHEAR_STRESS, rtol=2.0E-07)
+
+    def test_triaxiality(self):
+        """Triaxiality"""
+        # Answers are based on hand calculations using griz results for pressure and seff.
+        result = self.mili.query("triaxiality", "brick", states=[2,44,86], labels=[10, 20])
+        # State 2, labels 10, 20
+        self.assertAlmostEqual( result[0]['triaxiality']['data'][0][0][0], -3.83957754/3.88536481, delta=1.0E-08)
+        self.assertAlmostEqual( result[5]['triaxiality']['data'][0][0][0], +7.58286600/7.60721042, delta=1.0E-06)
+        # State 44, labels 10, 20
+        self.assertAlmostEqual( result[0]['triaxiality']['data'][1][0][0], -9.14670837e+02/1.88665918e+03, delta=1.0E-8)
+        self.assertAlmostEqual( result[5]['triaxiality']['data'][1][0][0], -1.33453210e+03/9.77912305e+03, delta=1.0E-8)
+        # State 86, labels 10, 20
+        self.assertAlmostEqual( result[0]['triaxiality']['data'][2][0][0], -1.01328064e+03/1.0905776e+03, delta=6.0E-8)
+        self.assertAlmostEqual( result[5]['triaxiality']['data'][2][0][0], -1.970438e+02/1.2283358e+03, delta=1.0E-8)
+
+        # Test derived equation for a single integration point
+        result = self.mili.query("triaxiality", "beam", labels=[20], states=[44], ips=[2])
+        self.assertEqual(result[6]['triaxiality']['source'], 'derived')
+        self.assertAlmostEqual( result[6]['triaxiality']['data'][0][0][0], -1.23563398e+04/3.95834883e+04, delta=1.0E-08)
+
+        # Test derived equation when there are multiple integration points
+        result = self.mili.query("triaxiality", "beam", labels=[20], states=[44], ips=[1,2,3,4])
+        PRESSURE = np.array([ [7.60622900e+03, 1.23563398e+04, 1.21421602e+04, 7.38469482e+03] ])
+        SEFF = np.array([ [2.46960137e+04, 3.95834883e+04, 3.90579766e+04, 2.41670957e+04] ])
+        TRIAXIALITY = -PRESSURE/SEFF
+        np.testing.assert_allclose( result[6]['triaxiality']['data'][0,:,:], TRIAXIALITY, rtol=1.0E-07)

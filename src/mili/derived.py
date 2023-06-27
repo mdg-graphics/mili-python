@@ -211,6 +211,11 @@ class DerivedExpressions:
         "primals_class": [None, None, None, None, None, None],
         "compute_function": self.__compute_max_shear_stress
       },
+      "triaxiality": {
+        "primals": ["sx","sy","sz","sxy","syz","szx"],
+        "primals_class": [None, None, None, None, None, None],
+        "compute_function": self.__compute_triaxiality
+      },
       "eps_rate": {
         "primals": ["eps"],
         "primals_class": [None],
@@ -1091,7 +1096,39 @@ class DerivedExpressions:
           result_matrix[i,j,k] = 0.5 * (max(eigen_values) - min(eigen_values))
     
     derived_result[result_name]['data'] = result_matrix
-            
+
+    return derived_result
+
+  def __compute_triaxiality(self,
+                         result_name: str,
+                         primal_data: dict,
+                         query_args: dict):
+    """Calculate the derived result 'triaxiality'."""
+    states = query_args['states']
+    # Create dictionary structure for the final result
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+
+    sx = primal_data['sx']['data']
+    sy = primal_data['sy']['data']
+    sz = primal_data['sz']['data']
+    sxy = primal_data['sxy']['data']
+    syz = primal_data['syz']['data']
+    szx = primal_data['szx']['data']
+
+    pressure = -(1/3) * (sx + sy + sz)
+    dev_stress_x = sx+pressure
+    dev_stress_y = sy+pressure
+    dev_stress_z = sz+pressure
+    
+    # Calculate the 2nd deviatoric stress invariant, J2
+    J2 = 0.5 * (dev_stress_x**2 + dev_stress_y**2 + dev_stress_z**2) \
+              + sxy*sxy + syz*syz + szx*szx
+              
+    # Calculate the effective stress
+    seff = np.sqrt(3*J2)
+
+    derived_result[result_name]['data'] = -pressure/seff
+
     return derived_result
 
   def __compute_plastic_strain_rate(self,
