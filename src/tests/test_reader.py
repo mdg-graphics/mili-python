@@ -5,6 +5,7 @@ SPDX-License-Identifier: (MIT)
 """
 import re
 import os
+import copy
 import unittest
 from mili import reader
 from mili.datatypes import Superclass
@@ -708,7 +709,7 @@ class SerialSingleStateFile(unittest.TestCase):
         v1 = { 'stress[sy]' :
                  { 'layout' :
                     {
-                        '1beam_mmsvn_rec' : np.array( [5], dtype = np.int32 ),
+                        'labels' : np.array( [5], dtype = np.int32 ),
                         'states' : np.array( [71], dtype = np.int32 )
                     },
                    'data' : np.array( [ [ [ -5545.70751953125 ] ] ], dtype = np.float32 )
@@ -2376,6 +2377,197 @@ class ExperimentalParallelSingleStateFile(unittest.TestCase):
         answer = self.mili.query("te", "glob", states=[22])
         self.assertAlmostEqual( answer[0]["te"]["data"][0,0,0], 1629.718, delta=1e-4)
 
+
+class TestCombineFunction(unittest.TestCase):
+    file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
+
+    def setUp(self):
+        self.mili = reader.open_database( TestCombineFunction.file_name, suppress_parallel=True )
+
+    def __compare_parallel_and_combined_result( self, parallel_result, combined_result ) -> bool:
+        """Helper function to validate combine function."""
+        for processor_result in parallel_result:
+            for svar in processor_result:
+                # Check svar exists
+                self.assertTrue(svar in combined_result)
+                # Check that states are the same
+                np.testing.assert_equal(processor_result[svar]['layout']['states'], combined_result[svar]['layout']['states'])
+                for elem_index, element in enumerate(processor_result[svar]['layout']['labels']):
+                    # Check that element exists
+                    self.assertTrue( element in combined_result[svar]['layout']['labels'] )
+                    combined_index = np.where( element == combined_result[svar]['layout']['labels'] )[0][0]
+                    # Check that element result is the same for all states
+                    for state_index, state in enumerate(processor_result[svar]['layout']['states']):
+                        np.testing.assert_equal( processor_result[svar]['data'][state_index,elem_index,:], combined_result[svar]['data'][state_index,combined_index,:] )
+
+    def test_combine_scalar( self ):
+        """ Test combine function with scalar result"""
+        res = self.mili.query("sx", "brick", states=[44, 78])
+        combined = reader.combine( res )
+        self.__compare_parallel_and_combined_result(res, combined)
+
+    def test_compile_multiple_scalars( self ):
+        """ Test combine function with multiple scalar results"""
+        res = self.mili.query(["sx","sy"], "brick", states=[44, 78])
+        combined = reader.combine( res )
+        self.__compare_parallel_and_combined_result(res, combined)
+
+    def test_combine_vector( self ):
+        """ Test combine function with vector result"""
+        res = self.mili.query("stress", "brick", states=[44, 78])
+        combined = reader.combine( res )
+        self.__compare_parallel_and_combined_result(res, combined)
+
+    def test_combine_vector_array( self ):
+        """ Test combine function with vector array result"""
+        res = self.mili.query("stress", "shell", states=[44, 78])
+        combined = reader.combine( res )
+        self.__compare_parallel_and_combined_result(res, combined)
+
+    def test_combine_nodal_scalar( self ):
+        """ Test combine function with nodal scalar result"""
+        res = self.mili.query("ux", "node", states=[44, 78])
+        combined = reader.combine( res )
+        self.__compare_parallel_and_combined_result(res, combined)
+
+    def test_combine_nodal_vector( self ):
+        """ Test combine function with nodal vector result"""
+        res = self.mili.query("nodpos", "node", states=[44, 78])
+        combined = reader.combine( res )
+        self.__compare_parallel_and_combined_result(res, combined)
+
+class TestResultsByElementFunction(unittest.TestCase):
+    file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
+
+    def setUp(self):
+        self.mili = reader.open_database( TestCombineFunction.file_name, suppress_parallel=True )
+
+    def __compare_parallel_and_reorganized_result( self, parallel_result, reorganized_result ) -> bool:
+        """Helper function to validate results_by_element function."""
+        for processor_result in parallel_result:
+            for svar in processor_result:
+                # Check svar exists
+                self.assertTrue(svar in reorganized_result)
+
+                for elem_index, element in enumerate(processor_result[svar]['layout']['labels']):
+                    # Check that element exists
+                    self.assertTrue( element in reorganized_result[svar] )
+                    # Check that element result is the same for all states
+                    for state_index, state in enumerate(processor_result[svar]['layout']['states']):
+                        np.testing.assert_equal( processor_result[svar]['data'][state_index,elem_index,:], reorganized_result[svar][element][state_index] )
+
+    def test_result_by_element_scalar( self ):
+        """ Test result_by_element function with scalar result"""
+        res = self.mili.query("sx", "brick", states=[44, 78])
+        reorganized = reader.results_by_element(res)
+        self.__compare_parallel_and_reorganized_result(res, reorganized)
+
+    def test_result_by_element_multiple_scalars( self ):
+        """ Test result_by_element function with multiple scalar results"""
+        res = self.mili.query(["sx","sy"], "brick", states=[44, 78])
+        reorganized = reader.results_by_element(res)
+        self.__compare_parallel_and_reorganized_result(res, reorganized)
+
+    def test_result_by_element_vector( self ):
+        """ Test result_by_element function with vector result"""
+        res = self.mili.query("stress", "brick", states=[44, 78])
+        reorganized = reader.results_by_element(res)
+        self.__compare_parallel_and_reorganized_result(res, reorganized)
+
+    def test_result_by_element_vector_array( self ):
+        """ Test result_by_element function with vector array result"""
+        res = self.mili.query("stress", "shell", states=[44, 78])
+        reorganized = reader.results_by_element(res)
+        self.__compare_parallel_and_reorganized_result(res, reorganized)
+
+    def test_result_by_element_nodal_scalar( self ):
+        """ Test result_by_element function with nodal scalar result"""
+        res = self.mili.query("ux", "node", states=[44, 78])
+        reorganized = reader.results_by_element(res)
+        self.__compare_parallel_and_reorganized_result(res, reorganized)
+
+    def test_result_by_element_nodal_vector( self ):
+        """ Test result_by_element function with nodal vector result"""
+        res = self.mili.query("nodpos", "node", states=[44, 78])
+        reorganized = reader.results_by_element(res)
+        self.__compare_parallel_and_reorganized_result(res, reorganized)
+
+class TestModifyUncombinedDatabase(unittest.TestCase):
+    file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
+
+    def setUp(self):
+        self.mili = reader.open_database( TestCombineFunction.file_name, suppress_parallel=True )
+    
+    def test_modify_scalar(self):
+        res = self.mili.query("sx", "brick", states=[1])
+        original = reader.combine(res)
+
+        # Modify database
+        modified = copy.deepcopy(original)
+        modified['sx']['data'][0,:] = 10.10
+        res = self.mili.query("sx", "brick", states=[1], write_data=modified)
+        np.testing.assert_equal( modified['sx']['data'], reader.combine(res)['sx']['data'] )
+
+        # Back to original
+        res = self.mili.query("sx", "brick", states=[1], write_data=original)
+        np.testing.assert_equal( original['sx']['data'], reader.combine(res)['sx']['data'] )
+    
+    def test_modify_vector(self):
+        res = self.mili.query("stress", "brick", states=[1])
+        original = reader.combine(res)
+
+        # Modify database
+        modified = copy.deepcopy(original)
+        modified['stress']['data'][0,:] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+        res = self.mili.query("stress", "brick", states=[1], write_data=modified)
+        np.testing.assert_equal( modified['stress']['data'], reader.combine(res)['stress']['data'] )
+
+        # Back to original
+        res = self.mili.query("stress", "brick", states=[1], write_data=original)
+        np.testing.assert_equal( original['stress']['data'], reader.combine(res)['stress']['data'] )
+    
+    def test_modify_vector_array_single_ipt(self):
+        res = self.mili.query("sx", "beam", states=[1], ips=[1])
+        original = reader.combine(res)
+
+        # Modify database
+        modified = copy.deepcopy(original)
+        modified['sx']['data'][0,:] = 10.10
+        res = self.mili.query("sx", "beam", states=[1], ips=[1], write_data=modified)
+        np.testing.assert_equal( modified['sx']['data'], reader.combine(res)['sx']['data'] )
+
+        # Back to original
+        res = self.mili.query("sx", "beam", states=[1], ips=[1], write_data=original)
+        np.testing.assert_equal( original['sx']['data'], reader.combine(res)['sx']['data'] )
+
+    def test_modify_vector_array_multiple_ipt(self):
+        res = self.mili.query("sx", "beam", states=[1], ips=[1,3])
+        original = reader.combine(res)
+
+        # Modify database
+        modified = copy.deepcopy(original)
+        modified['sx']['data'][0,:] = [10.20, 30.40]
+        res = self.mili.query("sx", "beam", states=[1], ips=[1,3], write_data=modified)
+        np.testing.assert_equal( modified['sx']['data'], reader.combine(res)['sx']['data'] )
+
+        # Back to original
+        res = self.mili.query("sx", "beam", states=[1], ips=[1,3], write_data=original)
+        np.testing.assert_equal( original['sx']['data'], reader.combine(res)['sx']['data'] )
+
+    def test_modify_vector_array_multiple_ipt(self):
+        res = self.mili.query("sx", "beam", states=[1])
+        original = reader.combine(res)
+
+        # Modify database
+        modified = copy.deepcopy(original)
+        modified['sx']['data'][0,:] = [10.20, 30.40, 50.60, 70.80]
+        res = self.mili.query("sx", "beam", states=[1], write_data=modified)
+        np.testing.assert_equal( modified['sx']['data'], reader.combine(res)['sx']['data'] )
+
+        # Back to original
+        res = self.mili.query("sx", "beam", states=[1], write_data=original)
+        np.testing.assert_equal( original['sx']['data'], reader.combine(res)['sx']['data'] )
+    
 
 if __name__ == "__main__":
     unittest.main()

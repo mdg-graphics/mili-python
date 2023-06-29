@@ -237,7 +237,7 @@ result = db.query('sx', 'brick', material = 'es_12', states = 37 )
 ```
 
 ---
-##### Understanding the results:
+### Understanding the results:
 
 Lets take a look at how the returned results are formatted using the query below.
 ```python
@@ -258,7 +258,7 @@ result = {
 ```
 **Note:** for parallel databases, the result data for each rank is contained in a top-level list.
 
-##### Getting data out of the result dictionary
+### Getting data out of the result dictionary
 
 The data array is indexed with tuples of the form `(state_index, label_index, scalar_index)`. To be clear the `state_index` and `label_index` are the indices of the state and label in the list of states and list of labels passed to query function call, which is why these are also returned in the 'layout' data since those query arguments are optional. Thus to find the indices for state `T` and node label `N`, we need to:
 ```python
@@ -268,6 +268,60 @@ nidx = np.where(N == result['noppos[ux]']['layout']['labels'])
 N_data_at_T = result['nodpos[ux]']['data'][sidx[0], nidx[0],:]
 ```
 **Note**: if you only need data for a single node or for single state, format the query so only that data is returned rather than querying large amounts of data and indexing into it as above.
+
+### Result Dictionary Utility Functions
+
+There are some additional functions that users will find helpful in reorganizing the data into an easier to use format. These are the `combine` function and the `results_by_element` function.
+
+#### The `combine` function
+
+The `combine` function converts the list of result dictionaries returned when querying an uncombined Mili database and merges all the data into a single dictionary.
+
+```python
+from mili.reader import combine
+
+result = db.query("sx", "brick", states=[40])
+combined = combine(result)
+
+# OR
+
+combined = combine( db.query("sx", "brick", states=[40]) )
+```
+
+#### The `results_by_element` function
+
+The `results_by_element` function extracts all the data from a result dictionary (For both serial and parallel database) and reorganizes the data into a new dictionary with the form `<variable-name> : { <element-id> : <numpy_array_of_data> }`.
+
+```python
+from mili.reader import results_by_element
+
+result = db.query("stress", "brick")
+element_data = results_by_element( result )
+
+# OR
+
+element_data = results_by_element( db.query("stress", "brick") )
+
+stress_brick_101 = element_data['stress'][101]  # [[ STATE 1: sx, sy, sz, sxy, syz, szx ],
+                                                #  [ STATE 2: sx, sy, sz, sxy, syz, szx ]
+                                                #  [ STATE 3: sx, sy, sz, sxy, syz, szx ]
+                                                #  ... ]
+
+# NOTE: State 0 is not the first state in the problem, but the first state
+#       that you queried. That may be the first state in the problem or a different
+#       state depending on the arguments you passed to the query
+stress_brick_20_state_0 = element_data['stress'][101][0]
+
+# Integration Point Data
+
+# The shell elements have integration points 1 and 2 for stress
+element_data = results_by_element( db.query("sy", "shell") )
+
+sy_shell_1 = element_data['sy'][1]  # [[ STATE 1: sy_int_point1, sy_int_point2 ],
+                                    #  [ STATE 2: sy_int_point1, sy_int_point2 ]
+                                    #  [ STATE 3: sy_int_point1, sy_int_point2 ]
+                                    #  ... ]
+```
 
 ---
 ##### NOTES:
@@ -308,15 +362,24 @@ result = db.query( 'prin_stress1', 'shell', labels = [1], states = [2], ips = [1
 # Modifying Results
 
 ```python
+# For a Serial Database
 db = reader.open_database( 'base_filename', suppress_parallel = True )
 nodpos_ux = db.query( 'nodpos[ux]', 'node' )
+# modify nodpos_ux
+nodpos_ux = db.query( 'nodpos[ux]', 'node', write_data = nodpos_ux )
+
+# For a Parallel Database
+db = reader.open_database( 'base_filename', suppress_parallel = True )
+nodpos_ux = db.query( 'nodpos[ux]', 'node' )
+# This merges all the individual processor result dictionaries into a single dictionary
+nodpos_ux = reader.combine(nodpos_ux)
 # modify nodpos_ux
 nodpos_ux = db.query( 'nodpos[ux]', 'node', write_data = nodpos_ux )
 ```
 
 Will write modified data back to the database. The `write_data` must have the same format as the result data for an identical query. In practice it is best to simply process a query, modify the results, and then submit the same query supplying the modified results as the `write_data` argument.
 
-> **Note:** in parallel, the result format has an additonal top-level list. This is not currently accounted for in write-mode. A user must currently produce a `write_data` argument that contains the union of the set of data to be written to the parallel database. Thus if some data was queried from rank 0 databases and some from rank 1, the results dictionaries for the first two top-level results in the list must be merged appropriately to allow the opertional to succeed. This is cumbersome and not reccomended. Opening individual parallel databases in serial mode is supported, and may present a cleaner solution until development accomodates this use-case.
+> **Note:** in parallel, the result format has an additonal top-level list. This is not currently accounted for in write-mode. A user must currently produce a `write_data` argument that contains the union of the set of data to be written to the parallel database. Thus if some data was queried from rank 0 databases and some from rank 1, the results dictionaries for the first two top-level results in the list must be merged appropriately to allow the opertional to succeed. This can be done using the `combine` function references above.
 
 > **Note:** minimal enforcement/checking of the `write_data` structure is currently done and malformed `write_data` *could* possibly (unlikely) cause database corruption, use at your own discretion. Create backups, test on smaller databases first, etc. A python expection is the most likely outcome here, but caution is best.
 

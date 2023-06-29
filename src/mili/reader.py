@@ -584,7 +584,7 @@ class MiliDatabase:
 
     res = dict.fromkeys( svar_names )
     for ikey in res.keys():
-      res[ikey] = { 'data' : {}, 'layout' : { 'states' : states,  'labels' : np_empty( np.int32 ) }, 'source': '' }
+      res[ikey] = { 'data' : np_empty( np.float32 ), 'layout' : { 'states' : states,  'labels' : np_empty( np.int32 ) }, 'source': '' }
 
     # for parallel operation it will often be the case a specific file doesn't have any labels
     labels_of_class = self.__labels.get( class_sname, np_empty(np.int32) )
@@ -632,13 +632,16 @@ class MiliDatabase:
         srecs_to_query = [srec for srec in srecs_to_query if srec.name == subrec]
 
       filtered_write_data = copy.deepcopy( write_data )
-      if write_data is not None and ordinals.size != labels.size:
-        # if we don't have all the labels queried and we're writing data, we potentially need
-        #  to filter for the subset of the labels we *do* have locally
-        local_write_labels = labels_of_class[ ordinals ]
-        rows_to_write = np.where( np.isin( local_write_labels,  filtered_write_data[queried_name]['layout']['labels'] ) )[0]
-        filtered_write_data[queried_name]['layout']['labels'] = local_write_labels
-        filtered_write_data[queried_name]['data'] = filtered_write_data[queried_name]['data'][ :, rows_to_write, : ]
+      if write_data is not None:
+        q_write_data = write_data.get(queried_name, None)
+        if q_write_data is not None:
+          if q_write_data['layout']['labels'].size != ordinals.size:
+            # if we don't have all the labels queried and we're writing data, we potentially need
+            #  to filter for the subset of the labels we *do* have locally
+            local_write_labels = labels_of_class[ ordinals ]
+            rows_to_write = np.where( np.isin( local_write_labels,  filtered_write_data[queried_name]['layout']['labels'] ) )[0]
+            filtered_write_data[queried_name]['layout']['labels'] = local_write_labels
+            filtered_write_data[queried_name]['data'] = filtered_write_data[queried_name]['data'][ :, rows_to_write, : ]
 
         # if we're looking for ip data determine which int_points we can get for each svar in each subrec
       matching_int_points = dict()
@@ -745,6 +748,53 @@ class MiliDatabase:
             res[ queried_name ][ "data" ][ sidx, :, : ] = var_data
 
     return res
+
+def combine( results_dict: List[Dict] ) -> dict:
+  """Given a parallel result dictionary, Merge data into a single dictionary.
+
+  NOTE: This does not take an insignificant amount of time 
+  """
+  # If result_dict is already a dictionary, just return it.
+  if isinstance( results_dict, dict ):
+    return results_dict
+
+  # Otherwise combine
+  merged_results = {}
+  for processor_result in results_dict:
+    for svar in processor_result:
+      if svar not in merged_results and processor_result[svar]['data'].size > 0:
+        merged_results[svar] = {}
+        merged_results[svar]['layout'] = {}
+        merged_results[svar]['source'] = processor_result[svar]['source']
+        merged_results[svar]['layout']['states'] = processor_result[svar]['layout']['states']
+        merged_results[svar]['data'] = processor_result[svar]['data']
+        merged_results[svar]['layout']['labels'] = processor_result[svar]['layout']['labels']
+      else:
+        if processor_result[svar]['data'].size > 0:
+          # Need to check for duplicates to handle Nodal results
+          non_duplicate_idxs = np.where( np.isin(processor_result[svar]['layout']['labels'], merged_results[svar]['layout']['labels'], invert=True) )[0]
+          merged_results[svar]['data'] = np.concatenate( (merged_results[svar]['data'], processor_result[svar]['data'][:,non_duplicate_idxs,:]), axis=1 )
+          merged_results[svar]['layout']['labels'] = np.concatenate( (merged_results[svar]['layout']['labels'], processor_result[svar]['layout']['labels'][non_duplicate_idxs]) )
+  
+  return merged_results
+
+def results_by_element( result_dict: Union[Dict,List[Dict]]) -> dict:
+  """Reorganize result data in a new dictionary with the form { svar: { element: <list_of_results> } }"""
+  if isinstance( result_dict, dict ):
+    result_dict = [result_dict]
+
+  reorganized_data = {}
+
+  for processor_result in result_dict:
+    for svar in processor_result:
+      if svar not in reorganized_data:
+        reorganized_data[svar] = {}
+      
+      for elem_idx, element in enumerate(processor_result[svar]['layout']['labels']):
+        if element not in reorganized_data:
+          reorganized_data[svar][element] = processor_result[svar]['data'][:,elem_idx,:]
+
+  return reorganized_data
 
 def open_database( base : os.PathLike, procs = [], suppress_parallel = False, experimental = False, **kwargs ):
   """
