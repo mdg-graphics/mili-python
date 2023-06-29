@@ -341,8 +341,22 @@ class MiliDatabase:
       return self.__conns.get(class_name, None)
     return self.__conns
 
-  def material_classes(self, mat):
-    return self.__elems_of_mat.get(mat,{}).keys()
+  def material_classes(self, mat: Union[str,int]):
+    """Get list of classes of a specified material"""
+    if type(mat) is not str and type(mat) is not int:
+      raise ValueError('material must be string or int')
+    mat_nums = []
+    if type(mat) is str and mat in self.__mats.keys():
+      mat_nums = self.__mats.get( mat, [] )
+    elif type(mat) is str and mat.isdigit():
+      mat = int(mat)
+    if type(mat) is int and mat in self.__elems_of_mat.keys():
+      mat_nums = [ mat ]
+    classes = []
+    for mat in mat_nums:
+      for class_name in self.__elems_of_mat.get(mat,{}).keys():
+        classes.append(class_name)
+    return classes
 
   def classes_of_state_variable(self, svar: str):
     classes = []
@@ -351,7 +365,7 @@ class MiliDatabase:
       classes = list(set([ srec.class_name for srec in state_variable.srecs ]))
     return classes
 
-  def parts_of_class_name( self, class_name ):
+  def parts_of_class_name( self, class_name: str ):
     """Get List of part numbers for all elements of a given class name."""
     elem_parts = np.zeros( self.__labels.get( class_name, np_empty(np.int32) ).shape, dtype=np.int32 )
     elem_parts[:] = -1
@@ -360,7 +374,7 @@ class MiliDatabase:
       elem_parts[ idxs ] = part
     return elem_parts
 
-  def materials_of_class_name( self, class_name ):
+  def materials_of_class_name( self, class_name: str ):
     """Get List of materials for all elements of a given class name."""
     elem_mats = np.zeros( self.__labels.get( class_name, np_empty(np.int32) ).shape, dtype=np.int32 )
     elem_mats[:] = -1
@@ -369,7 +383,7 @@ class MiliDatabase:
       elem_mats[ idxs ] = mat
     return elem_mats
 
-  def class_labels_of_material( self, mat, class_name ):
+  def class_labels_of_material( self, mat: Union[str,int], class_name: str ):
     '''
     Convert a material name into labels of the specified class (if any)
     '''
@@ -379,7 +393,10 @@ class MiliDatabase:
       raise ValueError('material must be string or int')
     if type(mat) is str:
       all_reps = set( self.__mats.keys() )
-    elif type(mat) is int:
+      # Check if mat is an integer passed in as a string
+      if mat not in all_reps and mat.isdigit():
+        mat = int(mat)
+    if type(mat) is int:
       all_reps = list( itertools.chain.from_iterable(self.__mats.values()) )
     if mat not in all_reps and mat not in self.__elems_of_mat.keys():
       return np_empty(np.int32)
@@ -392,14 +409,17 @@ class MiliDatabase:
     labels = self.__labels[ class_name ][ elem_idxs ]
     return labels
 
-  def all_labels_of_material( self, mat ):
+  def all_labels_of_material( self, mat: Union[str,int] ):
     ''' Given a specific material. Find all labels with that material and return their values. '''
-    if mat not in self.__mats.keys() and mat not in self.__elems_of_mat.keys():
-      return np_empty(np.int32)
-    if type(mat) == int:
-      mat_nums = [ mat ]
-    else:
+    if type(mat) is not str and type(mat) is not int:
+      raise ValueError('material must be string or int')
+    mat_nums = []
+    if type(mat) is str and mat in self.__mats.keys():
       mat_nums = self.__mats.get( mat, [] )
+    elif type(mat) is str and mat.isdigit():
+      mat = int(mat)
+    if type(mat) is int and mat in self.__elems_of_mat.keys():
+      mat_nums = [ mat ]
     labels = {}
     for mat_num in mat_nums:
       for class_name in self.__elems_of_mat.get( mat_num , {} ).keys():
@@ -427,8 +447,8 @@ class MiliDatabase:
 
   def nodes_of_material( self, mat ):
     ''' Find nodes associated with a material number '''
-    if mat not in self.__mats and mat not in self.__elems_of_mat:
-      return np_empty(np.int32)
+    if type(mat) is not str and type(mat) is not int:
+      raise ValueError('material must be string or int')
     element_labels = self.all_labels_of_material( mat )
     node_labels = np_empty(np.int32)
     for class_name, class_labels in element_labels.items():

@@ -483,11 +483,29 @@ class SerialSingleStateFile(unittest.TestCase):
        self.assertEqual(labels.size, 12)
        np.testing.assert_equal( labels, np.arange( 1, 13, dtype = np.int32 ) )
 
+       answer = self.mili.all_labels_of_material('3')
+       _, labels = list(answer.items())[0]
+       self.assertEqual(labels.size, 12)
+       np.testing.assert_equal( labels, np.arange( 1, 13, dtype = np.int32 ) )
+
+       answer = self.mili.all_labels_of_material(3)
+       _, labels = list(answer.items())[0]
+       self.assertEqual(labels.size, 12)
+       np.testing.assert_equal( labels, np.arange( 1, 13, dtype = np.int32 ) )
+
     '''
     Testing what nodes are associated with a material
     '''
     def test_nodes_material(self):
         answer = self.mili.nodes_of_material('es_1')
+        self.assertEqual(answer.size, 48)
+        np.testing.assert_equal( answer, np.arange(1, 49, dtype = np.int32) )
+
+        answer = self.mili.nodes_of_material('1')
+        self.assertEqual(answer.size, 48)
+        np.testing.assert_equal( answer, np.arange(1, 49, dtype = np.int32) )
+
+        answer = self.mili.nodes_of_material(1)
         self.assertEqual(answer.size, 48)
         np.testing.assert_equal( answer, np.arange(1, 49, dtype = np.int32) )
 
@@ -778,6 +796,12 @@ class SerialMutliStateFile(unittest.TestCase):
 
     def test_class_labels_of_mat(self):
         answer = self.mili.class_labels_of_material(5,'cseg')
+        np.testing.assert_equal(answer, np.array([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],dtype=np.int32))
+
+        answer = self.mili.class_labels_of_material("5",'cseg')
+        np.testing.assert_equal(answer, np.array([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],dtype=np.int32))
+
+        answer = self.mili.class_labels_of_material("slide1m",'cseg')
         np.testing.assert_equal(answer, np.array([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],dtype=np.int32))
 
     def test_modify_vector_array(self):
@@ -1315,12 +1339,30 @@ class ParallelSingleStateFile(unittest.TestCase):
        np.testing.assert_equal(answer[3]['shell'],np.array([1,2,3,4,5,6], dtype=np.int32))
        np.testing.assert_equal(answer[5]['shell'],np.array([7,8,10], dtype=np.int32))
 
+       answer = self.mili.all_labels_of_material('3')
+       np.testing.assert_equal(answer[2]['shell'],np.array([9,11,12], dtype=np.int32))
+       np.testing.assert_equal(answer[3]['shell'],np.array([1,2,3,4,5,6], dtype=np.int32))
+       np.testing.assert_equal(answer[5]['shell'],np.array([7,8,10], dtype=np.int32))
+
+       answer = self.mili.all_labels_of_material(3)
+       np.testing.assert_equal(answer[2]['shell'],np.array([9,11,12], dtype=np.int32))
+       np.testing.assert_equal(answer[3]['shell'],np.array([1,2,3,4,5,6], dtype=np.int32))
+       np.testing.assert_equal(answer[5]['shell'],np.array([7,8,10], dtype=np.int32))
+
 
     '''
     Testing what nodes are associated with a material
     '''
     def test_nodes_material(self):
         answer = self.mili.nodes_of_material('es_1')
+        node_labels = np.unique( np.concatenate((*answer,)) )
+        np.testing.assert_equal( node_labels, np.arange(1, 49, dtype = np.int32) )
+
+        answer = self.mili.nodes_of_material('1')
+        node_labels = np.unique( np.concatenate((*answer,)) )
+        np.testing.assert_equal( node_labels, np.arange(1, 49, dtype = np.int32) )
+
+        answer = self.mili.nodes_of_material(1)
         node_labels = np.unique( np.concatenate((*answer,)) )
         np.testing.assert_equal( node_labels, np.arange(1, 49, dtype = np.int32) )
 
@@ -2117,12 +2159,30 @@ class ExperimentalParallelSingleStateFile(unittest.TestCase):
        np.testing.assert_equal(answer[3]['shell'],np.array([1,2,3,4,5,6], dtype=np.int32))
        np.testing.assert_equal(answer[5]['shell'],np.array([7,8,10], dtype=np.int32))
 
+       answer = self.mili.all_labels_of_material('3')
+       np.testing.assert_equal(answer[2]['shell'],np.array([9,11,12], dtype=np.int32))
+       np.testing.assert_equal(answer[3]['shell'],np.array([1,2,3,4,5,6], dtype=np.int32))
+       np.testing.assert_equal(answer[5]['shell'],np.array([7,8,10], dtype=np.int32))
+
+       answer = self.mili.all_labels_of_material(3)
+       np.testing.assert_equal(answer[2]['shell'],np.array([9,11,12], dtype=np.int32))
+       np.testing.assert_equal(answer[3]['shell'],np.array([1,2,3,4,5,6], dtype=np.int32))
+       np.testing.assert_equal(answer[5]['shell'],np.array([7,8,10], dtype=np.int32))
+
 
     '''
     Testing what nodes are associated with a material
     '''
     def test_nodes_material(self):
         answer = self.mili.nodes_of_material('es_1')
+        node_labels = np.unique( np.concatenate((*answer,)) )
+        np.testing.assert_equal( node_labels, np.arange(1, 49, dtype = np.int32) )
+
+        answer = self.mili.nodes_of_material('1')
+        node_labels = np.unique( np.concatenate((*answer,)) )
+        np.testing.assert_equal( node_labels, np.arange(1, 49, dtype = np.int32) )
+
+        answer = self.mili.nodes_of_material(1)
         node_labels = np.unique( np.concatenate((*answer,)) )
         np.testing.assert_equal( node_labels, np.arange(1, 49, dtype = np.int32) )
 
