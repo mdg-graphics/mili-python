@@ -2559,73 +2559,159 @@ class TestModifyUncombinedDatabase(unittest.TestCase):
         self.mili = reader.open_database( TestCombineFunction.file_name, suppress_parallel=True )
     
     def test_modify_scalar(self):
-        res = self.mili.query("sx", "brick", states=[1])
+        res = self.mili.query("sx", "brick", states=[35])
         original = reader.combine(res)
 
         # Modify database
         modified = copy.deepcopy(original)
         modified['sx']['data'][0,:] = 10.10
-        res = self.mili.query("sx", "brick", states=[1], write_data=modified)
+        res = self.mili.query("sx", "brick", states=[35], write_data=modified)
         np.testing.assert_equal( modified['sx']['data'], reader.combine(res)['sx']['data'] )
 
         # Back to original
-        res = self.mili.query("sx", "brick", states=[1], write_data=original)
+        res = self.mili.query("sx", "brick", states=[35], write_data=original)
         np.testing.assert_equal( original['sx']['data'], reader.combine(res)['sx']['data'] )
     
     def test_modify_vector(self):
-        res = self.mili.query("stress", "brick", states=[1])
+        res = self.mili.query("stress", "brick", states=[35])
         original = reader.combine(res)
 
         # Modify database
         modified = copy.deepcopy(original)
         modified['stress']['data'][0,:] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-        res = self.mili.query("stress", "brick", states=[1], write_data=modified)
+        res = self.mili.query("stress", "brick", states=[35], write_data=modified)
         np.testing.assert_equal( modified['stress']['data'], reader.combine(res)['stress']['data'] )
 
         # Back to original
-        res = self.mili.query("stress", "brick", states=[1], write_data=original)
+        res = self.mili.query("stress", "brick", states=[35], write_data=original)
         np.testing.assert_equal( original['stress']['data'], reader.combine(res)['stress']['data'] )
     
     def test_modify_vector_array_single_ipt(self):
-        res = self.mili.query("sx", "beam", states=[1], ips=[1])
+        res = self.mili.query("sx", "beam", states=[35], ips=[1])
         original = reader.combine(res)
 
         # Modify database
         modified = copy.deepcopy(original)
         modified['sx']['data'][0,:] = 10.10
-        res = self.mili.query("sx", "beam", states=[1], ips=[1], write_data=modified)
+        res = self.mili.query("sx", "beam", states=[35], ips=[1], write_data=modified)
         np.testing.assert_equal( modified['sx']['data'], reader.combine(res)['sx']['data'] )
 
         # Back to original
-        res = self.mili.query("sx", "beam", states=[1], ips=[1], write_data=original)
+        res = self.mili.query("sx", "beam", states=[35], ips=[1], write_data=original)
         np.testing.assert_equal( original['sx']['data'], reader.combine(res)['sx']['data'] )
 
     def test_modify_vector_array_multiple_ipt(self):
-        res = self.mili.query("sx", "beam", states=[1], ips=[1,3])
+        res = self.mili.query("sx", "beam", states=[35], ips=[1,3])
         original = reader.combine(res)
 
         # Modify database
         modified = copy.deepcopy(original)
         modified['sx']['data'][0,:] = [10.20, 30.40]
-        res = self.mili.query("sx", "beam", states=[1], ips=[1,3], write_data=modified)
+        res = self.mili.query("sx", "beam", states=[35], ips=[1,3], write_data=modified)
         np.testing.assert_equal( modified['sx']['data'], reader.combine(res)['sx']['data'] )
 
         # Back to original
-        res = self.mili.query("sx", "beam", states=[1], ips=[1,3], write_data=original)
+        res = self.mili.query("sx", "beam", states=[35], ips=[1,3], write_data=original)
         np.testing.assert_equal( original['sx']['data'], reader.combine(res)['sx']['data'] )
 
-    def test_modify_vector_array_multiple_ipt(self):
-        res = self.mili.query("sx", "beam", states=[1])
+    def test_modify_vector_array_multiple_ipt_all(self):
+        res = self.mili.query("sx", "beam", states=[35])
         original = reader.combine(res)
 
         # Modify database
         modified = copy.deepcopy(original)
         modified['sx']['data'][0,:] = [10.20, 30.40, 50.60, 70.80]
-        res = self.mili.query("sx", "beam", states=[1], write_data=modified)
+        res = self.mili.query("sx", "beam", states=[35], write_data=modified)
         np.testing.assert_equal( modified['sx']['data'], reader.combine(res)['sx']['data'] )
 
         # Back to original
-        res = self.mili.query("sx", "beam", states=[1], write_data=original)
+        res = self.mili.query("sx", "beam", states=[35], write_data=original)
+        np.testing.assert_equal( original['sx']['data'], reader.combine(res)['sx']['data'] )
+
+class TestModifyUncombinedDatabaseResultsByElement(unittest.TestCase):
+    file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
+
+    def setUp(self):
+        self.mili = reader.open_database( TestCombineFunction.file_name, suppress_parallel=True )
+    
+    def test_modify_scalar(self):
+        res = self.mili.query("sx", "brick", states=[44])
+        original = reader.combine(res)
+        res_by_element = reader.results_by_element(res)
+
+        # Modify database
+        for elem in res_by_element['sx']:
+            res_by_element['sx'][elem][:,:] = 10.10
+        writeable = reader.writeable_from_results_by_element(res, res_by_element)
+        res = self.mili.query("sx", "brick", states=[44], write_data=writeable)
+        np.testing.assert_equal( writeable['sx']['data'], reader.combine(res)['sx']['data'] )
+
+        # Back to original
+        res = self.mili.query("sx", "brick", states=[44], write_data=original)
+        np.testing.assert_equal( original['sx']['data'], reader.combine(res)['sx']['data'] )
+    
+    def test_modify_vector(self):
+        res = self.mili.query("stress", "brick", states=[44])
+        original = reader.combine(res)
+        res_by_element = reader.results_by_element(res)
+
+        # Modify database
+        for elem in res_by_element['stress']:
+            res_by_element['stress'][elem][:,:] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+        writeable = reader.writeable_from_results_by_element(res, res_by_element)
+        res = self.mili.query("stress", "brick", states=[44], write_data=writeable)
+        np.testing.assert_equal( writeable['stress']['data'], reader.combine(res)['stress']['data'] )
+
+        # Back to original
+        res = self.mili.query("stress", "brick", states=[44], write_data=original)
+        np.testing.assert_equal( original['stress']['data'], reader.combine(res)['stress']['data'] )
+    
+    def test_modify_vector_array_single_ipt(self):
+        res = self.mili.query("sx", "beam", states=[44], ips=[1])
+        original = reader.combine(res)
+        res_by_element = reader.results_by_element(res)
+
+        # Modify database
+        for elem in res_by_element['sx']:
+            res_by_element['sx'][elem][:,:] = 10.10
+        writeable = reader.writeable_from_results_by_element(res, res_by_element)
+        res = self.mili.query("sx", "beam", states=[44], ips=[1], write_data=writeable)
+        np.testing.assert_equal( writeable['sx']['data'], reader.combine(res)['sx']['data'] )
+
+        # Back to original
+        res = self.mili.query("sx", "beam", states=[44], ips=[1], write_data=original)
+        np.testing.assert_equal( original['sx']['data'], reader.combine(res)['sx']['data'] )
+
+    def test_modify_vector_array_multiple_ipt(self):
+        res = self.mili.query("sx", "beam", states=[44], ips=[1,3])
+        original = reader.combine(res)
+        res_by_element = reader.results_by_element(res)
+
+        # Modify database
+        for elem in res_by_element['sx']:
+            res_by_element['sx'][elem][:,:] = [10.20, 30.40]
+        writeable = reader.writeable_from_results_by_element(res, res_by_element)
+        res = self.mili.query("sx", "beam", states=[44], ips=[1,3], write_data=writeable)
+        np.testing.assert_equal( writeable['sx']['data'], reader.combine(res)['sx']['data'] )
+
+        # Back to original
+        res = self.mili.query("sx", "beam", states=[44], ips=[1,3], write_data=original)
+        np.testing.assert_equal( original['sx']['data'], reader.combine(res)['sx']['data'] )
+
+    def test_modify_vector_array_multiple_ipt_all(self):
+        res = self.mili.query("sx", "beam", states=[44])
+        original = reader.combine(res)
+        res_by_element = reader.results_by_element(res)
+
+        # Modify database
+        for elem in res_by_element['sx']:
+            res_by_element['sx'][elem][:,:] = [10.20, 30.40, 50.60, 70.80]
+        writeable = reader.writeable_from_results_by_element(res, res_by_element)
+        res = self.mili.query("sx", "beam", states=[44], write_data=writeable)
+        np.testing.assert_equal( writeable['sx']['data'], reader.combine(res)['sx']['data'] )
+
+        # Back to original
+        res = self.mili.query("sx", "beam", states=[44], write_data=original)
         np.testing.assert_equal( original['sx']['data'], reader.combine(res)['sx']['data'] )
     
 

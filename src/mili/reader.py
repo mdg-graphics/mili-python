@@ -659,7 +659,7 @@ class MiliDatabase:
             # if we don't have all the labels queried and we're writing data, we potentially need
             #  to filter for the subset of the labels we *do* have locally
             local_write_labels = labels_of_class[ ordinals ]
-            rows_to_write = np.where( np.isin( local_write_labels,  filtered_write_data[queried_name]['layout']['labels'] ) )[0]
+            rows_to_write = np.where( np.isin( filtered_write_data[queried_name]['layout']['labels'], local_write_labels ) )[0]
             filtered_write_data[queried_name]['layout']['labels'] = local_write_labels
             filtered_write_data[queried_name]['data'] = filtered_write_data[queried_name]['data'][ :, rows_to_write, : ]
 
@@ -798,13 +798,12 @@ def combine( results_dict: List[Dict] ) -> dict:
   
   return merged_results
 
-def results_by_element( result_dict: Union[Dict,List[Dict]]) -> dict:
+def results_by_element( result_dict: Union[Dict,List[Dict]] ) -> dict:
   """Reorganize result data in a new dictionary with the form { svar: { element: <list_of_results> } }"""
   if isinstance( result_dict, dict ):
     result_dict = [result_dict]
 
   reorganized_data = {}
-
   for processor_result in result_dict:
     for svar in processor_result:
       if svar not in reorganized_data:
@@ -815,6 +814,17 @@ def results_by_element( result_dict: Union[Dict,List[Dict]]) -> dict:
           reorganized_data[svar][element] = processor_result[svar]['data'][:,elem_idx,:]
 
   return reorganized_data
+
+def writeable_from_results_by_element( results_dict: dict, results_by_element: dict ) -> dict:
+  """Given the query result dictionary and the results_by_element dictionary generate writeable dictionary."""
+  results_dict = combine(results_dict)
+  for result in results_by_element:
+    if result in results_dict:
+      for element in results_by_element[result]:
+        if element in results_dict[result]['layout']['labels']:
+          idx = np.where(element == results_dict[result]['layout']['labels'])[0][0]
+          results_dict[result]['data'][:,idx] = results_by_element[result][element]
+  return results_dict
 
 def open_database( base : os.PathLike, procs = [], suppress_parallel = False, experimental = False, **kwargs ):
   """

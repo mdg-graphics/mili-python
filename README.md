@@ -375,6 +375,13 @@ nodpos_ux = db.query( 'nodpos[ux]', 'node' )
 nodpos_ux = reader.combine(nodpos_ux)
 # modify nodpos_ux
 nodpos_ux = db.query( 'nodpos[ux]', 'node', write_data = nodpos_ux )
+
+# When using the results_by_element function
+nodpos_ux = db.query( 'nodpos[ux]', 'node' )
+nodpos_by_element = results_by_element( nodpos_ux )
+# Modify nodpos_by_element
+writeable_nodpos = writeable_from_results_by_element(nodpos_ux, nodpos_by_element)
+nodpos_ux = db.query( 'nodpos[ux]', 'node', write_data = writeable_nodpos )
 ```
 
 Will write modified data back to the database. The `write_data` must have the same format as the result data for an identical query. In practice it is best to simply process a query, modify the results, and then submit the same query supplying the modified results as the `write_data` argument.
