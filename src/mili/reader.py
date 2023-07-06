@@ -292,7 +292,7 @@ class MiliDatabase:
     return {k:v for k,v in self.__int_points.items() if k.startswith("es_")}
 
   def times( self, states : Optional[Union[List[int],int]] = None ):
-    if type(states) is int:
+    if isinstance(states, (int, np.integer)):
       states = np.array( [ states ], dtype = np.int32 )
     elif iterable( states ) and not type( states ) == str:
       states = np.array( states, dtype = np.int32 )
@@ -341,16 +341,20 @@ class MiliDatabase:
       return self.__conns.get(class_name, None)
     return self.__conns
 
+  def __valid_material_type(self, mat: Any ) -> bool:
+    """Check if type is valid for material number input."""
+    return isinstance(mat, (str, int, np.integer))
+
   def material_classes(self, mat: Union[str,int]):
     """Get list of classes of a specified material"""
-    if type(mat) is not str and type(mat) is not int:
+    if not self.__valid_material_type(mat):
       raise ValueError('material must be string or int')
     mat_nums = []
     if type(mat) is str and mat in self.__mats.keys():
       mat_nums = self.__mats.get( mat, [] )
     elif type(mat) is str and mat.isdigit():
       mat = int(mat)
-    if type(mat) is int and mat in self.__elems_of_mat.keys():
+    if isinstance(mat, (int, np.integer)) and mat in self.__elems_of_mat.keys():
       mat_nums = [ mat ]
     classes = []
     for mat in mat_nums:
@@ -389,14 +393,14 @@ class MiliDatabase:
     '''
     if class_name not in self.__labels.keys():
       return np_empty(np.int32)
-    if type(mat) is not str and type(mat) is not int:
+    if not self.__valid_material_type(mat):
       raise ValueError('material must be string or int')
     if type(mat) is str:
       all_reps = set( self.__mats.keys() )
       # Check if mat is an integer passed in as a string
       if mat not in all_reps and mat.isdigit():
         mat = int(mat)
-    if type(mat) is int:
+    if isinstance(mat, (int, np.integer)):
       all_reps = list( itertools.chain.from_iterable(self.__mats.values()) )
     if mat not in all_reps and mat not in self.__elems_of_mat.keys():
       return np_empty(np.int32)
@@ -411,14 +415,14 @@ class MiliDatabase:
 
   def all_labels_of_material( self, mat: Union[str,int] ):
     ''' Given a specific material. Find all labels with that material and return their values. '''
-    if type(mat) is not str and type(mat) is not int:
+    if not self.__valid_material_type(mat):
       raise ValueError('material must be string or int')
     mat_nums = []
     if type(mat) is str and mat in self.__mats.keys():
       mat_nums = self.__mats.get( mat, [] )
     elif type(mat) is str and mat.isdigit():
       mat = int(mat)
-    if type(mat) is int and mat in self.__elems_of_mat.keys():
+    if isinstance(mat, (int, np.integer)) and mat in self.__elems_of_mat.keys():
       mat_nums = [ mat ]
     labels = {}
     for mat_num in mat_nums:
@@ -447,7 +451,7 @@ class MiliDatabase:
 
   def nodes_of_material( self, mat ):
     ''' Find nodes associated with a material number '''
-    if type(mat) is not str and type(mat) is not int:
+    if not self.__valid_material_type(mat):
       raise ValueError('material must be string or int')
     element_labels = self.all_labels_of_material( mat )
     node_labels = np_empty(np.int32)
@@ -517,7 +521,7 @@ class MiliDatabase:
     if states is None:
       states = np.arange( min_st, max_st+1, dtype = np.int32 )
 
-    if type(states) is int:
+    if isinstance(states, (int, np.integer)):
       states = np.array( [ states ], dtype = np.int32 )
     elif iterable( states ) and not type( states ) == str:
       states = np.unique( np.array( states, dtype = np.int32 ) )
@@ -553,7 +557,7 @@ class MiliDatabase:
     if svar_names is None:
       raise TypeError( 'State variable names must be a string or iterable of strings' )
 
-    if type(ips) is int:
+    if isinstance(ips, (int, np.integer)):
       ips = [ips]
     if ips is None:
       ips = []
