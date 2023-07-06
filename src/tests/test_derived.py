@@ -60,6 +60,44 @@ class SerialDerivedExpressions(unittest.TestCase):
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
+    
+    def test_derived_variables_of_class(self):
+        BRICK_DERIVED = [
+            "vol_strain", "prin_strain1", "prin_strain2", "prin_strain3", "prin_dev_strain1",
+            "prin_dev_strain2", "prin_dev_strain3", "prin_strain1_alt", "prin_strain2_alt",
+            "prin_strain3_alt", "prin_dev_strain1_alt", "prin_dev_strain2_alt", "prin_dev_strain3_alt",
+            "prin_stress1", "prin_stress2", "prin_stress3", "eff_stress", "pressure", "prin_dev_stress1",
+            "prin_dev_stress2", "prin_dev_stress3", "max_shear_stress", "triaxiality"
+        ]
+        BEAM_DERIVED = [
+            "prin_stress1", "prin_stress2", "prin_stress3", "eff_stress", "pressure", "prin_dev_stress1",
+            "prin_dev_stress2", "prin_dev_stress3", "max_shear_stress", "triaxiality", "eps_rate"
+        ]
+        SHELL_DERIVED = [
+            "vol_strain", "prin_strain1", "prin_strain2", "prin_strain3", "prin_dev_strain1",
+            "prin_dev_strain2", "prin_dev_strain3", "prin_strain1_alt", "prin_strain2_alt",
+            "prin_strain3_alt", "prin_dev_strain1_alt", "prin_dev_strain2_alt", "prin_dev_strain3_alt",
+            "prin_stress1", "prin_stress2", "prin_stress3", "eff_stress", "pressure", "prin_dev_stress1",
+            "prin_dev_stress2", "prin_dev_stress3", "max_shear_stress", "triaxiality"
+        ]
+        CSEG_DERIVED = []
+        NODE_DERIVED = [
+            "disp_x", "disp_y", "disp_z", "disp_mag", "disp_rad_mag_xy", "vel_x", "vel_y", "vel_z",
+            "acc_x", "acc_y", "acc_z"
+        ]
+        self.assertEqual( self.mili.derived_variables_of_class("brick"), BRICK_DERIVED )
+        self.assertEqual( self.mili.derived_variables_of_class("beam"), BEAM_DERIVED )
+        self.assertEqual( self.mili.derived_variables_of_class("shell"), SHELL_DERIVED )
+        self.assertEqual( self.mili.derived_variables_of_class("cseg"), CSEG_DERIVED )
+        self.assertEqual( self.mili.derived_variables_of_class("node"), NODE_DERIVED )
+
+    def test_classes_of_derived_variable(self):
+        DISPX_CLASSES = ["node"]
+        EFF_STRESS_CLASSES = ["beam", "brick", "shell"]
+        VOL_STRAIN_CLASSES = ["brick", "shell"]
+        self.assertEqual( self.mili.classes_of_derived_variable("disp_x"), DISPX_CLASSES)
+        self.assertEqual( self.mili.classes_of_derived_variable("eff_stress"), EFF_STRESS_CLASSES)
+        self.assertEqual( self.mili.classes_of_derived_variable("vol_strain"), VOL_STRAIN_CLASSES)
 
     def test_pressure(self):
         """Pressure"""

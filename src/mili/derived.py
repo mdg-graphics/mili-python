@@ -231,6 +231,45 @@ class DerivedExpressions:
           Only that mili-python can caclulate them if all required inputs exist.
     """
     return list(self.__derived_expressions.keys())
+  
+  def derived_variables_of_class(self, class_name: str) -> List[str]:
+    """Return list of derived variables that can be calculated for a given class."""
+    derived_list = []
+    if class_name in self.db.class_names():
+      queriable_state_variables = self.db.queriable_svars()
+      for var_name, specs in self.__derived_expressions.items():
+        primals_found = []
+        for req_primal, req_primal_class in zip(specs['primals'], specs['primals_class']):
+          # Check that primal exists
+          if req_primal in queriable_state_variables:
+            # Check that primal exists for required element class
+            req_primal_class = class_name if req_primal_class is None else req_primal_class
+            if req_primal_class in self.db.classes_of_state_variable(req_primal):
+              primals_found.append(True)
+        # Check if all primals were found
+        if len(primals_found) == len(specs['primals']) and all(primals_found):
+          derived_list.append(var_name)
+    return derived_list
+  
+  def classes_of_derived_variable(self, var_name: str) -> List[str]:
+    """Return list of element classes for which the specified derived variable can be calculated."""
+    if var_name not in self.__derived_expressions:
+      raise KeyError(f"The derived result '{var_name}' does not exist")
+    derived_spec = self.__derived_expressions[var_name]
+    classes_of_derived = []
+    element_classes = self.db.class_names()
+
+    if all( [primal_class is None for primal_class in derived_spec['primals_class']] ):
+      # CASE 1: All primals must exist for same element class as derived result
+      for class_name in element_classes:
+        primals_found = [ class_name in self.db.classes_of_state_variable(primal) for primal in derived_spec['primals'] ]
+        if all(primals_found):
+          classes_of_derived.append(class_name)
+    else:
+      # CASE 2: primals must exists for class different from derived result
+      raise NotImplementedError("Currently not supported.")
+
+    return classes_of_derived
     
   def __init_derived_query_parameters(self,
                               result_name : str,

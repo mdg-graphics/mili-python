@@ -336,7 +336,18 @@ mili-python supports many derived variables that can be queried using the `query
 print( db.supported_derived_variables() )
 ```
 
-> **NOTE**: Not all of these variables are necessarily able to be calculated for every database. This list contains all the derived variables that mili-python can calculate if the required primal variables exist for your specific database.
+> **NOTE:** Not all of these variables are necessarily able to be calculated for every database. This list contains all the derived variables that mili-python can calculate if the required primal variables exist for your specific database.
+
+To determine the derived variables that can be calculated for your specific database you can use the functions `derived_variables_of_class` or `classes_of_derived_variable`.  The function `derived_variables_of_class` takes an element class
+name as the argument and returns a list of the derived variables that can be calculated for the class. The function `classes_of_derived_variable` takes a derived variable name as the argument and returns a list of the classes for which the derived variable can be calculated.
+
+```python
+classes_eff_stress = db.classes_of_derived_variable("eff_stress")  # ["brick", "beam", "shell"]
+
+nodal_derived_variables = db.derived_variables_of_class("node")  # ["disp_x", "disp_y", ...]
+```
+
+> **NOTE:** These functions do not guarantee that the derived variable can be calculated for **ALL** elements of the specified element class. They are checking that all the primal variables required to calculate the specific derived variable exist within the database for a given class (It does not check which specific elements of that class the primals exist for).
 
 Querying these derived variables works the same as querying any primal variable. The following are several examples of queries for derived results.
 

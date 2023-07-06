@@ -325,6 +325,12 @@ class MiliDatabase:
   def supported_derived_variables(self):
     return self.__derived.supported_variables()
 
+  def derived_variables_of_class(self, class_name: str) -> List[str]:
+    return self.__derived.derived_variables_of_class(class_name)
+
+  def classes_of_derived_variable(self, var_name: str) -> List[str]:
+    return self.__derived.classes_of_derived_variable(var_name)
+
   def labels(self, class_name: Optional[str] = None):
     if class_name is not None:
       return self.__labels.get(class_name, None)
