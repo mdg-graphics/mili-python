@@ -221,6 +221,11 @@ class DerivedExpressions:
         "primals_class": [None],
         "compute_function": self.__compute_plastic_strain_rate
       },
+      "nodtangmag": {
+        "primals": ["nodtang_x", "nodtang_y", "nodtang_z"],
+        "primals_class": [None, None, None],
+        "compute_function": self.__compute_nodal_tangential_traction_magnitude
+      }
       # TODO: Add more primals here
     }
 
@@ -1237,3 +1242,20 @@ class DerivedExpressions:
 
     return derived_result
 
+
+  def __compute_nodal_tangential_traction_magnitude(self,
+                                                    result_name: str,
+                                                    primal_data: dict,
+                                                    query_args: dict):
+    """Compute the derived result 'nodtangmag'."""
+    states = query_args['states']
+    # Create dictionary structure for the final result
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+
+    # Perform calculation
+    nodtang_x = primal_data['nodtang_x']['data']
+    nodtang_y = primal_data['nodtang_y']['data']
+    nodtang_z = primal_data['nodtang_z']['data']
+    derived_result[result_name]['data'] = np.sqrt(nodtang_x**2 + nodtang_y**2 + nodtang_z**2)
+
+    return derived_result

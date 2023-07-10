@@ -56,7 +56,7 @@ class SerialDerivedExpressions(unittest.TestCase):
                     'prin_dev_strain1_alt', 'prin_dev_strain2_alt', 'prin_dev_strain3_alt',
                     'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure',
                     'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress',
-                    'triaxiality', 'eps_rate'
+                    'triaxiality', 'eps_rate', 'nodtangmag'
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
@@ -760,6 +760,42 @@ class SerialDerivedExpressions(unittest.TestCase):
         EPS_RATE2_47_1 = 0.5 * ( (1.32413e-2 - 0.0)/1000 + (3.40781e-2 - 1.32413e-2)/1000 )
         EPS_RATE_STATES = np.array( [EPS_RATE2_46_1, EPS_RATE2_47_1] )
         np.testing.assert_allclose( result['eps_rate']['data'][0,:,0], EPS_RATE_STATES, rtol=1.0E-06)
+    
+    def test_nodetangmag(self):
+        """Nodal Tangential Traction Magnitude"""
+        # Uses a different database that contains the primals "nodtang"
+        file_name = os.path.join(dir_path,'data','serial','dbl_nodtang','dblplt')
+        db = reader.open_database( file_name, suppress_parallel=True )
+
+        result = db.query("nodtangmag", "cbs1_particle", labels=[5, 95, 115], states=[1, 60, 122])
+        # cbs1_particle 5
+        self.assertAlmostEqual(result['nodtangmag']['data'][0,0,0], 7.362608292957173e-14, delta=1.0e-20 )
+        self.assertAlmostEqual(result['nodtangmag']['data'][1,0,0], 2.091464039505183, delta=1.0e-20 )
+        self.assertAlmostEqual(result['nodtangmag']['data'][2,0,0], 2.091464039505183, delta=1.0e-20 )
+        # cbs1_particle 95
+        self.assertAlmostEqual(result['nodtangmag']['data'][0,1,0], 3.39893903983239e-13, delta=1.0e-20 )
+        self.assertAlmostEqual(result['nodtangmag']['data'][1,1,0], 57.39554750267382, delta=1.0e-20 )
+        self.assertAlmostEqual(result['nodtangmag']['data'][2,1,0], 72.4122659097881, delta=1.0e-20 )
+        # cbs1_particle 115
+        self.assertAlmostEqual(result['nodtangmag']['data'][0,2,0], 4.716543468420842e-13, delta=1.0e-20 )
+        self.assertAlmostEqual(result['nodtangmag']['data'][1,2,0], 36.95306253524787, delta=1.0e-20 )
+        self.assertAlmostEqual(result['nodtangmag']['data'][2,2,0], 36.41065450783031, delta=1.0e-20 )
+
+        result = db.query("nodtangmag", "cbs1_quad", labels=[51, 57, 60], states=[1, 60, 122])
+        # cbs1_quad 51
+        self.assertAlmostEqual(result['nodtangmag']['data'][0,0,0], 1.385230111634118e-14, delta=1.0e-20 )
+        self.assertAlmostEqual(result['nodtangmag']['data'][1,0,0], 70.13199989140008, delta=1.0e-20 )
+        self.assertAlmostEqual(result['nodtangmag']['data'][2,0,0], 78.51272797578739, delta=1.0e-20 )
+        # cbs1_quad 57
+        self.assertAlmostEqual(result['nodtangmag']['data'][0,1,0], 7.988411450852106e-13, delta=1.0e-20 )
+        self.assertAlmostEqual(result['nodtangmag']['data'][1,1,0], 10.36301416996304, delta=1.0e-20 )
+        self.assertAlmostEqual(result['nodtangmag']['data'][2,1,0], 10.36301416996304, delta=1.0e-20 )
+        # cbs1_quad 60
+        self.assertAlmostEqual(result['nodtangmag']['data'][0,2,0], 1.3815008478712372e-12, delta=1.0e-20 )
+        self.assertAlmostEqual(result['nodtangmag']['data'][1,2,0], 62.646706196877986, delta=1.0e-20 )
+        self.assertAlmostEqual(result['nodtangmag']['data'][2,2,0], 75.71470466999355, delta=1.0e-20 )
+
+
 
 class ParallelDerivedExpressions(unittest.TestCase):
     """Test Parallel implementation of Derived Expressions Wrapper class."""
