@@ -178,9 +178,9 @@ class MiliDatabase:
 
     for sname, elem_conn in self.__afile.dirs[DirectoryDecl.Type.ELEM_CONNS].items():
       if sname not in self.__conns.keys():
-        self.__conns[ sname ] = np.ndarray( (0,elem_conn.shape[1]-2), dtype = np.int32 )
-      # current_elem_count = self.__conns[ sname ].shape[0]
-      self.__conns[ sname ] = elem_conn[:,:-2] - 1 # remove the part id and material number and account for fortran indexing
+        self.__conns[ sname ] = np.ndarray( (0,elem_conn.shape[1]-1), dtype = np.int32 )
+      self.__conns[ sname ] = elem_conn[:,:-1]  # remove the part id, keep material number
+      self.__conns[ sname ][:,:-1] -= 1  # Account for fortran indexing (Except for material number)
       mats = np.unique( elem_conn[:,-2] )
       for mat in mats:
         # this assumes the load order of the conn blocks is identical to their mo_ids... which is probably the case but also is there not a way to make that explicit?
@@ -452,7 +452,7 @@ class MiliDatabase:
 
     # get the indices of the labels we're querying in the list of local labels of the element class, so we can retrieve their connectivity
     indices = (self.__labels[class_sname][:,None] == elem_labels).argmax(axis=0)
-    elem_conn = self.__conns[class_sname][indices]
+    elem_conn = self.__conns[class_sname][indices][:,:-1]
     return self.__labels['node'][elem_conn], self.__labels[class_sname][indices,None]
 
   def nodes_of_material( self, mat ):

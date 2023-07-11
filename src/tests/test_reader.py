@@ -303,6 +303,21 @@ class SerialSingleStateFile(unittest.TestCase):
         np.testing.assert_equal(labels['glob'], GLOB_LBLS)
         np.testing.assert_equal(labels['mat'], MATS_LBLS)
 
+    def test_connectivity_with_material_number(self):
+        """Test the connectivity method of the Mili class."""
+        all_conn = self.mili.connectivity()
+        conn_classes = list(all_conn.keys())
+        self.assertEqual(conn_classes, ["beam", "brick", "shell", "cseg"])
+        self.assertEqual(all_conn['beam'].shape, (46,4))
+        self.assertEqual(all_conn['brick'].shape, (36,9))
+        self.assertEqual(all_conn['shell'].shape, (12,5))
+        self.assertEqual(all_conn['cseg'].shape, (24,5))
+
+        self.assertTrue( all( all_conn['beam'][:,-1] == 1) )  # All beams are material 1
+        self.assertTrue( all( all_conn['brick'][:,-1] == 2) )  # All bricks are material 2
+        self.assertTrue( all( all_conn['shell'][:,-1] == 3) )  # All shells are material 3
+        self.assertTrue( all( all_conn['cseg'][1:12,-1] == 4) )  # Csegs 1-12 are material 4
+        self.assertTrue( all( all_conn['cseg'][12:24,-1] == 5) )  # Csegs 12-24 are material 5
 
     def test_reload_state_maps(self):
         """
