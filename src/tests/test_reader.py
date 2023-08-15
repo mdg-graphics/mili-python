@@ -247,6 +247,10 @@ class SerialSingleStateFile(unittest.TestCase):
         self.assertEqual(FIRST_STATE, times[0])
         self.assertEqual(LAST_STATE, times[-1])
 
+        times = self.mili.times([0,100])
+        self.assertEqual(FIRST_STATE, times[0])
+        self.assertEqual(LAST_STATE, times[-1])
+
     def test_labels_getter(self):
         """
         Testing the labels() method of the Mili class

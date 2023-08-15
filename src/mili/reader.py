@@ -296,7 +296,7 @@ class MiliDatabase:
       states = np.array( [ states ], dtype = np.int32 )
     elif iterable( states ) and not type( states ) == str:
       states = np.array( states, dtype = np.int32 )
-    if states != None and not isinstance( states, np.ndarray ) :
+    if not isinstance( states, np.ndarray ) and states is not None :
       raise TypeError( f"'states' must be None, an integer, or a list of integers" )
     if states is None:
       result = np.array( [ smap.time for smap in self.__smaps ] )
