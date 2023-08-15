@@ -25,7 +25,7 @@ before_script:
 unit_tests:
     stage: test
     tags:
-        - rzgenie
+        - rztopaz
         - shell
     script:
         - cd src
@@ -34,7 +34,7 @@ unit_tests:
 coverage:
     stage: test
     tags:
-        - rzgenie
+        - rztopaz
         - shell
     script:
         - cd src
@@ -58,7 +58,7 @@ coverage:
 stage-release:
     stage: deploy
     tags:
-        - rzgenie
+        - rztopaz
         - shell
     script:
         - pip3 install --upgrade build
@@ -68,7 +68,7 @@ stage-release:
 # deploy-release:
 #     stage: deploy
 #     tags:
-#         - rzgenie
+#         - rztopaz
 #         - shell
 #     script:
 #         - version=$(cat src/mili/__init__.py | grep 'version' | grep -Eo "[[:digit:]]+,[[:digit:]]+,[[:digit:]]+" | tr , . )

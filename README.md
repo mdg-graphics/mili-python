@@ -46,7 +46,7 @@ You will need to create a local virtual environment for testing and development.
 cd mili-python
 source .venv.sh
 ```
-This will create a virtual environment called `.venv-mili-python-3.7.2` with all the required dependencies for mili-python and activate it. To deactivate the virtual environment, run the command `deactivate` and to activate the environment run `source .venv-mili-python-3.7.2/bin/activate`.
+This will create a virtual environment called `.venv-mili-python-3.8.2` on Toss3 and `.venv-mili-python-3.9.12` on Toss4 with all the required dependencies for mili-python and activate it. To deactivate the virtual environment, run the command `deactivate` and to activate the environment run `source .venv-mili-python-3.8.2/bin/activate`.
 
 ### Testing
 
@@ -88,7 +88,7 @@ There are currently two methods of installing the mili-python module. The recomm
 
 ### From the LC Python Wheelhouse
 ```
-module load python/3.7.2
+module load python/3.9.12
 python -m venv <venv_name>
 source <venv_name>/bin/activate
 pip install --upgrade pip
@@ -105,7 +105,7 @@ pip install --upgrade --no-cache --find-links=https://www-lc.llnl.gov/python/whe
 
 If you want to install the packages into your ~/.local/ python cache so the module is usable with the system python install, try instead not creating and activating a virtual environment and instead (untested and may not work):
 ``` 
-module load python/3.7.2
+module load python/3.9.12
 python -m pip install --upgrade pip --user
 python -m pip install --upgrade --user --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse mili
 ```
@@ -113,7 +113,7 @@ python -m pip install --upgrade --user --no-cache --find-links=https://www-lc.ll
 ### From Gitlab Repository
 ```bash
 git clone ssh://git@rzgitlab.llnl.gov:7999/mdg/mili/mili-python.git
-module load python/3.7.2
+module load python/3.9.12
 cd mili-python
 source .venv.sh
 ```
