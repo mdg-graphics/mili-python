@@ -84,30 +84,30 @@ python3 -m twine upload -r pypi-wci <whl-file>
 
 # Installation
 
-There are currently two methods of installing the mili-python module. The recommeded method is installing from LC's python wheel house. However, if this does not work user may also install from source using the Git repository.
+There are currently two methods of installing the mili-python module. The recommeded method is installing from the WCI Nexus Mirror. However, if this does not work user may also install from source using the Git repository.
 
-### From the LC Python Wheelhouse
+### From the WCI Nexus Mirror
 ```
 module load python/3.9.12
 python -m venv <venv_name>
 source <venv_name>/bin/activate
 pip install --upgrade pip
-pip install --upgrade --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse mili
+pip install --upgrade --no-cache --https://wci-repo.llnl.gov/repository/pypi-group/simple mili
 ```
 - Make sure you're using python > 3.7:
 - Create a python virtual environment to install packages into locally:
 - Activate the environment:
 - Upgrade pip (numpy > 1.20.0 will fail to build with the base RZ pip):
-- Install the mili python package into the local venv from the LC wheelhouse:
+- Install the mili python package into the local venv from the WCI Nexus Mirror:
 
-> **Note:** Using `--find-links=<url>` will pull dependencies from the LC python wheelhouse, which should contain sufficient requirements to install mili-python and should be available on OCF and SCF.  
+> **Note:** Using `--find-links=<url>` will pull dependencies from the WCI Nexus Mirror, which should contain sufficient requirements to install mili-python and should be available on OCF and SCF.
 > **Note:** Using `--upgrade` will upgrade any already-installed copies of the mili module in the venv.
 
 If you want to install the packages into your ~/.local/ python cache so the module is usable with the system python install, try instead not creating and activating a virtual environment and instead (untested and may not work):
 ``` 
 module load python/3.9.12
 python -m pip install --upgrade pip --user
-python -m pip install --upgrade --user --no-cache --find-links=https://www-lc.llnl.gov/python/wheelhouse mili
+python -m pip install --upgrade --user --no-cache --find-links=https://wci-repo.llnl.gov/repository/pypi-group/simple mili
 ```
 
 ### From Gitlab Repository
