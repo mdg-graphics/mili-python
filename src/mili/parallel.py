@@ -10,12 +10,39 @@ from multiprocessing import Process
 import numpy as np
 import atexit
 import psutil
-
+from enum import Enum
 from typing import *
 
 # TODO: probably just create a wrapper/dispatch superclass, and implement loop/pool/client-server versions instead of loop/pool in one and client/server in another
 
-class LoopWrapper:
+class ReturnCode(Enum):
+  OK = 0
+  ERROR = 1
+  CRITICAL = 2
+
+  def str_repr(self):
+    return ["Success", "Error", "Critical"][self.value]
+
+def parse_return_codes(return_codes):
+  if not np.all([rcode_tup[0] == ReturnCode.OK for rcode_tup in return_codes]):
+    # An error has occurred. Need to determine severity.
+    num_ret_codes = len(return_codes)
+    error_types = np.array(return_codes)[:,0]
+    errors = np.where(np.isin(error_types, ReturnCode.ERROR))[0]
+    critical = np.where(np.isin(error_types, ReturnCode.CRITICAL))[0]
+    if len(critical) > 0 or len(errors) == num_ret_codes:
+      all_errors = np.concatenate((return_codes[errors], return_codes[critical]))
+      error_msgs = list(set([f"{retcode[0].str_repr()}: {retcode[1]}" for retcode in all_errors]))
+      raise ValueError(", ".join(error_msgs))
+
+class Wrapper:
+  """Wrapper superclass."""
+  def __init__(self, cls_obj):
+    self.supports_returncode = False
+    if hasattr(cls_obj, "returncode"):
+      self.supports_returncode = True
+
+class LoopWrapper(Wrapper):
   def __init__( self,
                 cls_obj : Type,
                 proc_pargs : List[List[Any]] = [],
@@ -28,6 +55,9 @@ class LoopWrapper:
       proc_pargs = [] * num_kwargs
     elif num_kwargs != num_pargs:
       raise ValueError(f'Must supply the same number of pargs ({num_pargs}) and kwargs ({num_kwargs}) to instantiate object list.')
+
+    # Call super class constructor to set up return code if available
+    super(LoopWrapper, self).__init__(cls_obj)
 
     objs = [ cls_obj( *pargs, **kwargs ) for pargs, kwargs in zip(proc_pargs, proc_kwargs) ]
 
@@ -44,9 +74,13 @@ class LoopWrapper:
       setattr( self, func, call_lambda(func,cls_obj,objs) )
 
   def loop_caller(self,attr,cls_obj,objs,*pargs,**kwargs):
-    return [ getattr(cls_obj,attr)( obj, *pargs, **kwargs ) for obj in objs ]
+    result = [ getattr(cls_obj,attr)( obj, *pargs, **kwargs ) for obj in objs ]
+    if self.supports_returncode:
+      return_codes = np.array([ obj.returncode() for obj in objs ])
+      parse_return_codes( return_codes )
+    return result
 
-class PoolWrapper:
+class PoolWrapper(Wrapper):
   def __init__( self,
                 cls_obj : Type,
                 proc_pargs : List[List[Any]] = [],
@@ -60,6 +94,9 @@ class PoolWrapper:
       proc_pargs = [] * num_kwargs
     elif num_kwargs != num_pargs:
       raise ValueError(f'Must supply the same number of pargs ({num_pargs}) and kwargs ({num_kwargs}) to instantiate worker processes')
+
+    # Call super class constructor to set up return code if available
+    super(PoolWrapper, self).__init__(cls_obj)
 
     with mp.ProcessingPool(len(proc_pargs)) as pool:
       objs = pool.map( lambda args: cls_obj( *args[0], **args[1] ), list( zip(proc_pargs, proc_kwargs) ) )
@@ -76,17 +113,36 @@ class PoolWrapper:
     for func in ( func for func in dir(cls_obj) if not func.startswith('__') and not func.startswith(f'_{cls_obj.__name__}') and callable(getattr(cls_obj,func)) ):
       setattr( self, func, call_lambda(func,cls_obj,objs) )
 
+  def returncode_wrapper(func):
+    """Wrapper to run function and get returncode in single call.
+
+    NOTE: This is needed because the state of each object is not maintained across calls
+          to pool.map, so all data needs to be retrieved in one call.
+    """
+    def wrapper(self, *pargs, **kwargs):
+      res = func(self, *pargs, **kwargs)
+      return_codes = self.returncode()
+      return res, return_codes
+    return wrapper
+
   def pool_caller(self,attr,cls_obj,objs,*pargs,**kwargs):
     # we make the list ahead of time to bind the pargs and kwargs identically across the pool, instead of having to pass in or make arrays for them
-    to_invoke = [ partial( getattr(cls_obj,attr), obj, *pargs, **kwargs ) for obj in objs ]
-    with mp.ProcessingPool(len(objs)) as pool:
-      res = pool.map(lambda f: f(), to_invoke) # can't partial the pargs or the first will bind to self
+    if self.supports_returncode:
+      to_invoke = [ partial( PoolWrapper.returncode_wrapper(getattr(cls_obj,attr)), obj, *pargs, **kwargs ) for obj in objs ]
+      with mp.ProcessingPool(len(objs)) as pool:
+        result = pool.map(lambda f: f(), to_invoke) # can't partial the pargs or the first will bind to self
+        res, return_codes = zip(*result)
+        parse_return_codes( np.array(return_codes) )
+    else:
+      to_invoke = [ partial( getattr(cls_obj,attr), obj, *pargs, **kwargs ) for obj in objs ]
+      with mp.ProcessingPool(len(objs)) as pool:
+        res = pool.map(lambda f: f(), to_invoke) # can't partial the pargs or the first will bind to self
     return res
 
 
 # check asyncio module
 
-class ServerWrapper:
+class ServerWrapper(Wrapper):
   """Multiprocessing client/server wrapper for reading Mili databases in parallel.
 
   When more plot files exist than processors, each processor handles multiple file
@@ -129,9 +185,9 @@ class ServerWrapper:
             break
           else:
             try:
-                result = [ getattr( self.__cls_obj, cmd )( wrapped, *pargs, **kwargs) for wrapped in self.__wrapped ]
+              result = [ getattr( self.__cls_obj, cmd )( wrapped, *pargs, **kwargs) for wrapped in self.__wrapped ]
             except:
-                result = []
+              result = []
             self.__conn.send_bytes( dill.dumps(result) )
       return
   
@@ -154,12 +210,15 @@ class ServerWrapper:
     elif num_kwargs != num_pargs:
       raise ValueError(f'Must supply the same number of pargs ({num_pargs}) and kwargs ({num_kwargs}) to instantiate worker processes')
 
+    # Call super class constructor to set up return code if available
+    super(ServerWrapper, self).__init__(cls_obj)
+
     # need to have a lambda that returns new lambdas for each func to avoid only have a single lambda bound for all funcs
     mem_maker = lambda attr : lambda *pargs, **kwargs : self.__worker_call( attr, *pargs, **kwargs )
     # generate member functions mimicking those in the wrapped class, excluding private and class functions
     for func in ( func for func in dir(cls_obj) if not func.startswith('__') and not func.startswith(f'_{cls_obj.__name__}') and callable(getattr(cls_obj,func)) ):
       setattr( self, func, mem_maker(func) )
-    
+
     # Get the number of processors that are available
     n_cores = int( psutil.cpu_count(logical=False) )
 
@@ -195,7 +254,7 @@ class ServerWrapper:
     if hasattr( self, '_ServerWrapper__pool'):
       for proc in self.__pool:
         proc.join( )
-    self.__procs = []
+    self.__pool = []
 
   def __flatten( self, alist: List[Any] ):
     return [item for sublist in alist for item in sublist]
@@ -212,6 +271,16 @@ class ServerWrapper:
 
     for idx, conn in enumerate(self.__conns):
       results[idx] = dill.loads( conn.recv_bytes() )
+
+    if self.supports_returncode:
+      return_codes = []
+      for conn in self.__conns:
+        conn.send( dill.dumps( ("returncode",[],{}) ) )
+
+      for idx, conn in enumerate(self.__conns):
+        return_codes.append( dill.loads( conn.recv_bytes() ) )
+      return_codes = np.array(self.__flatten(return_codes))
+      parse_return_codes(return_codes)
 
     return self.__flatten(results)
 

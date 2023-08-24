@@ -9,6 +9,7 @@ import copy
 import unittest
 from mili import reader
 from mili.datatypes import Superclass
+from mili.parallel import ReturnCode
 import numpy as np
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -190,7 +191,7 @@ class SerialSingleStateFile(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.mili.query(['nodpos[ux]'], 'node', labels = 4, states = 'cat')
         with self.assertRaises(TypeError):
-            self.mili.query(['nodposss[ux]'], 'node', labels = 4, states = 3, ips = 'cat')
+            self.mili.query(['nodpos[ux]'], 'node', labels = 4, states = 3, ips = 'cat')
 
     def test_nodes_getter(self):
         """
@@ -907,7 +908,7 @@ class ParallelSingleStateFile(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.mili.query(['nodpos[ux]'], 'node', labels = 4, states = 'cat')
         with self.assertRaises(TypeError):
-            self.mili.query(['nodposss[ux]'], 'node', labels = 4, states = 3, ips = 'cat')
+            self.mili.query(['nodpos[ux]'], 'node', labels = 4, states = 3, ips = 'cat')
 
 
     """
@@ -2470,7 +2471,8 @@ class TestCombineFunction(unittest.TestCase):
                 # Check svar exists
                 self.assertTrue(svar in combined_result)
                 # Check that states are the same
-                np.testing.assert_equal(processor_result[svar]['layout']['states'], combined_result[svar]['layout']['states'])
+                if processor_result[svar]['layout']['states'].size > 0:
+                    np.testing.assert_equal(processor_result[svar]['layout']['states'], combined_result[svar]['layout']['states'])
                 for elem_index, element in enumerate(processor_result[svar]['layout']['labels']):
                     # Check that element exists
                     self.assertTrue( element in combined_result[svar]['layout']['labels'] )
@@ -2732,7 +2734,55 @@ class TestModifyUncombinedDatabaseResultsByElement(unittest.TestCase):
         # Back to original
         res = self.mili.query("sx", "beam", states=[44], write_data=original)
         np.testing.assert_equal( original['sx']['data'], reader.combine(res)['sx']['data'] )
+
+class TestReturnCodes(unittest.TestCase):
+    file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
     
+    def test_loopwrapper(self):
+        mili = reader.open_database( TestCombineFunction.file_name, suppress_parallel=True )
+        # All procs return ReturnCode.ERROR so Exception is raised
+        with self.assertRaises(ValueError):
+            res = mili.query("does-not-exist", "brick")
+        # Test some procs returning ReturnCode.ERROR so call succeeds
+        res = mili.query("s1", "cseg", states = [1] )
+        ret_codes = mili.returncode()
+        self.assertEqual(ret_codes[0][0], ReturnCode.ERROR)
+        self.assertEqual(ret_codes[1][0], ReturnCode.ERROR)
+        self.assertEqual(ret_codes[2][0], ReturnCode.OK)
+        self.assertEqual(ret_codes[3][0], ReturnCode.OK)
+        self.assertEqual(ret_codes[4][0], ReturnCode.ERROR)
+        self.assertEqual(ret_codes[5][0], ReturnCode.OK)
+        self.assertEqual(ret_codes[6][0], ReturnCode.ERROR)
+        self.assertEqual(ret_codes[7][0], ReturnCode.ERROR)
+
+    def test_poolwrapper(self):
+        mili = reader.open_database( TestCombineFunction.file_name, suppress_parallel=False )
+        # All procs return ReturnCode.ERROR so Exception is raised
+        with self.assertRaises(ValueError):
+            res = mili.query("does-not-exist", "brick")
+        # Test some procs returning ReturnCode.ERROR so call succeeds
+        res = mili.query("s1", "cseg", states = [1] )
+        # We don't check return code's here because they are not maintained
+        # across calls to the pool wrapper. They are all handled internally.
+        # This is fine because we don't expect users to access the returncode methd.
+        
+
+    def test_serverwrapper(self):
+        mili = reader.open_database( TestCombineFunction.file_name, suppress_parallel=False, experimental=True )
+        # All procs return ReturnCode.ERROR so Exception is raised
+        with self.assertRaises(ValueError):
+            res = mili.query("does-not-exist", "brick")
+        # Test some procs returning ReturnCode.ERROR so call succeeds
+        res = mili.query("s1", "cseg", states = [1] )
+        ret_codes = mili.returncode()
+        self.assertEqual(ret_codes[0][0], ReturnCode.ERROR)
+        self.assertEqual(ret_codes[1][0], ReturnCode.ERROR)
+        self.assertEqual(ret_codes[2][0], ReturnCode.OK)
+        self.assertEqual(ret_codes[3][0], ReturnCode.OK)
+        self.assertEqual(ret_codes[4][0], ReturnCode.ERROR)
+        self.assertEqual(ret_codes[5][0], ReturnCode.OK)
+        self.assertEqual(ret_codes[6][0], ReturnCode.ERROR)
+        self.assertEqual(ret_codes[7][0], ReturnCode.ERROR)
 
 if __name__ == "__main__":
     unittest.main()

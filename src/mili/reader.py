@@ -4,7 +4,7 @@ SPDX-License-Identifier: (MIT)
 
 # TODO : account for endianness
 #        for numpy: modify the dtype to account for endianness: https://numpy.org/doc/stable/reference/generated/numpy.frombuffer.html
-
+from __future__ import annotations
 import copy
 import itertools
 import numpy as np
@@ -43,6 +43,7 @@ class MiliDatabase:
                                      - {base_filename}T is the T-file in mili format >= v3
                                      - {base_filename}### are state file(s) containing state data for this database
     """
+    self.__return_code = (ReturnCode.OK, "")
     self.__state_files = []
     self.__smaps = []
 
@@ -244,6 +245,16 @@ class MiliDatabase:
 
     # Create instance of wrapper class to handle derived queries
     self.__derived = DerivedExpressions( self )
+
+  def _clear_return_code(func):
+    """Decorator to clear return code before function calls"""
+    def wrapper(self, *args, **kwargs):
+      self.__return_code = (ReturnCode.OK, "")
+      return func(self, *args, **kwargs)
+    return wrapper
+
+  def returncode(self):
+    return self.__return_code
 
   def reload_state_maps(self):
     """Reload the state maps."""
@@ -581,6 +592,7 @@ class MiliDatabase:
     return svar_names, class_sname, material, labels, states, ips, write_data
 
 
+  @_clear_return_code
   def query( self,
              svar_names : Union[List[str],str],
              class_sname : str,
@@ -619,16 +631,22 @@ class MiliDatabase:
     # for parallel operation it will often be the case a specific file doesn't have any labels
     labels_of_class = self.__labels.get( class_sname, np_empty(np.int32) )
     ordinals = np.where( np.isin( labels_of_class, labels ) )[0]
-    if ordinals.size == 0:
-      return res
 
     for queried_name in svar_names:
       queried_svar_name, comp_svar_names, actual_result_source = self.__parse_query_name_and_source( queried_name, requested_result_source )
+      if actual_result_source == '':
+        self.__return_code = (ReturnCode.ERROR, f"The state variable '{queried_name}' does not exist")
+        continue
+
+      # If no labels, then skip.
+      # NOTE: This has to be done after checking if the state variable exists so that the reader
+      #       can correctly report when a state variable doesn't exist across all processors.
+      if ordinals.size == 0:
+        return res
 
       res[queried_name]['source'] = actual_result_source
-      if actual_result_source in ('', 'derived'):
-        if actual_result_source == 'derived':
-          res[queried_name] = self.__derived.query(queried_name, class_sname, material, labels, states, ips, **kwargs)[queried_name]
+      if actual_result_source == 'derived':
+        res[queried_name] = self.__derived.query(queried_name, class_sname, material, labels, states, ips, **kwargs)[queried_name]
         continue
       # NOTE: else the actual_result_source is "primal" and we keep going
 
