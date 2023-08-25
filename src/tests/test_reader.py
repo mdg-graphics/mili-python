@@ -2471,7 +2471,7 @@ class TestCombineFunction(unittest.TestCase):
                 # Check svar exists
                 self.assertTrue(svar in combined_result)
                 # Check that states are the same
-                if processor_result[svar]['layout']['states'].size > 0:
+                if processor_result[svar]['layout']['states'].size != 0:
                     np.testing.assert_equal(processor_result[svar]['layout']['states'], combined_result[svar]['layout']['states'])
                 for elem_index, element in enumerate(processor_result[svar]['layout']['labels']):
                     # Check that element exists

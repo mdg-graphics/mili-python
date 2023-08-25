@@ -30,6 +30,16 @@ if tuple( int(vnum) for vnum in np.__version__.split('.') ) < (1,20,0):
 def np_empty(dtype):
   return np.empty([0],dtype=dtype)
 
+# Set up Logging
+mili_python_logger = logging.getLogger(__name__)
+log_handler = logging.StreamHandler()
+formatter = logging.Formatter(fmt="[%(levelname)s : %(asctime)s] %(file)s : %(message)s",
+                              datefmt="%Y-%m-%dT%H:%M:%S")
+log_handler.setFormatter(formatter)
+mili_python_logger.addHandler(log_handler)
+mili_python_logger.setLevel(logging.ERROR)
+mili_python_logger.propagate = False
+
 class MiliDatabase:
 
   def __init__( self, dir_name : os.PathLike, base_filename : os.PathLike, **kwargs ):
@@ -71,13 +81,21 @@ class MiliDatabase:
 
     self.__params = defaultdict( lambda : defaultdict( list ) )
 
+    # Set up logging
+    self.__logger = kwargs.get("logger", None)
+    if self.__logger is None:
+      self.__logger = logging.getLogger()
+    self.__log_msg_extra = {"file": base_filename}
+
     self.__afile = AFile()
     self.__base_filename = base_filename
     self.__dir_name = dir_name
     log_validator = kwargs.get("log_validator", True)
     parse_success = AFileParser(log_validator=log_validator).parse( self.__afile, os.path.join( dir_name, base_filename ) )
     if not parse_success:
-      logging.error("AFile parsing validation failure!\nPlease inspect your database via afileIO.parse_database() before attempting any queries.")
+      self.__logger.error(("AFile parsing validation failure!\n"
+                           "Please inspect your database via afileIO.parse_database() "
+                           "before attempting any queries."), extra=self.__log_msg_extra)
 
     self.__sfile_suf_len = self.__afile.sfile_suffix_length
     sfile_re = re.compile(re.escape(base_filename) + f"(\d{{{self.__sfile_suf_len},}})$")
@@ -246,6 +264,18 @@ class MiliDatabase:
     # Create instance of wrapper class to handle derived queries
     self.__derived = DerivedExpressions( self )
 
+  def _log_function_call(func):
+    """Decorator to log function calls"""
+    def wrap(self, *args, **kwargs):
+      self.__logger.info(f"Calling '{func.__name__}' with args: {args}, kwargs: {kwargs}", extra=self.__log_msg_extra)
+      result = func(self, *args, **kwargs)
+      return result
+    return wrap
+
+  def set_log_level(self, log_level):
+    """Setter for logging output level"""
+    self.__logger.setLevel(log_level)
+
   def _clear_return_code(func):
     """Decorator to clear return code before function calls"""
     def wrapper(self, *args, **kwargs):
@@ -261,7 +291,9 @@ class MiliDatabase:
     afile = AFile()
     parse_success = AFileParser().parse( afile, os.path.join( self.__dir_name, self.__base_filename ) )
     if not parse_success:
-      logging.error("AFile parsing validation failure!\nPlease inspect your database via afileIO.parse_database() before attempting any queries.")
+      self.__logger.error(("AFile parsing validation failure!\n"
+                           "Please inspect your database via afileIO.parse_database() "
+                           "before attempting any queries."), extra=self.__log_msg_extra)
     self.__smaps = afile.smaps
 
   def nodes(self):
@@ -322,6 +354,8 @@ class MiliDatabase:
     queriable = []
     for sname, svar in self.__svars.items():
       if svar.agg_type in ( StateVariable.Aggregation.VEC_ARRAY, StateVariable.Aggregation.VECTOR ):
+        if svar.agg_type == StateVariable.Aggregation.VECTOR:
+          queriable.append( sname )
         for subvar in svar.svars:
           name = sname
           if show_ips and svar.agg_type == StateVariable.Aggregation.VEC_ARRAY:
@@ -593,6 +627,7 @@ class MiliDatabase:
 
 
   @_clear_return_code
+  @_log_function_call
   def query( self,
              svar_names : Union[List[str],str],
              class_sname : str,
@@ -626,7 +661,7 @@ class MiliDatabase:
 
     res = dict.fromkeys( svar_names )
     for ikey in res.keys():
-      res[ikey] = { 'data' : np_empty( np.float32 ), 'layout' : { 'states' : states,  'labels' : np_empty( np.int32 ) }, 'source': '' }
+      res[ikey] = { 'data' : np_empty( np.float32 ), 'layout' : { 'states' : np_empty( np.int32 ),  'labels' : np_empty( np.int32 ) }, 'source': '' }
 
     # for parallel operation it will often be the case a specific file doesn't have any labels
     labels_of_class = self.__labels.get( class_sname, np_empty(np.int32) )
@@ -636,14 +671,17 @@ class MiliDatabase:
       queried_svar_name, comp_svar_names, actual_result_source = self.__parse_query_name_and_source( queried_name, requested_result_source )
       if actual_result_source == '':
         self.__return_code = (ReturnCode.ERROR, f"The state variable '{queried_name}' does not exist")
+        self.__logger.warning(f"The svar '{queried_name}' does not exist", extra=self.__log_msg_extra)
         continue
 
       # If no labels, then skip.
       # NOTE: This has to be done after checking if the state variable exists so that the reader
       #       can correctly report when a state variable doesn't exist across all processors.
       if ordinals.size == 0:
+        self.__logger.warning(f"No labels found for the class {class_sname}")
         return res
 
+      res[queried_name]['layout']['states'] = states
       res[queried_name]['source'] = actual_result_source
       if actual_result_source == 'derived':
         res[queried_name] = self.__derived.query(queried_name, class_sname, material, labels, states, ips, **kwargs)[queried_name]
@@ -731,6 +769,7 @@ class MiliDatabase:
       # filter out any subrecords we have no labels for
       srecs_to_query = [ srec for srec in srecs_to_query if srec_internal_offsets[srec.name].size != 0 ]
       if not srecs_to_query:
+        self.__logger.warning(f"No subrecords found for the result/class combination {queried_name}, {class_sname}")
         break
 
       # initialize the results structure for this queried name
@@ -883,6 +922,8 @@ def open_database( base : os.PathLike, procs = [], suppress_parallel = False, ex
   dir_names = [ dir_name ] * len(proc_bases)
 
   proc_pargs = [ [dir_name,base_file]  for dir_name, base_file in zip(dir_names,proc_bases) ]
+  # Set logger for mili-python
+  kwargs["logger"] = mili_python_logger
   proc_kwargs = [ kwargs.copy() for _ in proc_pargs ]
 
   # Open Mili Database.
