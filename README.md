@@ -69,11 +69,10 @@ cd mili-python/
 version=$(cat src/mili/__init__.py | grep 'version' | grep -Eo "[[:digit:]]+,[[:digit:]]+,[[:digit:]]+" | tr , . )
 git tag -a v${version} -m "version $version"
 git push origin v${version}
-pip3 install --upgrade build
-python3 -m build
+python3 -m build .
 ```
 
-This will generate a directory in the top level of the `mili-python` repository that contains the `whl` file.
+This will generate a `./dist` directory in the top level of the `mili-python` repository that contains the `whl` file, as well as the `sdist` (not currently distributed).
 
 To upload the `whl` file to the nexus repository you will need to use twine as shown below:
 ```
@@ -104,7 +103,7 @@ pip install --upgrade --no-cache --https://wci-repo.llnl.gov/repository/pypi-gro
 > **Note:** Using `--upgrade` will upgrade any already-installed copies of the mili module in the venv.
 
 If you want to install the packages into your ~/.local/ python cache so the module is usable with the system python install, try instead not creating and activating a virtual environment and instead (untested and may not work):
-``` 
+```
 module load python/3.9.12
 python -m pip install --upgrade pip --user
 python -m pip install --upgrade --user --no-cache --find-links=https://wci-repo.llnl.gov/repository/pypi-group/simple mili
@@ -364,8 +363,8 @@ result = db.mili.query( 'disp_mag', 'node', labels = [6,7,8], states = [1,2,3])
 result = db.query( 'prin_stress1', 'shell', labels = [1], states = [2], ips = [1])
 ```
 
-> **NOTE**: When calculating rate-based results, numerical difference methods are used to approximate the time derivatives of primal variables. These results include nodal velocity, nodal acceleration, and effective plastic strain rate. There are a few limitations and assumptions for these results: 
->- The accuracy of the results is highly dependent on the size of the time step. Smaller time steps provide more accurate results. 
+> **NOTE**: When calculating rate-based results, numerical difference methods are used to approximate the time derivatives of primal variables. These results include nodal velocity, nodal acceleration, and effective plastic strain rate. There are a few limitations and assumptions for these results:
+>- The accuracy of the results is highly dependent on the size of the time step. Smaller time steps provide more accurate results.
 >- The calculations assume that the time step is the same on each side of the calculation time ( t^(n-1) and t^(n+1) ).  Significant differences in dt will result in more error.
 >- Results for the first and last states use forward and backward difference methods, which are less accurate than the central difference method used for the other states.  The exception is that nodal velocity uses backward difference for all states (except state 1), which is consistent with the griz calculation.  The nodal velocity at state 1 is set to zero.
 >- When possible, have the analysis code output primal variables for rates instead of calculating derived variables.  They will almost always be more accurate, and will never be less accurate.
@@ -407,11 +406,11 @@ Will write modified data back to the database. The `write_data` must have the sa
 ```python
 def mesh_dimensions(self) -> int
 ```
-**Description**: Get the mesh dimensions  
-**Arguments**:  
-    - `None`  
-**Returns**:  
-    - `int`: The dimensions (2 or 3).  
+**Description**: Get the mesh dimensions
+**Arguments**:
+    - `None`
+**Returns**:
+    - `int`: The dimensions (2 or 3).
 
 ### Example
 ```python
@@ -423,11 +422,11 @@ dims = db.mesh_dimensions()
 ```python
 def state_maps(self) -> List[StateMap]
 ```
-**Description**: Getter for the state maps  
-**Arguments**:  
-    - `None`  
-**Returns**:  
-    - `List[StateMap]`: The list of state map objects for the database.  
+**Description**: Getter for the state maps
+**Arguments**:
+    - `None`
+**Returns**:
+    - `List[StateMap]`: The list of state map objects for the database.
 
 ### Example
 ```python
@@ -438,11 +437,11 @@ state_maps = db.state_maps()
 ```python
 def times( self, states : Optional[Union[List[int],int]] = None )
 ```
-**Description**: Get the times for specific states numbers in the database.  
-**Arguments**:  
-    - `states`: The List of states to get the times for. None means all states.  
-**Returns**:  
-    - `numpy.ndarray`: List of state times.  
+**Description**: Get the times for specific states numbers in the database.
+**Arguments**:
+    - `states`: The List of states to get the times for. None means all states.
+**Returns**:
+    - `numpy.ndarray`: List of state times.
 
 ### Example
 ```python
@@ -482,9 +481,9 @@ array([0.00000000e+00, 9.99999975e-06, 1.99999995e-05, 2.99999992e-05,
 ```python
 def nodes(self)
 ```
-**Description**: Getter function for the initial nodal positions.  
-**Arguments**:  
-    - `None`  
+**Description**: Getter function for the initial nodal positions.
+**Arguments**:
+    - `None`
 **Returns**:
     - `numpy.ndarray`: The initial nodal positions.
 
@@ -509,11 +508,11 @@ array([[ 1.0000000e+00,  0.0000000e+00,  0.0000000e+00],
 ```python
 def labels(self, class_name: Optional[str] = None)
 ```
-**Description**: Get the element labels for an element class.  
-**Arguments**:  
-    - `class_name`:  The class name to retrieve labels for. If None, returns labels for all classes.  
-**Returns**:  
-    - `Union[ Dict[str,numpy.ndarray], numpy.ndarray ]`: If a class name is specified returns a list containing all element labels. If no class name is specified then returns a dictionary containing a list of the element labels for each class.  
+**Description**: Get the element labels for an element class.
+**Arguments**:
+    - `class_name`:  The class name to retrieve labels for. If None, returns labels for all classes.
+**Returns**:
+    - `Union[ Dict[str,numpy.ndarray], numpy.ndarray ]`: If a class name is specified returns a list containing all element labels. If no class name is specified then returns a dictionary containing a list of the element labels for each class.
 
 ### Example
 ```python
@@ -528,12 +527,12 @@ array([ 1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12], dtype=int32)
 ```python
 def parameter(self, name: str, default: Optional[Any] = None) -> Any
 ```
-**Description**: Getter for a single Mili parameter.  
-**Arguments**:  
-    - `name`: The name of the parameter to retrieve.  
-    - `default`: An optional value specifying what to return if the parameter does not exist. Defaults to None.  
-**Returns**:  
-    - `Any`: The value of the specified parameter if it exists, else default value.  
+**Description**: Getter for a single Mili parameter.
+**Arguments**:
+    - `name`: The name of the parameter to retrieve.
+    - `default`: An optional value specifying what to return if the parameter does not exist. Defaults to None.
+**Returns**:
+    - `Any`: The value of the specified parameter if it exists, else default value.
 
 ### Example
 ```python
@@ -544,11 +543,11 @@ db_job_id = db.parameter('job_id')
 ```python
 def parameters(self) -> Dict[str,Any]
 ```
-**Description**: Getter function for the Mili database parameters dictionary.  
-**Arguments**:  
-    - `None`  
-**Returns**:  
-    - `Dict[str,Any]`: Parameters dictionary.   
+**Description**: Getter function for the Mili database parameters dictionary.
+**Arguments**:
+    - `None`
+**Returns**:
+    - `Dict[str,Any]`: Parameters dictionary.
 
 ### Example
 ```python
@@ -559,11 +558,11 @@ params = db.parameters()
 ```python
 def class_names(self) -> List[str]
 ```
-**Description**: Getter function for the element class names.  
-**Arguments**:  
-    - `None`  
-**Returns**:  
-    - `List[str]`: List of element class names.   
+**Description**: Getter function for the element class names.
+**Arguments**:
+    - `None`
+**Returns**:
+    - `List[str]`: List of element class names.
 
 ### Example
 ```python
@@ -578,11 +577,11 @@ print(class_names)
 ```python
 def mesh_object_classes(self) -> Dict[str,MeshObjectClass]
 ```
-**Description**: Getter function mesh object class dictionary.  
-**Arguments**:  
-    - `None`  
-**Returns**:  
-    - `Dict[str,MeshObjectClass]`: The Mesh object classes in the database.  
+**Description**: Getter function mesh object class dictionary.
+**Arguments**:
+    - `None`
+**Returns**:
+    - `Dict[str,MeshObjectClass]`: The Mesh object classes in the database.
 
 ### Example
 ```python
@@ -591,7 +590,7 @@ print(mo_classes.keys())
 print(mo_classes['brick'])
 """
 ['glob', 'mat', 'node', 'beam', 'brick', 'shell', 'cseg']
-MeshObjectClass(mesh_id=0, short_name='brick', long_name='Bricks', sclass=<Superclass.M_HEX: 9>, elem_qty=36, idents_exist=True) 
+MeshObjectClass(mesh_id=0, short_name='brick', long_name='Bricks', sclass=<Superclass.M_HEX: 9>, elem_qty=36, idents_exist=True)
 """
 ```
 
@@ -599,11 +598,11 @@ MeshObjectClass(mesh_id=0, short_name='brick', long_name='Bricks', sclass=<Super
 ```python
 def connectivity( self, class_name : Optional[str] = None )
 ```
-**Description**: Get the element connectivity for a specified element class.  
-**Arguments**:  
-    - `class_name`: The name of the element class to get the connectivity for. If none, gets connectivity for all classes.  
-**Returns**:  
-    - `Union[ Dict[str,numpy.ndarray], numpy.ndarray ]`: The element connecivity. If class name is specified then returns a numpy.ndarray of integers. If class name is None, then dictionary is returned with keys being class_names and values being numpy.ndarray.  
+**Description**: Get the element connectivity for a specified element class.
+**Arguments**:
+    - `class_name`: The name of the element class to get the connectivity for. If none, gets connectivity for all classes.
+**Returns**:
+    - `Union[ Dict[str,numpy.ndarray], numpy.ndarray ]`: The element connecivity. If class name is specified then returns a numpy.ndarray of integers. If class name is None, then dictionary is returned with keys being class_names and values being numpy.ndarray.
 
 ### Example
 ```python
@@ -655,12 +654,12 @@ array([[ 64,  80,  84,  68,  65,  81,  85,  69],
 ```python
 def nodes_of_elems( self, class_sname, elem_labels )
 ```
-**Description**: Get a list of nodes associated with elements by label.  
-**Arguments**:  
-    - `class_sname`: The element class name.   
-    - `elem_labels`: The list of element labels.  
-**Returns**:  
-    - `numpy.ndarray, numpy.ndarray`: The list of element labels retrieved and the nodes associated with those labels.  
+**Description**: Get a list of nodes associated with elements by label.
+**Arguments**:
+    - `class_sname`: The element class name.
+    - `elem_labels`: The list of element labels.
+**Returns**:
+    - `numpy.ndarray, numpy.ndarray`: The list of element labels retrieved and the nodes associated with those labels.
 
 ### Example
 ```python
@@ -678,12 +677,12 @@ array([[1], [2]], dtype=int32)
 ```python
 def queriable_svars(self, vector_only = False, show_ips = False)
 ```
-**Description**: Get a list of queriable svar names for the database.   
-**Arguments**:  
-    - `vector_only`: Only return vector state variables.   
-    - `show_ips`: Return all integration points for each state variable.   
-**Returns**:  
-    - `List[str]`: List of state variable names.  
+**Description**: Get a list of queriable svar names for the database.
+**Arguments**:
+    - `vector_only`: Only return vector state variables.
+    - `show_ips`: Return all integration points for each state variable.
+**Returns**:
+    - `List[str]`: List of state variable names.
 
 ### Example
 ```python
@@ -694,11 +693,11 @@ svars = db.queriable_svars()
 ```python
 def classes_of_state_variable(self, svar: str)
 ```
-**Description**: Get the element class names for which a state variable exists.  
-**Arguments**:  
-    - `svar`:  The name of the state variable.  
-**Returns**:  
-    - `List[str]`: The names of the element classes for which the result exists.  
+**Description**: Get the element class names for which a state variable exists.
+**Arguments**:
+    - `svar`:  The name of the state variable.
+**Returns**:
+    - `List[str]`: The names of the element classes for which the result exists.
 
 ### Example
 ```python
@@ -713,11 +712,11 @@ print(classes)
 ```python
 def material_numbers(self)
 ```
-**Description**: Get the material numbers in the database.  
-**Arguments**:  
-    - `None`  
-**Returns**:  
-    - `List[int]`: The material numbers in the database.  
+**Description**: Get the material numbers in the database.
+**Arguments**:
+    - `None`
+**Returns**:
+    - `List[int]`: The material numbers in the database.
 
 ### Example
 ```python
@@ -732,11 +731,11 @@ print(mat_nums)
 ```python
 def materials_of_class_name( self, class_name: str )
 ```
-**Description**: Get List of materials for all elements of a given class name.  
-**Arguments**:  
-    - `class_name`: The Element class name.  
-**Returns**:  
-    - `numpy.ndarray`: The material number for each element of the specified element class.  
+**Description**: Get List of materials for all elements of a given class name.
+**Arguments**:
+    - `class_name`: The Element class name.
+**Returns**:
+    - `numpy.ndarray`: The material number for each element of the specified element class.
 
 ### Example
 ```python
@@ -751,12 +750,12 @@ array([4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5], 
 ```python
 def class_labels_of_material( self, mat, class_name )
 ```
-**Description**: Convert a material name into labels of the specified class (if any).  
-**Arguments**:  
-    - `mat`: The material name or number.  
-    - `class_name`: The Element class name.  
-**Returns**:  
-    - `numpy.ndarray`: The labels of the specified element class that are the specified material.  
+**Description**: Convert a material name into labels of the specified class (if any).
+**Arguments**:
+    - `mat`: The material name or number.
+    - `class_name`: The Element class name.
+**Returns**:
+    - `numpy.ndarray`: The labels of the specified element class that are the specified material.
 
 ### Example
 ```python
@@ -771,11 +770,11 @@ array([ 1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12])
 ```python
 def all_labels_of_material( self, mat )
 ```
-**Description**: Given a specific material. Find all labels with that material and return their values.  
-**Arguments**:  
-    - `mat`: The material name or number.  
-**Returns**:  
-    - `Dict[str,numpy.ndarray]`: The labels of the specified material.  
+**Description**: Given a specific material. Find all labels with that material and return their values.
+**Arguments**:
+    - `mat`: The material name or number.
+**Returns**:
+    - `Dict[str,numpy.ndarray]`: The labels of the specified material.
 
 ### Example
 ```python
@@ -792,11 +791,11 @@ print(lbls)
 ```python
 def nodes_of_material( self, mat )
 ```
-**Description**: Get a list of nodes associated with a specific material number.  
-**Arguments**:  
-    - `mat`: The material name or number.   
-**Returns**:  
-    - `numpy.ndarray`: The list of nodes associated with the material number.  
+**Description**: Get a list of nodes associated with a specific material number.
+**Arguments**:
+    - `mat`: The material name or number.
+**Returns**:
+    - `numpy.ndarray`: The list of nodes associated with the material number.
 
 ### Example
 ```python
@@ -812,7 +811,7 @@ array([ 65,  69,  73,  77,  81,  85,  89,  93,  97, 101, 105, 109, 113,
 # License
 ----------------
 
-Mili Python Reader is distributed under the terms of both the MIT license. 
+Mili Python Reader is distributed under the terms of both the MIT license.
 
 All new contributions must be made under both the MIT license.
 

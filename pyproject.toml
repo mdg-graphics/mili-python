@@ -1,30 +1,88 @@
+# This metadata file represents the abstract project specifications. These specifications
+# should be PEP-compliant (first introduced in PEP 517, but additional PEPs formalize
+# the use of this file). See:
+# - https://pip.pypa.io/en/stable/reference/build-system/pyproject-toml/
+# - https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html#configuring-setuptools-using-pyproject-toml-files
+#
+# The most recent versions of setuptools (unclear exactly when this transition was made)
+# additionally support editable installs of projects using a pyproject.toml file without
+# the presence of a nearly empty setup.py file.
+#
+# Optional dependencies for development can be installed by providing the optional
+# flags to pip, such as:
+#   ``python3 -m pip install .[dev]``
+
 [project]
-  name = "mili"
-  description = "modules for interacting with mili database files"
-  authors = [ { name = "William R Tobin", email = "tobin6@llnl.gov" },
-  	      { name = "Ryan Hathaway", email = "hathaway6@llnl.gov" },
-              { name = "Kevin Durrenberger", email = "durrenberger1@llnl.gov" } ]
-  readme = "README.md"
-  requires-python = ">3.7"
-  license = { text = "LGPL-2.1-only" }
-  dynamic = [ "dependencies", "version" ]
+name = "mili"
+description = "modules for interacting with mili database files"
+authors = [
+  { name = "William R Tobin", email = "tobin6@llnl.gov" },
+  { name = "Ryan Hathaway", email = "hathaway6@llnl.gov" },
+  { name = "Kevin Durrenberger", email = "durrenberger1@llnl.gov" },
+]
+readme = "README.md"
+requires-python = ">3.7"
+license = { text = "LGPL-2.1-only" }
+dynamic = ["version"]
 
-[dependencies]
-  pathos = ""
-  numpy = ">1.20.0, < 1.22"
-  coverage = ">= 4.0.0"
-  dill = "== 0.3.4"
-  psutil = ""
+# When using setuptools as a backend (see [build-system]), then dependencies
+# in a pyproject.toml file are specified according to PEP 631. More info:
+#  - https://peps.python.org/pep-0631/
+#  - https://setuptools.pypa.io/en/latest/userguide/dependency_management.html
+dependencies = [
+  "dill==0.3.4",
+  "numpy>=1.20.0,<1.22; python_version<'3.8'",
+  "numpy>=1.20.0; python_version>='3.8'",
+  "pathos",
+  "psutil",
+]
 
+# The `optional-dependencies` target is used here to separate dev from user
+# dependencies. Individual "variants" (e.g., `dev` from below), are used to
+# specify additional dependencies not required by all installations of the
+# distributed package. More info here:
+#  - https://peps.python.org/pep-0631/#optional-dependencies
+#  - https://setuptools.pypa.io/en/latest/userguide/dependency_management.html#optional-dependencies
+
+# Installation with pip is handled by specifying the variant flag as follows:
+#  `python3 -m pip install -e .[dev]`
+# where the `.[dev]` specifies the `dev` variant (there could be others), and
+# the `.` is the path to the directory containing this file.
+# Installing multiple optional dependencies is performed by adding other targets
+# to the list, without spaces between the delimiter:
+#  `python3 -m pip install -e .[dev,doc]`
+[project.optional-dependencies]
+dev = [
+  "build",
+  "coverage>=4.0.0",
+  "twine",
+  "wheel",
+]
+
+# When used with a pyproject.toml file, setuptools must use a minimum
+# version of 61.0.0. See the "Note" in the documentation:
+#  - https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
 [build-system]
-  requires = ["setuptools", "wheel", "toml", "GitPython"]
-  build-backend = "setuptools.build_meta"
+requires = ["setuptools==68.0.0"]
+build-backend = "setuptools.build_meta"
 
+# More info on package discovery for ``./src`` layouts with setuptools build backends
+#  - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html#src-layout
 [tool.setuptools.packages.find]
-  where = ["src"]
-  include = [
-    "mili*",
-  ]
+where = ["src"]
+include = [
+  "mili*",
+]
+# The ./src/scripts and ./src/tests directories are excluded by default, but
+# explicity excluding them here for clarity since they are in the ./src directory
+exclude = [
+  "scripts*",
+  "tests*",
+]
 
 [tool.setuptools.package-data]
-  mili = ["py.typed"]
+mili = ["py.typed"]
+
+
+[tool.setuptools.dynamic]
+version = {attr = "mili.__init__.__version__"}
