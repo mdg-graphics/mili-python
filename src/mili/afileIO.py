@@ -72,8 +72,8 @@ class AFileReader:
 
   def __parse_header( self, header_data : bytes ):
     self.__mili_file_version = int(header_data[4])
-    self.__dir_dtype = 'i' if int(header_data[7]) == 1 else 'q'
-    self.__endian_str = 'big' if int(header_data[8]) == 1 else 'little'
+    self.__dir_dtype = 'i' if int(header_data[5]) <= 2 else 'q'
+    self.__endian_str = 'big' if int(header_data[6]) == 1 else 'little'
 
   def __parse_footer( self, footer_data : bytes ):
     self.__string_bytes = int.from_bytes( footer_data[0:3], byteorder = self.__endian_str )
@@ -114,7 +114,7 @@ class AFileReader:
   def read( self, f : BinaryIO, t : BinaryIO ) -> None:
     header = f.read(16)
     self.__callback( AFile.Section.HEADER, header )
-    dirs_bytes = 24 if header[5] == 1 else 48
+    dirs_bytes = 24 if header[5] <= 2 else 48
 
     if t is None:
     	self.__has_tfile = False
@@ -237,7 +237,7 @@ class AFileParser:
     afile.file_version = self.verify('header/file_version', int(header_data[4]), version_validator )
     directory_version_validator = lambda x : AFile.DirectoryVersion.MIN <= x <= AFile.DirectoryVersion.MAX
     afile.directory_version = self.verify('header/directory_verion', int(header_data[5]), directory_version_validator )
-    self.__dir_dtype = 'i' if afile.directory_version == 1 else 'q'
+    self.__dir_dtype = 'i' if afile.directory_version <= 2 else 'q'
     endians = [ dmem[1] for dmem in getdatamembers( AFile.Endian ) ]
     afile.endian_flag = self.verify('header/endian_flag', int(header_data[6]), lambda x : x in endians)
     self.__endian_str = 'big' if afile.endian_flag == 1 else 'little'

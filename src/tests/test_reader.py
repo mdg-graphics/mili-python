@@ -14,6 +14,14 @@ import numpy as np
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
+class DirectoryVersionTwo(unittest.TestCase):
+    def __init__(self, *args, **kwargs):
+        super(DirectoryVersionTwo, self).__init__(*args,**kwargs)
+        self.file_name = os.path.join(dir_path,'data','serial','dir_version_2','dblplt2009')
+
+    def test_open( self ):
+        mili = reader.open_database( self.file_name, suppress_parallel = True )
+
 class NonsequentialMOBlocks(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(NonsequentialMOBlocks, self).__init__(*args,**kwargs)
