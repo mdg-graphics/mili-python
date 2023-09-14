@@ -117,6 +117,16 @@ cd mili-python
 source .venv.sh
 ```
 
+### From GitHub Repository
+```bash
+git clone https://github.com/mdg-graphics/mili-python.git
+cd mili-python
+python3 -m venv venv-mili-python
+source venv-mili-python/bin/activate
+pip3 install --upgrade pip
+pip3 install -e .
+```
+
 # Importing the reader module
 ```python
 from mili import reader
