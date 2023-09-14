@@ -38,6 +38,7 @@ def parse_return_codes(return_codes):
 class Wrapper:
   """Wrapper superclass."""
   def __init__(self, cls_obj):
+    self.cls_obj = cls_obj
     self.supports_returncode = False
     if hasattr(cls_obj, "returncode"):
       self.supports_returncode = True
@@ -46,7 +47,8 @@ class LoopWrapper(Wrapper):
   def __init__( self,
                 cls_obj : Type,
                 proc_pargs : List[List[Any]] = [],
-                proc_kwargs : List[Mapping[Any,Any]] = [] ):
+                proc_kwargs : List[Mapping[Any,Any]] = [],
+                objects : List[Any] = None ):
     num_pargs = len(proc_pargs)
     num_kwargs = len(proc_kwargs)
     if num_pargs > 0 and num_kwargs == 0:
@@ -59,7 +61,10 @@ class LoopWrapper(Wrapper):
     # Call super class constructor to set up return code if available
     super(LoopWrapper, self).__init__(cls_obj)
 
-    objs = [ cls_obj( *pargs, **kwargs ) for pargs, kwargs in zip(proc_pargs, proc_kwargs) ]
+    if objects:
+      objs = objects
+    else:
+      objs = [ cls_obj( *pargs, **kwargs ) for pargs, kwargs in zip(proc_pargs, proc_kwargs) ]
 
     # ensure all contained objects are the same exact type (no instances, subclasses are not valid)
     obj_type = type(objs[0])
@@ -70,11 +75,22 @@ class LoopWrapper(Wrapper):
 
     # Add member functions to this object based on the member functions of the wrapped objects
     call_lambda = lambda _attr, _cls_obj, _objs : lambda *pargs, **kwargs: self.loop_caller(_attr,_cls_obj,_objs,*pargs,**kwargs)
-    for func in ( func for func in dir(cls_obj) if not func.startswith('__') and not func.startswith(f'_{cls_obj.__name__}') and callable(getattr(cls_obj,func)) ):
-      setattr( self, func, call_lambda(func,cls_obj,objs) )
+    for func in ( func for func in dir(cls_obj) if not func.startswith('__') and not func.startswith(f'_{cls_obj.__name__}') ):
+      # Class Methods
+      if callable(getattr(cls_obj,func)):
+        setattr( self, func, call_lambda(func,cls_obj,objs) )
+      # Support for properties
+      elif isinstance(getattr(cls_obj, func), property):
+        prop_objs = [ getattr(obj, func) for obj in objs ]
+        prop_objs_type = type(prop_objs[0])
+        setattr( self, func, LoopWrapper(prop_objs_type, objects=prop_objs))
 
   def loop_caller(self,attr,cls_obj,objs,*pargs,**kwargs):
-    result = [ getattr(cls_obj,attr)( obj, *pargs, **kwargs ) for obj in objs ]
+    if callable(getattr(cls_obj, attr)):
+      result = [ getattr(cls_obj,attr)( obj, *pargs, **kwargs ) for obj in objs ]
+    else:
+      result = [ getattr(obj,attr) for obj in objs ]
+
     if self.supports_returncode:
       return_codes = np.array([ obj.returncode() for obj in objs ])
       parse_return_codes( return_codes )
@@ -84,7 +100,8 @@ class PoolWrapper(Wrapper):
   def __init__( self,
                 cls_obj : Type,
                 proc_pargs : List[List[Any]] = [],
-                proc_kwargs : List[Mapping[Any,Any]] = [] ):
+                proc_kwargs : List[Mapping[Any,Any]] = [],
+                objects: List[Any] = None ):
     # validate parameters
     num_pargs = len(proc_pargs)
     num_kwargs = len(proc_kwargs)
@@ -98,8 +115,11 @@ class PoolWrapper(Wrapper):
     # Call super class constructor to set up return code if available
     super(PoolWrapper, self).__init__(cls_obj)
 
-    with mp.ProcessingPool(len(proc_pargs)) as pool:
-      objs = pool.map( lambda args: cls_obj( *args[0], **args[1] ), list( zip(proc_pargs, proc_kwargs) ) )
+    if objects:
+      objs = objects
+    else:
+      with mp.ProcessingPool(len(proc_pargs)) as pool:
+        objs = pool.map( lambda args: cls_obj( *args[0], **args[1] ), list( zip(proc_pargs, proc_kwargs) ) )
 
     # ensure all contained objects are the same exact type (no instances, subclasses are not valid)
     obj_type = type(objs[0])
@@ -110,8 +130,15 @@ class PoolWrapper(Wrapper):
 
     # Add member functions to this object based on the member functions of the wrapped objects
     call_lambda = lambda _attr, _cls_obj, _objs : lambda *pargs, **kwargs: self.pool_caller(_attr,_cls_obj,_objs,*pargs,**kwargs)
-    for func in ( func for func in dir(cls_obj) if not func.startswith('__') and not func.startswith(f'_{cls_obj.__name__}') and callable(getattr(cls_obj,func)) ):
-      setattr( self, func, call_lambda(func,cls_obj,objs) )
+    for func in ( func for func in dir(cls_obj) if not func.startswith('__') and not func.startswith(f'_{cls_obj.__name__}') ):
+      # Class Methods
+      if callable(getattr(cls_obj,func)):
+        setattr( self, func, call_lambda(func,cls_obj,objs) )
+      # Support for properties
+      elif isinstance(getattr(cls_obj, func), property):
+        prop_objs = [ getattr(obj, func) for obj in objs ]
+        prop_objs_type = type(prop_objs[0])
+        setattr( self, func, LoopWrapper(prop_objs_type, objects=prop_objs))
 
   def returncode_wrapper(func):
     """Wrapper to run function and get returncode in single call.
@@ -185,7 +212,10 @@ class ServerWrapper(Wrapper):
             break
           else:
             try:
-              result = [ getattr( self.__cls_obj, cmd )( wrapped, *pargs, **kwargs) for wrapped in self.__wrapped ]
+              if callable(getattr(obj_type, cmd)):
+                result = [ getattr( self.__cls_obj, cmd )( wrapped, *pargs, **kwargs) for wrapped in self.__wrapped ]
+              elif isinstance(getattr(obj_type, cmd), property):
+                result = [ getattr( wrapped, cmd ) for wrapped in self.__wrapped ]
             except:
               result = []
             self.__conn.send_bytes( dill.dumps(result) )
@@ -199,7 +229,10 @@ class ServerWrapper(Wrapper):
       si = (d+1)*(i if i < r else r) + d*(0 if i < r else i - r)
       yield values[si:si+(d+1 if i < r else d)]
   
-  def __init__( self, cls_obj : Type, proc_pargs : List[List[Any]] = [], proc_kwargs : List[Mapping[Any,Any]] = [] ):
+  def __init__( self,
+               cls_obj : Type,
+               proc_pargs : List[List[Any]] = [],
+               proc_kwargs : List[Mapping[Any,Any]] = [] ):
     # validate parameters
     num_pargs = len(proc_pargs)
     num_kwargs = len(proc_kwargs)
@@ -216,8 +249,10 @@ class ServerWrapper(Wrapper):
     # need to have a lambda that returns new lambdas for each func to avoid only have a single lambda bound for all funcs
     mem_maker = lambda attr : lambda *pargs, **kwargs : self.__worker_call( attr, *pargs, **kwargs )
     # generate member functions mimicking those in the wrapped class, excluding private and class functions
-    for func in ( func for func in dir(cls_obj) if not func.startswith('__') and not func.startswith(f'_{cls_obj.__name__}') and callable(getattr(cls_obj,func)) ):
-      setattr( self, func, mem_maker(func) )
+    for func in ( func for func in dir(cls_obj) if not func.startswith('__') and not func.startswith(f'_{cls_obj.__name__}') ):
+      # Class Methods and Properties
+      if callable(getattr(cls_obj,func)) or isinstance(getattr(cls_obj, func), property):
+        setattr( self, func, mem_maker(func) )
 
     # Get the number of processors that are available
     n_cores = int( psutil.cpu_count(logical=False) )
@@ -239,6 +274,13 @@ class ServerWrapper(Wrapper):
     # spawn the worker processes
     for proc in self.__pool:
       proc.start()
+
+    for func in ( func for func in dir(cls_obj) if not func.startswith('__') and not func.startswith(f'_{cls_obj.__name__}') ):
+      # Rewrap properties with PoolWrapper
+      if isinstance(getattr(cls_obj, func), property):
+        prop_objs = getattr(self, func)([],{})
+        prop_objs_type = type(prop_objs[0])
+        setattr( self, func, LoopWrapper(prop_objs_type, objects=prop_objs))
   
   def close(self):
     """Close the database and end all subprocesses."""
@@ -283,8 +325,7 @@ class ServerWrapper(Wrapper):
       parse_return_codes(return_codes)
 
     return self.__flatten(results)
-
-
+  
 def get_wrapper( suppress_parallel = False, experimental = False ):
   Wrapper = None
   if suppress_parallel:

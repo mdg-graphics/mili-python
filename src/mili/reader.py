@@ -21,6 +21,7 @@ from mili.datatypes import *
 from mili.afileIO import *
 from mili.parallel import *
 from mili.derived import *
+from mili.adjacency import *
 
 if sys.version_info < (3, 7):
   raise ImportError(f"This module requires python version >= 3.7!")
@@ -263,6 +264,12 @@ class MiliDatabase:
 
     # Create instance of wrapper class to handle derived queries
     self.__derived = DerivedExpressions( self )
+    # Create instance of wrapper class to handle Geometric Mesh information/queries
+    self.__geometry = GeometricMeshInfo( self )
+
+  @property
+  def geometry(self):
+    return self.__geometry
 
   def _log_function_call(func):
     """Decorator to log function calls"""
@@ -499,7 +506,7 @@ class MiliDatabase:
     indices = (self.__labels[class_sname][:,None] == elem_labels).argmax(axis=0)
     elem_conn = self.__conns[class_sname][indices][:,:-1]
     return self.__labels['node'][elem_conn], self.__labels[class_sname][indices,None]
-
+  
   def nodes_of_material( self, mat ):
     ''' Find nodes associated with a material number '''
     if not self.__valid_material_type(mat):
@@ -678,7 +685,7 @@ class MiliDatabase:
       # NOTE: This has to be done after checking if the state variable exists so that the reader
       #       can correctly report when a state variable doesn't exist across all processors.
       if ordinals.size == 0:
-        self.__logger.warning(f"No labels found for the class {class_sname}")
+        self.__logger.warning(f"No labels found for the class {class_sname}", extra=self.__log_msg_extra)
         return res
 
       res[queried_name]['layout']['states'] = states
@@ -769,7 +776,7 @@ class MiliDatabase:
       # filter out any subrecords we have no labels for
       srecs_to_query = [ srec for srec in srecs_to_query if srec_internal_offsets[srec.name].size != 0 ]
       if not srecs_to_query:
-        self.__logger.warning(f"No subrecords found for the result/class combination {queried_name}, {class_sname}")
+        self.__logger.warning(f"No subrecords found for the result/class combination {queried_name}, {class_sname}", extra=self.__log_msg_extra)
         break
 
       # initialize the results structure for this queried name

@@ -12,6 +12,7 @@
 - [Querying Results](#querying-results)
 - [Derived Variables](#derived-variables)
 - [Modifying Results](#modifying-results)
+- [Adjacency Queries](#adjacency-queries)
 - [MiliDatabase Member Functions](#milidatabase-class-member-functions)
     - [mesh_dimensions](#mesh_dimensions)
     - [state_maps](#state_maps)
@@ -409,6 +410,45 @@ Will write modified data back to the database. The `write_data` must have the sa
 > **Note:** in parallel, the result format has an additonal top-level list. This is not currently accounted for in write-mode. A user must currently produce a `write_data` argument that contains the union of the set of data to be written to the parallel database. Thus if some data was queried from rank 0 databases and some from rank 1, the results dictionaries for the first two top-level results in the list must be merged appropriately to allow the opertional to succeed. This can be done using the `combine` function references above.
 
 > **Note:** minimal enforcement/checking of the `write_data` structure is currently done and malformed `write_data` *could* possibly (unlikely) cause database corruption, use at your own discretion. Create backups, test on smaller databases first, etc. A python expection is the most likely outcome here, but caution is best.
+
+# Adjacency Queries
+
+The mili-python reader provides some support for querying element adjacencies through the `AdjacencyMapping` wrapper. Currently users can query all elements within a specified radius of a given element using the function `mesh_entities_within_radius` or query all elements associated with a set of specific nodes using the `elems_of_nodes` function.
+
+The function `mesh_entities_within_radius` computes the centroid of the element you have specified using the nodal coordinates for that element at the specified state. The reader then gathers all nodes within the specified radius of that centroid and returns all elements that are associated with those nodes.
+
+```python
+from mili import adjacency
+adj = adjacency.AdjacencyMapping(db)
+
+# Gathers the elements within a radius of 0.30 length units from shell 6 at state 1
+adjacent_elements = adj.mesh_entities_within_radius("shell", 6, 1, 0.30)
+
+"""
+The format of the returned dictionary is shown below:
+
+adjacent_elements = {
+    "shell": [3,4,5,6,9,11],
+    "beam": [5,6,37,42],
+    "cseg": [2,3,5,6,8,9],
+}
+"""
+```
+
+The function `elems_of_nodes` gathers all elements associated with a set of nodes.
+
+```python
+from mili import adjacency
+
+adj = adjacency.AdjacencyMapping(db)
+
+elems = adj.elems_of_nodes(120)
+# or
+elems = adj.elems_of_nodes([1,2,3])
+```
+
+The dictionary returned by `elems_of_nodes` has the same format as that returned by `mesh_entities_within_radius`
+
 
 # MiliDatabase Class member functions
 
