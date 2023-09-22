@@ -734,30 +734,34 @@ class DerivedExpressions:
     ezx: np.ndarray = primal_data['ezx']['data']
 
     num_states = len(ex[:,0,0])
-    num_labels = len(ex[0,:,0])
-    num_ipt = len(ex[0,0,:])  # number of integration points
     
     # Create 3 x 3 x num_states x num_labels x 1 array
     x_col = np.stack( [ex, exy, ezx])  # 3 x num_states x num_labels x 1 array
     y_col = np.stack( [exy, ey, eyz])  # 3 x num_states x num_labels x 1 array
     z_col = np.stack( [ezx, eyz, ez])  # 3 x num_states x num_labels x 1 array
-    strain = np.stack( [x_col, y_col, z_col])  # full 5-d stress array
+    strain = np.stack( [x_col, y_col, z_col])  # full 5-d Strain array
     
     result_matrix = np.empty_like(ex)
-    for i in range(num_states):
-      for j in range(num_labels):
-        for k in range(num_ipt):
-          eigen_values, _ = np.linalg.eig(strain[:, :, i, j, k,])  # all three principal stresses
-          if result_name=='prin_strain1':
-            result_matrix[i,j,k] = max(eigen_values)
-          elif result_name =='prin_strain3':
-            result_matrix[i,j,k] = min(eigen_values)
-          elif result_name =='prin_strain2':
-            eigen_values.sort()  # results aren't sorted by default
-            result_matrix[i,j,k] = eigen_values[1]  # get the 2nd value
-          else:
-            raise ValueError
-    
+    # Strain is 3 x 3 x states x elems x ipts,
+    # Shift to be states x elems x ipts x 3 x 3 so that first three indices match result_matrix.
+    strain = np.moveaxis(strain, [0,1,2,3,4], [3,4,0,1,2])
+
+    if result_name == "prin_strain1":
+      for i in range(num_states):
+        eigen_values = np.linalg.eigvals(strain[i,:,:])
+        result_matrix[i] = np.max(eigen_values, axis=2)
+    elif result_name =='prin_strain3':
+      for i in range(num_states):
+        eigen_values = np.linalg.eigvals(strain[i,:,:])
+        result_matrix[i] = np.min(eigen_values, axis=2)
+    elif result_name =='prin_strain2':
+      for i in range(num_states):
+        eigen_values = np.linalg.eigvals(strain[i,:,:])
+        eigen_values = np.sort(eigen_values, axis=2)  # results aren't sorted by default
+        result_matrix[i] = eigen_values[:,:,1]  # get the 2nd value
+    else:
+      raise ValueError
+
     derived_result[result_name]['data'] = result_matrix
             
     return derived_result
@@ -858,29 +862,33 @@ class DerivedExpressions:
     e_hyd = (1/3) * (ex + ey + ez)  # hydrostatic strain
 
     num_states = len(ex[:,0,0])
-    num_labels = len(ex[0,:,0])
-    num_ipt = len(ex[0,0,:])
     
     # Create 3 x 3 x num_states x num_labels x num_ipt array
     x_col = np.stack( [ex-e_hyd, exy, ezx])  # 3 x num_states x num_labels x num_ipt array
     y_col = np.stack( [exy, ey-e_hyd, eyz])  # 3 x num_states x num_labels x num_ipt array
     z_col = np.stack( [ezx, eyz, ez-e_hyd])  # 3 x num_states x num_labels x num_ipt array
-    dev_strain = np.stack( [x_col, y_col, z_col])  # full 5-d stress array
+    dev_strain = np.stack( [x_col, y_col, z_col])  # full 5-d strain array
     
     result_matrix = np.empty_like(ex)
-    for i in range(num_states):
-      for j in range(num_labels):
-        for k in range(num_ipt):
-          eigen_values, _ = np.linalg.eig(dev_strain[:, :, i, j, k,])  # all three principal stresses
-          if result_name=='prin_dev_strain1':
-            result_matrix[i,j,k] = max(eigen_values)
-          elif result_name =='prin_dev_strain3':
-            result_matrix[i,j,k] = min(eigen_values)
-          elif result_name =='prin_dev_strain2':
-            eigen_values.sort()  # results aren't sorted by default
-            result_matrix[i,j,k] = eigen_values[1]  # get the 2nd value
-          else:
-            raise ValueError
+    # Strain is 3 x 3 x states x elems x ipts,
+    # Shift to be states x elems x ipts x 3 x 3 so that first three indices match result_matrix.
+    dev_strain = np.moveaxis(dev_strain, [0,1,2,3,4], [3,4,0,1,2])
+
+    if result_name == "prin_dev_strain1":
+      for i in range(num_states):
+        eigen_values = np.linalg.eigvals(dev_strain[i,:,:])
+        result_matrix[i] = np.max(eigen_values, axis=2)
+    elif result_name =='prin_dev_strain3':
+      for i in range(num_states):
+        eigen_values = np.linalg.eigvals(dev_strain[i,:,:])
+        result_matrix[i] = np.min(eigen_values, axis=2)
+    elif result_name =='prin_dev_strain2':
+      for i in range(num_states):
+        eigen_values = np.linalg.eigvals(dev_strain[i,:,:])
+        eigen_values = np.sort(eigen_values, axis=2)  # results aren't sorted by default
+        result_matrix[i] = eigen_values[:,:,1]  # get the 2nd value
+    else:
+      raise ValueError
     
     derived_result[result_name]['data'] = result_matrix
             
@@ -982,32 +990,36 @@ class DerivedExpressions:
     syz: np.ndarray = primal_data['syz']['data']
     szx: np.ndarray = primal_data['szx']['data']
 
-    num_labels = len(sx[0,:,0])
     num_states = len(sx[:,0,0])
-    num_ips = len(sx[0,0,:])
     
     # Create 3 x 3 x l x m x 1 array
     x_col = np.stack( [sx, sxy, szx])  # 3 x l x m x 1 array
     y_col = np.stack( [sxy, sy, syz])  # 3 x l x m x 1 array
     z_col = np.stack( [szx, syz, sz])  # 3 x l x m x 1 array
     stress = np.stack( [x_col, y_col, z_col])  # full 5-d stress array
-    
+
     result_matrix = np.empty_like(sx)
-    for i in range(num_states):
-      for j in range(num_labels):
-        for k in range(num_ips):
-          eigen_values, _ = np.linalg.eig(stress[:, :, i, j, k,])  # all three principal stresses
-          if result_name=='prin_stress1':
-            result_matrix[i,j,k] = max(eigen_values)
-          elif result_name =='prin_stress3':
-            result_matrix[i,j,k] = min(eigen_values)
-          elif result_name =='prin_stress2':
-            eigen_values.sort()  # results aren't sorted by default
-            result_matrix[i,j,k] = eigen_values[1]  # get the 2nd value
-          else:
-            raise ValueError
+    # Stress is 3 x 3 x states x elems x ipts,
+    # Shift to be states x elems x ipts x 3 x 3 so that first three indices match result_matrix.
+    stress = np.moveaxis(stress, [0,1,2,3,4], [3,4,0,1,2])
+
+    if result_name == "prin_stress1":
+      for i in range(num_states):
+        eigen_values = np.linalg.eigvals(stress[i,:,:])
+        result_matrix[i] = np.max(eigen_values, axis=2)
+    elif result_name =='prin_stress3':
+      for i in range(num_states):
+        eigen_values = np.linalg.eigvals(stress[i,:,:])
+        result_matrix[i] = np.min(eigen_values, axis=2)
+    elif result_name =='prin_stress2':
+      for i in range(num_states):
+        eigen_values = np.linalg.eigvals(stress[i,:,:])
+        eigen_values = np.sort(eigen_values, axis=2)  # results aren't sorted by default
+        result_matrix[i] = eigen_values[:,:,1]  # get the 2nd value
+    else:
+      raise ValueError
       
-      derived_result[result_name]['data'] = result_matrix
+    derived_result[result_name]['data'] = result_matrix
             
     return derived_result
 
@@ -1074,8 +1086,6 @@ class DerivedExpressions:
     szx = primal_data['szx']['data']
 
     num_states = len(sx[:,0,0])
-    num_labels = len(sx[0,:,0])
-    num_ips = len(sx[0,0,:])
     
     pressure = -(1/3) * (sx + sy + sz)
     
@@ -1086,21 +1096,27 @@ class DerivedExpressions:
     dev_stress = np.stack( [x_col, y_col, z_col])  # full 5-d stress array
 
     result_matrix = np.empty_like(sx)
-    for i in range(num_states):
-      for j in range(num_labels):
-        for k in range(num_ips):
-          eigen_values, _ = np.linalg.eig(dev_stress[:, :, i, j, k,])  # all three principal stresses
-          if result_name=='prin_dev_stress1':
-            result_matrix[i,j,k] = max(eigen_values)
-          elif result_name =='prin_dev_stress3':
-            result_matrix[i,j,k] = min(eigen_values)
-          elif result_name =='prin_dev_stress2':
-            eigen_values.sort()  # results aren't sorted by default
-            result_matrix[i,j,k] = eigen_values[1]  # get the 2nd value
-          else:
-            raise ValueError
+    # Stress is 3 x 3 x states x elems x ipts,
+    # Shift to be states x elems x ipts x 3 x 3 so that first three indices match result_matrix.
+    dev_stress = np.moveaxis(dev_stress, [0,1,2,3,4], [3,4,0,1,2])
+
+    if result_name == "prin_dev_stress1":
+      for i in range(num_states):
+        eigen_values = np.linalg.eigvals(dev_stress[i,:,:])
+        result_matrix[i] = np.max(eigen_values, axis=2)
+    elif result_name =='prin_dev_stress3':
+      for i in range(num_states):
+        eigen_values = np.linalg.eigvals(dev_stress[i,:,:])
+        result_matrix[i] = np.min(eigen_values, axis=2)
+    elif result_name =='prin_dev_stress2':
+      for i in range(num_states):
+        eigen_values = np.linalg.eigvals(dev_stress[i,:,:])
+        eigen_values = np.sort(eigen_values, axis=2)  # results aren't sorted by default
+        result_matrix[i] = eigen_values[:,:,1]  # get the 2nd value
+    else:
+      raise ValueError
       
-      derived_result[result_name]['data'] = result_matrix
+    derived_result[result_name]['data'] = result_matrix
             
     return derived_result
 
@@ -1121,8 +1137,6 @@ class DerivedExpressions:
     szx = primal_data['szx']['data']
 
     num_states = len(sx[:,0,0])
-    num_labels = len(sx[0,:,0])
-    num_ips = len(sx[0,0,:])
     
     pressure = -(1/3) * (sx + sy + sz)
     
@@ -1133,11 +1147,13 @@ class DerivedExpressions:
     stress = np.stack( [x_col, y_col, z_col])  # full 5-d stress array
 
     result_matrix = np.empty_like(sx)
+    # Stress is 3 x 3 x states x elems x ipts,
+    # Shift to be states x elems x ipts x 3 x 3 so that first three indices match result_matrix.
+    stress = np.moveaxis(stress, [0,1,2,3,4], [3,4,0,1,2])
+
     for i in range(num_states):
-      for j in range(num_labels):
-        for k in range(num_ips):
-          eigen_values, _ = np.linalg.eig(stress[:, :, i, j, k,])  # all three principal stresses
-          result_matrix[i,j,k] = 0.5 * (max(eigen_values) - min(eigen_values))
+      eigen_values = np.linalg.eigvals(stress[i,:,:])
+      result_matrix[i] = 0.5 * (np.max(eigen_values, axis=2) - np.min(eigen_values, axis=2))
     
     derived_result[result_name]['data'] = result_matrix
 
