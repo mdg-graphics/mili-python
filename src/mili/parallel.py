@@ -6,7 +6,7 @@ import multiprocessing
 import dill
 import pathos.multiprocessing as mp
 from functools import partial
-from multiprocessing import Process
+from multiprocessing import Process, Manager
 import numpy as np
 import atexit
 import psutil
@@ -178,6 +178,7 @@ class ServerWrapper(Wrapper):
   class ClientWrapper(Process):
     def __init__( self,
                   conn, 
+                  shared_dict,
                   cls_obj: Type,
                   proc_pargs: List[List[Any]] = [],
                   proc_kwargs: List[Mapping[Any,Any]] = [] ):
@@ -193,6 +194,7 @@ class ServerWrapper(Wrapper):
         raise ValueError(f'Must supply the same number of pargs ({num_pargs}) and kwargs ({num_kwargs}) to instantiate object list.')
 
       self.__conn = conn
+      self.__shared_dict = shared_dict
       self.__cls_obj = cls_obj
       self.__proc_pargs = proc_pargs
       self.__proc_kwargs = proc_kwargs
@@ -207,10 +209,13 @@ class ServerWrapper(Wrapper):
 
       while True:
         if self.__conn.poll():
-          cmd, pargs, kwargs = dill.loads( self.__conn.recv() )
-          if cmd == '__exit':
+          status = dill.loads( self.__conn.recv() )
+          if status == '__exit':
             break
           else:
+            cmd = self.__shared_dict["cmd"]
+            pargs = self.__shared_dict["pargs"]
+            kwargs = self.__shared_dict["kwargs"]
             try:
               if callable(getattr(obj_type, cmd)):
                 result = [ getattr( self.__cls_obj, cmd )( wrapped, *pargs, **kwargs) for wrapped in self.__wrapped ]
@@ -257,6 +262,10 @@ class ServerWrapper(Wrapper):
     # Get the number of processors that are available
     n_cores = int( psutil.cpu_count(logical=False) )
 
+    # Create shared dictionary for passing commands/arguments to subprocesses
+    self.__manager = Manager()
+    self.__shared_dict = self.__manager.dict()
+
     # Break out into groups for each processor available
     proc_pargs = self.__divide_into_sequential_groups( proc_pargs, n_cores )
     proc_kwargs = self.__divide_into_sequential_groups( proc_kwargs, n_cores )
@@ -266,7 +275,7 @@ class ServerWrapper(Wrapper):
     self.__conns = []
     for pargs, kwargs in zip( proc_pargs, proc_kwargs ):
       c0, c1 = multiprocessing.Pipe()
-      self.__pool.append( ServerWrapper.ClientWrapper( c1, cls_obj, pargs, kwargs ) )
+      self.__pool.append( ServerWrapper.ClientWrapper( c1, self.__shared_dict, cls_obj, pargs, kwargs ) )
       self.__conns.append( c0 )
 
     atexit.register(self.__cleanup_processes)
@@ -291,7 +300,7 @@ class ServerWrapper(Wrapper):
   def __cleanup_processes(self):
     if hasattr( self, '_ServerWrapper__conns' ):
       for conn in self.__conns:
-        conn.send( dill.dumps( ( '__exit', [], {} ) ) )
+        conn.send( dill.dumps( '__exit' ) )
     self.__conns = []
     if hasattr( self, '_ServerWrapper__pool'):
       for proc in self.__pool:
@@ -306,18 +315,26 @@ class ServerWrapper(Wrapper):
   #  arguments to individual processes is not supported currently.
   def __worker_call(self,attr,*pargs,**kwargs):
     results = [None] * len(self.__conns)
-    data = ( attr, pargs, kwargs )
 
+    # Set command and arguments in shared dictionary.
+    self.__shared_dict["cmd"] = attr
+    self.__shared_dict["pargs"] = pargs
+    self.__shared_dict["kwargs"] = kwargs
+
+    # Tell subprocesses there is a new command to be processed.
     for conn in self.__conns:
-      conn.send( dill.dumps( data ) )
+      conn.send( dill.dumps( "__cmd" ) )
 
     for idx, conn in enumerate(self.__conns):
       results[idx] = dill.loads( conn.recv_bytes() )
 
     if self.supports_returncode:
       return_codes = []
+      self.__shared_dict["cmd"] = "returncode"
+      self.__shared_dict["pargs"] = []
+      self.__shared_dict["kwargs"] = {}
       for conn in self.__conns:
-        conn.send( dill.dumps( ("returncode",[],{}) ) )
+        conn.send( dill.dumps( "__cmd" ) )
 
       for idx, conn in enumerate(self.__conns):
         return_codes.append( dill.loads( conn.recv_bytes() ) )
