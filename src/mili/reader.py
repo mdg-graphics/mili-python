@@ -16,6 +16,7 @@ import sys
 from collections import defaultdict
 from numpy.lib.function_base import iterable
 from typing import *
+from timeit import default_timer
 
 from mili.datatypes import *
 from mili.afileIO import *
@@ -275,7 +276,10 @@ class MiliDatabase:
     """Decorator to log function calls"""
     def wrap(self, *args, **kwargs):
       self.__logger.info(f"Calling '{func.__name__}' with args: {args}, kwargs: {kwargs}", extra=self.__log_msg_extra)
+      start_time = default_timer()
       result = func(self, *args, **kwargs)
+      elapsed = default_timer() - start_time
+      self.__logger.info(f"Call to '{func.__name__}' took {elapsed} seconds", extra=self.__log_msg_extra)
       return result
     return wrap
 
@@ -558,7 +562,7 @@ class MiliDatabase:
       if not derived_exists and primal_exists:
         actual_result_source = 'primal'
 
-    return svar_name, svar_comps, actual_result_source
+    return svar_query_input, svar_name, svar_comps, actual_result_source
 
   def __init_query_parameters( self,
                                svar_names : Union[List[str],str],
@@ -674,26 +678,32 @@ class MiliDatabase:
     labels_of_class = self.__labels.get( class_sname, np_empty(np.int32) )
     ordinals = np.where( np.isin( labels_of_class, labels ) )[0]
 
-    for queried_name in svar_names:
-      queried_svar_name, comp_svar_names, actual_result_source = self.__parse_query_name_and_source( queried_name, requested_result_source )
-      if actual_result_source == '':
-        self.__return_code = (ReturnCode.ERROR, f"The state variable '{queried_name}' does not exist")
-        self.__logger.warning(f"The svar '{queried_name}' does not exist", extra=self.__log_msg_extra)
-        continue
+    query_specs = [self.__parse_query_name_and_source( queried_name, requested_result_source ) for queried_name in svar_names ]
+    not_found = [ spec for spec in query_specs if spec[3] == "" ]
+    derived_specs = [ spec for spec in query_specs if spec[3] == "derived" ]
+    primal_specs = [ spec for spec in query_specs if spec[3] == "primal" ]
 
-      # If no labels, then skip.
-      # NOTE: This has to be done after checking if the state variable exists so that the reader
-      #       can correctly report when a state variable doesn't exist across all processors.
-      if ordinals.size == 0:
-        self.__logger.warning(f"No labels found for the class {class_sname}", extra=self.__log_msg_extra)
-        return res
+    # Warnings for not found variables
+    for name in not_found:
+      self.__return_code = (ReturnCode.ERROR, f"The state variable '{name}' does not exist")
+      self.__logger.warning(f"The svar '{name}' does not exist", extra=self.__log_msg_extra)
+
+    # If no labels, then skip. We do this here to ensure non existant state variables are reported.
+    if ordinals.size == 0:
+      self.__logger.warning(f"No labels found for the class {class_sname}", extra=self.__log_msg_extra)
+      return res
+
+    # Handle derived queries
+    derived_query_names = [spec[0] for spec in derived_specs]
+    if derived_query_names:
+      res.update( self.__derived.query(derived_query_names, class_sname, material, labels, states, ips, **kwargs) )
+
+    # Handle primal queries
+    for query_spec in primal_specs:
+      queried_name, queried_svar_name, comp_svar_names, actual_result_source = query_spec
 
       res[queried_name]['layout']['states'] = states
       res[queried_name]['source'] = actual_result_source
-      if actual_result_source == 'derived':
-        res[queried_name] = self.__derived.query(queried_name, class_sname, material, labels, states, ips, **kwargs)[queried_name]
-        continue
-      # NOTE: else the actual_result_source is "primal" and we keep going
 
       match_aggregate_svar = ""
       if self.__svars[queried_svar_name].agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:

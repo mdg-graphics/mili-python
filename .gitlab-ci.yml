@@ -39,7 +39,7 @@ coverage:
     script:
         - cd src
         - python3 -m coverage --version
-        - srun -N1 -n1 -c8 python3 -m coverage run -m unittest
+        - srun -N1 -n1 -c8 -p pdebug python3 -m coverage run -m unittest
         # avoid failure if there are not multiple reports
         - python3 -m coverage combine || freturn 0
         - python3 -m coverage xml

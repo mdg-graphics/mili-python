@@ -32,6 +32,7 @@ import inspect
 from typing import *
 from mili.reader import *
 import numpy as np
+from itertools import groupby
 
 class DerivedExpressions:
   """A wrapper class for MiliDatabase that calculates derived results using the primal
@@ -48,182 +49,218 @@ class DerivedExpressions:
       "disp_x": {
         "primals": ["ux"],  # The primals needed to compute the derived result
         "primals_class": [None],  # The element class of each primal, None = same as requested class_name.
+        "supports_batching": False,
         "compute_function": self.__compute_node_displacement
       },
       "disp_y": {
         "primals": ["uy"],
         "primals_class": [None],
+        "supports_batching": False,
         "compute_function": self.__compute_node_displacement
       },
       "disp_z": {
         "primals": ["uz"],
         "primals_class": [None],
+        "supports_batching": False,
         "compute_function": self.__compute_node_displacement
       },
       "disp_mag": {
         "primals": ["ux", "uy", "uz"],
         "primals_class": [None, None, None],
+        "supports_batching": False,
         "compute_function": self.__compute_node_displacement_magnitude
       },
       "disp_rad_mag_xy": {
         "primals": ["ux", "uy"],
         "primals_class": [None, None],
+        "supports_batching": False,
         "compute_function": self.__compute_node_radial_displacement
       },
       "vel_x": {
         "primals": ["ux"],
         "primals_class": [None],
+        "supports_batching": False,
         "compute_function": self.__compute_node_velocity
       },
       "vel_y": {
         "primals": ["uy"],
         "primals_class": [None],
+        "supports_batching": False,
         "compute_function": self.__compute_node_velocity
       },
       "vel_z": {
         "primals": ["uz"],
         "primals_class": [None],
+        "supports_batching": False,
         "compute_function": self.__compute_node_velocity
       },
       "acc_x": {
         "primals": ["ux"],
         "primals_class": [None],
+        "supports_batching": False,
         "compute_function": self.__compute_node_acceleration
       },
       "acc_y": {
         "primals": ["uy"],
         "primals_class": [None],
+        "supports_batching": False,
         "compute_function": self.__compute_node_acceleration
       },
       "acc_z": {
         "primals": ["uz"],
         "primals_class": [None],
+        "supports_batching": False,
         "compute_function": self.__compute_node_acceleration
       },
       "vol_strain": {
         "primals": ["ex","ey","ez"],
         "primals_class": [None, None, None],
+        "supports_batching": False,
         "compute_function": self.__compute_vol_strain
       },
       "prin_strain1": {
         "primals": ["ex","ey","ez","exy","eyz","ezx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": True,
         "compute_function": self.__compute_principal_strain
       },
       "prin_strain2": {
         "primals": ["ex","ey","ez","exy","eyz","ezx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": True,
         "compute_function": self.__compute_principal_strain
       },
       "prin_strain3": {
         "primals": ["ex","ey","ez","exy","eyz","ezx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": True,
         "compute_function": self.__compute_principal_strain
       },
       "prin_dev_strain1": {
         "primals": ["ex","ey","ez","exy","eyz","ezx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": True,
         "compute_function": self.__compute_dev_principal_strain
       },
       "prin_dev_strain2": {
         "primals": ["ex","ey","ez","exy","eyz","ezx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": True,
         "compute_function": self.__compute_dev_principal_strain
       },
       "prin_dev_strain3": {
         "primals": ["ex","ey","ez","exy","eyz","ezx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": True,
         "compute_function": self.__compute_dev_principal_strain
       },
       # Alternate calculation methods used to check for possibility of errors.
       "prin_strain1_alt": {
         "primals": ["ex","ey","ez","exy","eyz","ezx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": False,
         "compute_function": self.__compute_principal_strain_alt
       },
       "prin_strain2_alt": {
         "primals": ["ex","ey","ez","exy","eyz","ezx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": False,
         "compute_function": self.__compute_principal_strain_alt
       },
       "prin_strain3_alt": {
         "primals": ["ex","ey","ez","exy","eyz","ezx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": False,
         "compute_function": self.__compute_principal_strain_alt
       },
       "prin_dev_strain1_alt": {
         "primals": ["ex","ey","ez","exy","eyz","ezx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": False,
         "compute_function": self.__compute_dev_principal_strain_alt
       },
       "prin_dev_strain2_alt": {
         "primals": ["ex","ey","ez","exy","eyz","ezx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": False,
         "compute_function": self.__compute_dev_principal_strain_alt
       },
       "prin_dev_strain3_alt": {
         "primals": ["ex","ey","ez","exy","eyz","ezx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": False,
         "compute_function": self.__compute_dev_principal_strain_alt
       },
       "prin_stress1": {
         "primals": ["sx","sy","sz","sxy","syz","szx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": True,
         "compute_function": self.__compute_principal_stress
       },
       "prin_stress2": {
         "primals": ["sx","sy","sz","sxy","syz","szx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": True,
         "compute_function": self.__compute_principal_stress
       },
       "prin_stress3": {
         "primals": ["sx","sy","sz","sxy","syz","szx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": True,
         "compute_function": self.__compute_principal_stress
       },
       "eff_stress": {
         "primals": ["sx","sy","sz","sxy","syz","szx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": False,
         "compute_function": self.__compute_effective_stress
       },
       "pressure": {
         "primals": ['sx', 'sy', 'sz'],
         "primals_class": [None, None, None],
+        "supports_batching": False,
         "compute_function": self.__compute_pressure 
       },
       "prin_dev_stress1": {
         "primals": ["sx","sy","sz","sxy","syz","szx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": True,
         "compute_function": self.__compute_principal_dev_stress
       },
       "prin_dev_stress2": {
         "primals": ["sx","sy","sz","sxy","syz","szx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": True,
         "compute_function": self.__compute_principal_dev_stress
       },
       "prin_dev_stress3": {
         "primals": ["sx","sy","sz","sxy","syz","szx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": True,
         "compute_function": self.__compute_principal_dev_stress
       },
       "max_shear_stress": {
         "primals": ["sx","sy","sz","sxy","syz","szx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": False,
         "compute_function": self.__compute_max_shear_stress
       },
       "triaxiality": {
         "primals": ["sx","sy","sz","sxy","syz","szx"],
         "primals_class": [None, None, None, None, None, None],
+        "supports_batching": False,
         "compute_function": self.__compute_triaxiality
       },
       "eps_rate": {
         "primals": ["eps"],
         "primals_class": [None],
+        "supports_batching": False,
         "compute_function": self.__compute_plastic_strain_rate
       },
       "nodtangmag": {
         "primals": ["nodtang_x", "nodtang_y", "nodtang_z"],
         "primals_class": [None, None, None],
+        "supports_batching": False,
         "compute_function": self.__compute_nodal_tangential_traction_magnitude
       }
       # TODO: Add more primals here
@@ -275,9 +312,26 @@ class DerivedExpressions:
       raise NotImplementedError("Currently not supported.")
 
     return classes_of_derived
+  
+  def find_batchable_queries(self, result_names: List[str]):
+    """Determine if any derived queries can be batched based on the result names."""
+    groups = []
+    result_names = sorted(result_names)
+    for res in result_names:
+      if res in self.__derived_expressions:
+        groups.append( (res, self.__derived_expressions[res]["compute_function"].__name__, self.__derived_expressions[res]["supports_batching"]) )
+    grouped_by_compute_function = [list(g) for _,g in groupby(groups, lambda x: x[1])]
+    final_groups = []
+    for group in grouped_by_compute_function:
+      if all(g[2] for g in group):
+        final_groups.append([g[0] for g in group])
+      else:
+        for g in group:
+          final_groups.append([g[0]])
+    return final_groups
     
   def __init_derived_query_parameters(self,
-                              result_name : str,
+                              result_names : List[str],
                               class_name : str,
                               material : Optional[Union[str,int]] = None,
                               labels : Optional[Union[List[int],int]] = None,
@@ -288,9 +342,10 @@ class DerivedExpressions:
         throws TypeException and/or ValueException as appropriate. Does not throw exceptions in cases where
         the result of the argument deviation from the norm would be expected to be encountered when operating in parallel.
     """
-    # Check that derived result is supported
-    if result_name not in self.__derived_expressions:
-      raise ValueError(f"The derived result '{result_name}' is not supported.")
+    # Check that derived results are supported
+    for result_name in result_names:
+      if result_name not in self.__derived_expressions:
+        raise ValueError(f"The derived result '{result_name}' is not supported.")
 
     # Check that class name exists in problem
     if class_name not in self.db.class_names():
@@ -338,14 +393,19 @@ class DerivedExpressions:
     if type(ips) is not list:
       raise TypeError( 'comp must be an integer or list of integers' )
     
-    return result_name, class_name, material, labels, states, ips
+    return result_names, class_name, material, labels, states, ips
 
-  def __parse_derived_result_spec( self, result_name: str, class_name: str, kwargs: dict ):
+  def __parse_derived_result_spec( self, result_names: List[str], class_name: str, kwargs: dict ):
     """Parse the derived result specification, perform error handling, set up kwargs (if necessary)."""
+    # There will always be at least one result name. If there are more than one result names then
+    # the query specification will be the same for all so we can just use the first result
+    result_name = result_names[0]
+
     required_primals = np.array( self.__derived_expressions[result_name]['primals'] )
     primal_classes = self.__derived_expressions[result_name]['primals_class']
     primal_classes = np.array( [ pclass if pclass is not None else class_name for pclass in primal_classes] )
     compute_function = self.__derived_expressions[result_name]['compute_function']
+    supports_batching = self.__derived_expressions[result_name]['supports_batching']
 
     # Check that the element classes exists in problem.
     for primal_class in primal_classes:
@@ -370,7 +430,7 @@ class DerivedExpressions:
         raise ValueError(f"Unexpected keyword argument '{keyword}' was provided.")
 
     # Check that any keyword arguments have been provided.
-    consistant_arguments = set(['self', 'result_name', 'primal_data', 'query_args'])
+    consistant_arguments = set(['self', 'result_name', 'result_names', 'primal_data', 'query_args'])
     keyword_arguments = function_arguments - consistant_arguments
     if keyword_arguments:
       for keyword in keyword_arguments:
@@ -380,7 +440,7 @@ class DerivedExpressions:
             raise ValueError((f"For the derived result '{result_name}' you must "
                               f"provide the key word argument '{keyword}'"))
     
-    return required_primals, primal_classes, kwargs, compute_function
+    return required_primals, primal_classes, kwargs, supports_batching, compute_function
   
   def __generate_elem_node_map(self, elem_node_association):
     """Generate masks for each element that maps to nodal data.
@@ -449,7 +509,7 @@ class DerivedExpressions:
     return primal_data, query_args
     
   def query(self,
-            result_name: str,
+            result_names: List[str],
             class_name: str,
             material : Optional[Union[str,int]] = None,
             labels : Optional[Union[List[int],int]] = None,
@@ -458,7 +518,7 @@ class DerivedExpressions:
             **kwargs):
     """General derived result function.
     
-    : param result_name : The derived result to compute
+    : param result_names : The list of derived results to compute
     : param class_sname : mesh class name being queried
     : param material : optional sname or material number to select labels from
     : param labels : optional labels to query data about, filtered by material if material if material is supplied, default is all
@@ -466,26 +526,37 @@ class DerivedExpressions:
     : param ips : optional for svars with array or vec_array aggregation query just these components, default is all available
     """
     # Validate incoming data
-    result_name, class_name, material, labels, states, ips = self.__init_derived_query_parameters(result_name, class_name, material, labels, states, ips)
-    
-    # Get specifications for this derived result
-    required_primals, primal_classes, kwargs, compute_function = self.__parse_derived_result_spec( result_name, class_name, kwargs )
+    result_names, class_name, material, labels, states, ips = self.__init_derived_query_parameters(result_names, class_name, material, labels, states, ips)
 
-    # Gather the required primal data
-    primal_data, query_args = self.__query_required_primals( required_primals, primal_classes, class_name, labels, states, ips )
+    # Group together derived variables that can be calculated with a single call
+    batchable_results = self.find_batchable_queries( result_names )
 
-    # Call function to derive result
-    derived_result = compute_function( result_name, primal_data, query_args, **kwargs )
+    derived_result = {}
+    for group in batchable_results:
+      # Get specifications for this derived result
+      required_primals, primal_classes, kwargs, supports_batching, compute_function = self.__parse_derived_result_spec( group, class_name, kwargs )
+
+      # Gather the required primal data
+      primal_data, query_args = self.__query_required_primals( required_primals, primal_classes, class_name, labels, states, ips )
+
+      # Call function to derive result
+      if supports_batching:
+        derived_result = compute_function( group, primal_data, query_args, **kwargs )
+      else:
+        derived_result = compute_function( group[0], primal_data, query_args, **kwargs )
     
     return derived_result
   
-  def __initialize_result_dictionary( self, result_name: str, primal_data: dict, states: List[int] ) -> dict:
+  def __initialize_result_dictionary( self, result_names: List[str], primal_data: dict ) -> dict:
     """Initialize the empty dictionary structure to store the derived results in."""
     primal = list(primal_data.keys())[0]
     derived_result = {}
-    derived_result[result_name] = { 'source': 'derived' }
-    derived_result[result_name]['data'] = np.empty_like( primal_data[primal]['data'])
-    derived_result[result_name]['layout'] = primal_data[primal]['layout']
+    if isinstance(result_names, str):
+      result_names = [result_names]
+    for result_name in result_names:
+      derived_result[result_name] = { 'source': 'derived' }
+      derived_result[result_name]['data'] = np.empty_like( primal_data[primal]['data'])
+      derived_result[result_name]['layout'] = primal_data[primal]['layout']
     return derived_result
   
   def __get_nodal_reference_positions( self, components: Union[List[str],str], reference_state: int, labels ):
@@ -524,9 +595,8 @@ class DerivedExpressions:
                                   reference_state: int = 0):
     """Calculate the derived result 'disp_x', 'disp_y', or 'disp_z'."""
     labels = query_args['labels']
-    states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data )
 
     # Determine which displacement we are calculating and what primal is needed.
     result_idx = ['disp_x', 'disp_y', 'disp_z'].index( result_name )
@@ -548,9 +618,8 @@ class DerivedExpressions:
                                   reference_state: int = 0):
     """Calculate the derived result 'disp_mag'."""
     labels = query_args['labels']
-    states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data )
 
     # Get reference nodal positions
     reference_data = self.__get_nodal_reference_positions( ['ux', 'uy', 'uz'], reference_state, labels )
@@ -571,9 +640,8 @@ class DerivedExpressions:
                                   reference_state: int = 0):
     """Calculate the derived result 'disp_rad_mag_xy'."""
     labels = query_args['labels']
-    states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data )
 
     # Get reference nodal positions
     reference_data = self.__get_nodal_reference_positions( ['ux', 'uy', 'uz'], reference_state, labels )
@@ -594,7 +662,7 @@ class DerivedExpressions:
     labels = query_args['labels']
     states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data )
 
     # Determine which displacement we are calculating and what primal is needed.
     result_idx = ['vel_x', 'vel_y', 'vel_z'].index( result_name )
@@ -631,7 +699,7 @@ class DerivedExpressions:
     labels = query_args['labels']
     states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data )
 
     # Determine which displacement we are calculating and what primal is needed.
     result_idx = ['acc_x', 'acc_y', 'acc_z'].index( result_name )
@@ -704,9 +772,8 @@ class DerivedExpressions:
                          primal_data: dict,
                          query_args: dict):
     """Calculate the derived result 'vol_strain'."""
-    states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data )
 
     # Perform principal stress computation
     ex: np.ndarray = primal_data['ex']['data']
@@ -717,13 +784,12 @@ class DerivedExpressions:
     return derived_result
 
   def __compute_principal_strain(self,
-                         result_name: str,
+                         result_names: List[str],
                          primal_data: dict,
                          query_args: dict):
     """Calculate the derived result 'prin_strain1', 'prin_strain2', 'prin_strain3'."""
-    states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_names, primal_data )
 
     # Perform principal stress computation
     ex: np.ndarray = primal_data['ex']['data']
@@ -733,36 +799,31 @@ class DerivedExpressions:
     eyz: np.ndarray = primal_data['eyz']['data']
     ezx: np.ndarray = primal_data['ezx']['data']
 
-    num_states = len(ex[:,0,0])
-    
     # Create 3 x 3 x num_states x num_labels x 1 array
     x_col = np.stack( [ex, exy, ezx])  # 3 x num_states x num_labels x 1 array
     y_col = np.stack( [exy, ey, eyz])  # 3 x num_states x num_labels x 1 array
     z_col = np.stack( [ezx, eyz, ez])  # 3 x num_states x num_labels x 1 array
     strain = np.stack( [x_col, y_col, z_col])  # full 5-d Strain array
     
-    result_matrix = np.empty_like(ex)
     # Strain is 3 x 3 x states x elems x ipts,
     # Shift to be states x elems x ipts x 3 x 3 so that first three indices match result_matrix.
     strain = np.moveaxis(strain, [0,1,2,3,4], [3,4,0,1,2])
 
-    if result_name == "prin_strain1":
-      for i in range(num_states):
-        eigen_values = np.linalg.eigvals(strain[i,:,:])
-        result_matrix[i] = np.max(eigen_values, axis=2)
-    elif result_name =='prin_strain3':
-      for i in range(num_states):
-        eigen_values = np.linalg.eigvals(strain[i,:,:])
-        result_matrix[i] = np.min(eigen_values, axis=2)
-    elif result_name =='prin_strain2':
-      for i in range(num_states):
-        eigen_values = np.linalg.eigvals(strain[i,:,:])
-        eigen_values = np.sort(eigen_values, axis=2)  # results aren't sorted by default
-        result_matrix[i] = eigen_values[:,:,1]  # get the 2nd value
-    else:
-      raise ValueError
+    # Compute eigenvalues
+    eigen_values = np.linalg.eigvalsh(strain)
 
-    derived_result[result_name]['data'] = result_matrix
+    # Extract correct component
+    for result_name in result_names:
+      result_matrix = np.empty_like(ex)
+      if result_name == "prin_strain1":
+        result_matrix = np.max(eigen_values, axis=3)
+      elif result_name =='prin_strain3':
+        result_matrix = np.min(eigen_values, axis=3)
+      elif result_name =='prin_strain2':
+        result_matrix = eigen_values[:,:,:,1]  # get the 2nd value
+      else:
+        raise ValueError
+      derived_result[result_name]['data'] = result_matrix
             
     return derived_result
 
@@ -775,9 +836,8 @@ class DerivedExpressions:
     Uses an alternate calculation method based on the griz algorithm. This was used to help debug
     the code by checking to see if the methods matched.
     """
-    states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data )
 
     ex: np.ndarray = primal_data['ex']['data']
     ey: np.ndarray = primal_data['ey']['data']
@@ -844,13 +904,12 @@ class DerivedExpressions:
     return derived_result
 
   def __compute_dev_principal_strain(self,
-                         result_name: str,
+                         result_names: List[str],
                          primal_data: dict,
                          query_args: dict):
     """Calculate the derived result 'prin_dev_strain1', 'prin_dev_strain2', 'prin_dev_strain3'."""
-    states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_names, primal_data )
 
     ex: np.ndarray = primal_data['ex']['data']
     ey: np.ndarray = primal_data['ey']['data']
@@ -861,36 +920,31 @@ class DerivedExpressions:
 
     e_hyd = (1/3) * (ex + ey + ez)  # hydrostatic strain
 
-    num_states = len(ex[:,0,0])
-    
     # Create 3 x 3 x num_states x num_labels x num_ipt array
     x_col = np.stack( [ex-e_hyd, exy, ezx])  # 3 x num_states x num_labels x num_ipt array
     y_col = np.stack( [exy, ey-e_hyd, eyz])  # 3 x num_states x num_labels x num_ipt array
     z_col = np.stack( [ezx, eyz, ez-e_hyd])  # 3 x num_states x num_labels x num_ipt array
     dev_strain = np.stack( [x_col, y_col, z_col])  # full 5-d strain array
     
-    result_matrix = np.empty_like(ex)
     # Strain is 3 x 3 x states x elems x ipts,
     # Shift to be states x elems x ipts x 3 x 3 so that first three indices match result_matrix.
     dev_strain = np.moveaxis(dev_strain, [0,1,2,3,4], [3,4,0,1,2])
 
-    if result_name == "prin_dev_strain1":
-      for i in range(num_states):
-        eigen_values = np.linalg.eigvals(dev_strain[i,:,:])
-        result_matrix[i] = np.max(eigen_values, axis=2)
-    elif result_name =='prin_dev_strain3':
-      for i in range(num_states):
-        eigen_values = np.linalg.eigvals(dev_strain[i,:,:])
-        result_matrix[i] = np.min(eigen_values, axis=2)
-    elif result_name =='prin_dev_strain2':
-      for i in range(num_states):
-        eigen_values = np.linalg.eigvals(dev_strain[i,:,:])
-        eigen_values = np.sort(eigen_values, axis=2)  # results aren't sorted by default
-        result_matrix[i] = eigen_values[:,:,1]  # get the 2nd value
-    else:
-      raise ValueError
-    
-    derived_result[result_name]['data'] = result_matrix
+    # Compute eigenvalues
+    eigen_values = np.linalg.eigvalsh(dev_strain)
+
+    # Extract correct component
+    for result_name in result_names:
+      result_matrix = np.empty_like(ex)
+      if result_name == "prin_dev_strain1":
+        result_matrix = np.max(eigen_values, axis=3)
+      elif result_name =='prin_dev_strain3':
+        result_matrix = np.min(eigen_values, axis=3)
+      elif result_name =='prin_dev_strain2':
+        result_matrix = eigen_values[:,:,:,1]  # get the 2nd value
+      else:
+        raise ValueError
+      derived_result[result_name]['data'] = result_matrix
             
     return derived_result
 
@@ -904,9 +958,8 @@ class DerivedExpressions:
     the code by checking to see if the methods matched.
     Can also calculate the derived result 'prin_dev_strain1_alt', 'prin_dev_strain2_alt', 'prin_dev_strain3_alt'.
     """
-    states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data )
 
     ex: np.ndarray = primal_data['ex']['data']
     ey: np.ndarray = primal_data['ey']['data']
@@ -975,13 +1028,12 @@ class DerivedExpressions:
     return derived_result
 
   def __compute_principal_stress(self,
-                         result_name: str,
+                         result_names: List[str],
                          primal_data: dict,
                          query_args: dict):
     """Calculate the derived result 'prin_stress1', 'prin_stress2', 'prin_stress3'."""
-    states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_names, primal_data )
 
     sx: np.ndarray = primal_data['sx']['data']
     sy: np.ndarray = primal_data['sy']['data']
@@ -990,36 +1042,32 @@ class DerivedExpressions:
     syz: np.ndarray = primal_data['syz']['data']
     szx: np.ndarray = primal_data['szx']['data']
 
-    num_states = len(sx[:,0,0])
-    
     # Create 3 x 3 x l x m x 1 array
     x_col = np.stack( [sx, sxy, szx])  # 3 x l x m x 1 array
     y_col = np.stack( [sxy, sy, syz])  # 3 x l x m x 1 array
     z_col = np.stack( [szx, syz, sz])  # 3 x l x m x 1 array
     stress = np.stack( [x_col, y_col, z_col])  # full 5-d stress array
 
-    result_matrix = np.empty_like(sx)
     # Stress is 3 x 3 x states x elems x ipts,
     # Shift to be states x elems x ipts x 3 x 3 so that first three indices match result_matrix.
     stress = np.moveaxis(stress, [0,1,2,3,4], [3,4,0,1,2])
 
-    if result_name == "prin_stress1":
-      for i in range(num_states):
-        eigen_values = np.linalg.eigvals(stress[i,:,:])
-        result_matrix[i] = np.max(eigen_values, axis=2)
-    elif result_name =='prin_stress3':
-      for i in range(num_states):
-        eigen_values = np.linalg.eigvals(stress[i,:,:])
-        result_matrix[i] = np.min(eigen_values, axis=2)
-    elif result_name =='prin_stress2':
-      for i in range(num_states):
-        eigen_values = np.linalg.eigvals(stress[i,:,:])
-        eigen_values = np.sort(eigen_values, axis=2)  # results aren't sorted by default
-        result_matrix[i] = eigen_values[:,:,1]  # get the 2nd value
-    else:
-      raise ValueError
-      
-    derived_result[result_name]['data'] = result_matrix
+    # Compute eigenvalues
+    eigen_values = np.linalg.eigvalsh(stress)
+    
+    # Extract component based on result(s)
+    for result_name in result_names:
+      result_matrix = np.empty_like(sx)
+      if result_name == "prin_stress1":
+        result_matrix = np.max(eigen_values, axis=3)
+      elif result_name =='prin_stress3':
+        result_matrix = np.min(eigen_values, axis=3)
+      elif result_name =='prin_stress2':
+        result_matrix = eigen_values[:,:,:,1]  # get the 2nd value
+      else:
+        raise ValueError
+        
+      derived_result[result_name]['data'] = result_matrix
             
     return derived_result
 
@@ -1028,9 +1076,8 @@ class DerivedExpressions:
                          primal_data: dict,
                          query_args: dict):
     """Calculate the derived result 'eff_stress'."""
-    states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data )
 
     sx = primal_data['sx']['data']
     sy = primal_data['sy']['data']
@@ -1057,9 +1104,8 @@ class DerivedExpressions:
                          primal_data: dict,
                          query_args: dict):
     """Calculate the derived result 'pressure'."""
-    states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data )
 
     # Perform pressure computation
     sx = primal_data['sx']['data']
@@ -1070,13 +1116,12 @@ class DerivedExpressions:
     return derived_result
 
   def __compute_principal_dev_stress(self,
-                         result_name: str,
+                         result_names: List[str],
                          primal_data: dict,
                          query_args: dict):
     """Calculate the derived result 'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3'."""
-    states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_names, primal_data )
 
     sx = primal_data['sx']['data']
     sy = primal_data['sy']['data']
@@ -1085,8 +1130,6 @@ class DerivedExpressions:
     syz = primal_data['syz']['data']
     szx = primal_data['szx']['data']
 
-    num_states = len(sx[:,0,0])
-    
     pressure = -(1/3) * (sx + sy + sz)
     
     # Create 3 x 3 x num_states x num_labels x 1 array
@@ -1095,28 +1138,25 @@ class DerivedExpressions:
     z_col = np.stack( [szx, syz, sz+pressure])  # 3 x num_states x num_labels x 1 array
     dev_stress = np.stack( [x_col, y_col, z_col])  # full 5-d stress array
 
-    result_matrix = np.empty_like(sx)
     # Stress is 3 x 3 x states x elems x ipts,
     # Shift to be states x elems x ipts x 3 x 3 so that first three indices match result_matrix.
     dev_stress = np.moveaxis(dev_stress, [0,1,2,3,4], [3,4,0,1,2])
 
-    if result_name == "prin_dev_stress1":
-      for i in range(num_states):
-        eigen_values = np.linalg.eigvals(dev_stress[i,:,:])
-        result_matrix[i] = np.max(eigen_values, axis=2)
-    elif result_name =='prin_dev_stress3':
-      for i in range(num_states):
-        eigen_values = np.linalg.eigvals(dev_stress[i,:,:])
-        result_matrix[i] = np.min(eigen_values, axis=2)
-    elif result_name =='prin_dev_stress2':
-      for i in range(num_states):
-        eigen_values = np.linalg.eigvals(dev_stress[i,:,:])
-        eigen_values = np.sort(eigen_values, axis=2)  # results aren't sorted by default
-        result_matrix[i] = eigen_values[:,:,1]  # get the 2nd value
-    else:
-      raise ValueError
-      
-    derived_result[result_name]['data'] = result_matrix
+    # Compute eigenvalues
+    eigen_values = np.linalg.eigvalsh(dev_stress)
+
+    # Extract correct component
+    for result_name in result_names:
+      result_matrix = np.empty_like(sx)
+      if result_name == "prin_dev_stress1":
+        result_matrix = np.max(eigen_values, axis=3)
+      elif result_name =='prin_dev_stress3':
+        result_matrix = np.min(eigen_values, axis=3)
+      elif result_name =='prin_dev_stress2':
+        result_matrix = eigen_values[:,:,:,1]  # get the 2nd value
+      else:
+        raise ValueError
+      derived_result[result_name]['data'] = result_matrix
             
     return derived_result
 
@@ -1125,9 +1165,8 @@ class DerivedExpressions:
                          primal_data: dict,
                          query_args: dict):
     """Calculate the derived result 'max_shear_stress'."""
-    states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data )
 
     sx = primal_data['sx']['data']
     sy = primal_data['sy']['data']
@@ -1136,8 +1175,6 @@ class DerivedExpressions:
     syz = primal_data['syz']['data']
     szx = primal_data['szx']['data']
 
-    num_states = len(sx[:,0,0])
-    
     pressure = -(1/3) * (sx + sy + sz)
     
     # Create 3 x 3 x num_states x num_labels x 1 array
@@ -1151,9 +1188,8 @@ class DerivedExpressions:
     # Shift to be states x elems x ipts x 3 x 3 so that first three indices match result_matrix.
     stress = np.moveaxis(stress, [0,1,2,3,4], [3,4,0,1,2])
 
-    for i in range(num_states):
-      eigen_values = np.linalg.eigvals(stress[i,:,:])
-      result_matrix[i] = 0.5 * (np.max(eigen_values, axis=2) - np.min(eigen_values, axis=2))
+    eigen_values = np.linalg.eigvalsh(stress)
+    result_matrix = 0.5 * (np.max(eigen_values, axis=3) - np.min(eigen_values, axis=3))
     
     derived_result[result_name]['data'] = result_matrix
 
@@ -1164,9 +1200,8 @@ class DerivedExpressions:
                          primal_data: dict,
                          query_args: dict):
     """Calculate the derived result 'triaxiality'."""
-    states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data )
 
     sx = primal_data['sx']['data']
     sy = primal_data['sy']['data']
@@ -1198,7 +1233,7 @@ class DerivedExpressions:
     """Calculate the derived result 'eps_rate'."""
     states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data )
 
     # Get the additional query arguments
     labels = query_args['labels']
@@ -1264,9 +1299,8 @@ class DerivedExpressions:
                                                     primal_data: dict,
                                                     query_args: dict):
     """Compute the derived result 'nodtangmag'."""
-    states = query_args['states']
     # Create dictionary structure for the final result
-    derived_result = self.__initialize_result_dictionary( result_name, primal_data, states )
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data )
 
     # Perform calculation
     nodtang_x = primal_data['nodtang_x']['data']

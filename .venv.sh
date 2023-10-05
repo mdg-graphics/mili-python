@@ -5,7 +5,7 @@
 if [[ $SYS_TYPE == "toss_3_x86_64_ib" ]]; then
     PYVS=3.8.2
 elif [[ $SYS_TYPE == "toss_4_x86_64_ib" ]]; then
-    PYVS=3.9.12
+    PYVS=3.10.8
 fi
 
 module load python/${PYVS}
