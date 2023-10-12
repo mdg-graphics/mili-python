@@ -92,7 +92,7 @@ class MiliDatabase:
     self.__afile = AFile()
     self.__base_filename = base_filename
     self.__dir_name = dir_name
-    log_validator = kwargs.get("log_validator", True)
+    log_validator = kwargs.get("log_validator", False)
     parse_success = AFileParser(log_validator=log_validator).parse( self.__afile, os.path.join( dir_name, base_filename ) )
     if not parse_success:
       self.__logger.error(("AFile parsing validation failure!\n"
@@ -638,7 +638,6 @@ class MiliDatabase:
 
 
   @_clear_return_code
-  @_log_function_call
   def query( self,
              svar_names : Union[List[str],str],
              class_sname : str,
@@ -734,19 +733,7 @@ class MiliDatabase:
       if subrec is not None:
         srecs_to_query = [srec for srec in srecs_to_query if srec.name == subrec]
 
-      filtered_write_data = copy.deepcopy( write_data )
-      if write_data is not None:
-        q_write_data = write_data.get(queried_name, None)
-        if q_write_data is not None:
-          if q_write_data['layout']['labels'].size != ordinals.size:
-            # if we don't have all the labels queried and we're writing data, we potentially need
-            #  to filter for the subset of the labels we *do* have locally
-            local_write_labels = labels_of_class[ ordinals ]
-            rows_to_write = np.where( np.isin( filtered_write_data[queried_name]['layout']['labels'], local_write_labels ) )[0]
-            filtered_write_data[queried_name]['layout']['labels'] = local_write_labels
-            filtered_write_data[queried_name]['data'] = filtered_write_data[queried_name]['data'][ :, rows_to_write, : ]
-
-        # if we're looking for ip data determine which int_points we can get for each svar in each subrec
+      # if we're looking for ip data determine which int_points we can get for each svar in each subrec
       matching_int_points = dict()
       if len( ips ) > 0:
         for svar in svars_to_query:
@@ -789,8 +776,20 @@ class MiliDatabase:
         self.__logger.warning(f"No subrecords found for the result/class combination {queried_name}, {class_sname}", extra=self.__log_msg_extra)
         break
 
-      # initialize the results structure for this queried name
+      # Get state variable data type
       svar_np_dtype = self.__svars[queried_svar_name].data_type.numpy_dtype()
+
+      # filter data to be written to each subrecord
+      filtered_write_data = None
+      if write_data is not None and queried_name in write_data:
+        filtered_write_data = {}
+        for srec in srecs_to_query:
+          elements_to_write = self.__labels[class_sname][srec_element_ordinals[srec.name]] 
+          if elements_to_write.size > 0:
+            rows_to_write = np.where( np.isin(write_data[queried_name]['layout']['labels'], elements_to_write) )[0]
+            filtered_write_data[srec.name] = write_data[queried_name]['data'][:,rows_to_write,:]
+
+      # initialize the results structure for this queried name
       qty_states = len(states) # dim 1 is number of states
       qty_elems = 0
       comp_qtys = []
@@ -841,8 +840,8 @@ class MiliDatabase:
               state_file.seek( state_offset + srec.state_byte_offset )
               byte_read_data = state_file.read( srec.byte_size )
 
-              if filtered_write_data is not None:
-                srec_var_data, byte_write_data = srec.extract_ordinals( byte_read_data, srec_offsets, write_data = filtered_write_data[ queried_name ][ 'data' ][ sidx,:,: ] )
+              if filtered_write_data is not None and srec.name in filtered_write_data:
+                srec_var_data, byte_write_data = srec.extract_ordinals( byte_read_data, srec_offsets, write_data = filtered_write_data[srec.name][ sidx,:,: ] )
                 state_file.seek( state_offset + srec.state_byte_offset )
                 state_file.write( byte_write_data )
               else:
@@ -864,21 +863,23 @@ def combine( results_dict: List[Dict] ) -> dict:
 
   # Otherwise combine
   merged_results = {}
-  for processor_result in results_dict:
-    for svar in processor_result:
-      if svar not in merged_results and processor_result[svar]['data'].size > 0:
-        merged_results[svar] = {}
-        merged_results[svar]['layout'] = {}
-        merged_results[svar]['source'] = processor_result[svar]['source']
-        merged_results[svar]['layout']['states'] = processor_result[svar]['layout']['states']
-        merged_results[svar]['data'] = processor_result[svar]['data']
-        merged_results[svar]['layout']['labels'] = processor_result[svar]['layout']['labels']
-      else:
-        if processor_result[svar]['data'].size > 0:
-          # Need to check for duplicates to handle Nodal results
-          non_duplicate_idxs = np.where( np.isin(processor_result[svar]['layout']['labels'], merged_results[svar]['layout']['labels'], invert=True) )[0]
-          merged_results[svar]['data'] = np.concatenate( (merged_results[svar]['data'], processor_result[svar]['data'][:,non_duplicate_idxs,:]), axis=1 )
-          merged_results[svar]['layout']['labels'] = np.concatenate( (merged_results[svar]['layout']['labels'], processor_result[svar]['layout']['labels'][non_duplicate_idxs]) )
+
+  svars = list(set(np.concatenate([list(res.keys()) for res in results_dict])))
+  for svar in svars:
+    merged_results[svar] = {}
+    # Get list of processors that contain data
+    processors_with_data = [ results_dict[i] for i in np.where( [d[svar]['data'].size > 0 for d in results_dict] )[0] ]
+    if processors_with_data:
+      merged_results[svar]['layout'] = {}
+      merged_results[svar]['source'] = processors_with_data[0][svar]['source']
+      merged_results[svar]['layout']['states'] = processors_with_data[0][svar]['layout']['states']
+      merged_results[svar]['data'] = np.concatenate( [d[svar]['data'][:,:,:] for d in processors_with_data], axis=1 )
+      merged_results[svar]['layout']['labels'] = np.concatenate( [d[svar]['layout']['labels'] for d in processors_with_data] )
+
+      _, indexes, counts = np.unique(merged_results[svar]['layout']['labels'], return_counts=True, return_index=True)
+      if np.any(counts > 1):
+        merged_results[svar]['data'] = merged_results[svar]['data'][:,indexes,:]
+        merged_results[svar]['layout']['labels'] = merged_results[svar]['layout']['labels'][indexes]
   
   return merged_results
 
@@ -904,9 +905,10 @@ def writeable_from_results_by_element( results_dict: dict, results_by_element: d
   results_dict = combine(results_dict)
   for result in results_by_element:
     if result in results_dict:
-      for element in results_by_element[result]:
-        if element in results_dict[result]['layout']['labels']:
-          idx = np.where(element == results_dict[result]['layout']['labels'])[0][0]
+      for idx, element in enumerate(list(results_by_element[result].keys())):
+          # NOTE: We are able to just use idx (0-N) because we assume results_dict and results_by_element
+          # are from the same query which means that the element order in results_dict and results_by_element
+          # will be the same.
           results_dict[result]['data'][:,idx] = results_by_element[result][element]
   return results_dict
 
