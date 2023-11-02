@@ -99,8 +99,6 @@ class TestSerialGeometricMeshInfo(unittest.TestCase):
         # beam 1, 2, 12
         np.testing.assert_equal( elems["beam"], [1,2,12] )
 
-
-
 class TestSerialAdjacencyMapping(unittest.TestCase):
     file_name = os.path.join(dir_path,'data','serial','sstate','d3samp6.plt')
 
@@ -120,6 +118,37 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
         np.testing.assert_equal( elems["shell"], [3,4,5,6,9,11] )
         np.testing.assert_equal( elems["beam"], [5,6,37,42] )
         np.testing.assert_equal( elems["cseg"], [2,3,5,6,8,9] )
+
+    def test_nearest_node(self):
+        """Test the nearest_node function."""
+        node, dist = self.adjacency.nearest_node([0.0,0.0,0.0], 1)
+        self.assertEqual(node, 3)
+        self.assertEqual(dist, 0.9999999865388264)
+
+        node, dist = self.adjacency.nearest_node([0.5,0.5,0.5], 44)
+        self.assertEqual(node, 26)
+        self.assertEqual(dist, 0.4160180349843221)
+
+        node, dist = self.adjacency.nearest_node([0.75,1.5,2.8], 101)
+        self.assertEqual(node, 140)
+        self.assertEqual(dist, 0.23785513406115558)
+
+    def test_nearest_element(self):
+        """Test the nearest_element function."""
+        class_name, label, dist = self.adjacency.nearest_element([0.0,0.0,0.0], 1)
+        self.assertEqual(class_name, "beam")
+        self.assertEqual(label, 12)
+        self.assertEqual(dist, 0.778031964849994)
+
+        class_name, label, dist = self.adjacency.nearest_element([0.5,0.5,0.5], 44)
+        self.assertEqual(class_name, "beam")
+        self.assertEqual(label, 13)
+        self.assertEqual(dist, 0.1837874009986171)
+
+        class_name, label, dist = self.adjacency.nearest_element([0.75,1.5,2.8], 101)
+        self.assertEqual(class_name, "brick")
+        self.assertEqual(label, 36)
+        self.assertEqual(dist, 0.5292167548771606)
 
 class ParallelAdjacencyTests:
     class TestParallelGeometricMeshInfo(unittest.TestCase):
@@ -203,6 +232,37 @@ class ParallelAdjacencyTests:
             np.testing.assert_equal( shell_elems, [3,4,5,6,9,11] )
             np.testing.assert_equal( beam_elems, [5,6,37,42] )
             np.testing.assert_equal( cseg_elems, [2,3,5,6,8,9] )
+
+        def test_nearest_node(self):
+            """Test the nearest_node function."""
+            node, dist = self.adjacency.nearest_node([0.0,0.0,0.0], 1)
+            self.assertEqual(node, 3)
+            self.assertEqual(dist, 0.9999999865388264)
+
+            node, dist = self.adjacency.nearest_node([0.5,0.5,0.5], 44)
+            self.assertEqual(node, 26)
+            self.assertEqual(dist, 0.4160180349843221)
+
+            node, dist = self.adjacency.nearest_node([0.75,1.5,2.8], 101)
+            self.assertEqual(node, 140)
+            self.assertEqual(dist, 0.23785513406115558)
+
+        def test_nearest_element(self):
+            """Test the nearest_element function."""
+            class_name, label, dist = self.adjacency.nearest_element([0.0,0.0,0.0], 1)
+            self.assertEqual(class_name, "beam")
+            self.assertEqual(label, 12)
+            self.assertEqual(dist, 0.778031964849994)
+
+            class_name, label, dist = self.adjacency.nearest_element([0.5,0.5,0.5], 44)
+            self.assertEqual(class_name, "beam")
+            self.assertEqual(label, 13)
+            self.assertEqual(dist, 0.1837874009986171)
+
+            class_name, label, dist = self.adjacency.nearest_element([0.75,1.5,2.8], 101)
+            self.assertEqual(class_name, "brick")
+            self.assertEqual(label, 36)
+            self.assertEqual(dist, 0.5292167548771606)
 
 ###############################################
 # Tests for each parallel wrapper class

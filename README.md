@@ -413,7 +413,11 @@ Will write modified data back to the database. The `write_data` must have the sa
 
 # Adjacency Queries
 
-The mili-python reader provides some support for querying element adjacencies through the `AdjacencyMapping` wrapper. Currently users can query all elements within a specified radius of a given element using the function `mesh_entities_within_radius` or query all elements associated with a set of specific nodes using the `elems_of_nodes` function.
+The mili-python reader provides some support for querying element adjacencies through the `AdjacencyMapping` wrapper. The current list of supported adjacency queries includes:
+- Querying all elements within a specified radius of a given element using the function `mesh_entities_within_radius`.
+- Querying all elements associated with a set of specific nodes using the `elems_of_nodes` function.
+- Querying the nearest node to a 3d coordinate using the `nearest_node` function.
+- Querying the nearest element to a 3d coordinate using the `nearest_element` function.
 
 The function `mesh_entities_within_radius` computes the centroid of the element you have specified using the nodal coordinates for that element at the specified state. The reader then gathers all nodes within the specified radius of that centroid and returns all elements that are associated with those nodes.
 
@@ -449,6 +453,24 @@ elems = adj.elems_of_nodes([1,2,3])
 
 The dictionary returned by `elems_of_nodes` has the same format as that returned by `mesh_entities_within_radius`
 
+The function `nearest_node` finds the closest node to a given 3d coordinate at a specified time step.
+
+```python
+from mili import adjacency
+adj = adjacency.AdjacencyMapping(db)
+
+# Get the closest node and its distance from the point (0.0, 0.0, 0.0) at state 1.
+nearest_node, distance = adj.nearest_node( [0.0, 0.0, 0.0], 1)
+```
+
+The function `nearest_element` finds the element whose centroid is closest to a given 3d coordinate at a specified time step.
+```python
+from mili import adjacency
+adj = adjacency.AdjacencyMapping(db)
+
+# Get the closest element (class name and label) and its distance from the point (0.0, 0.0, 0.0) at state 1.
+class_name, label, distance = adj.nearest_element( [0.0, 0.0, 0.0], 1)
+```
 
 # MiliDatabase Class member functions
 
