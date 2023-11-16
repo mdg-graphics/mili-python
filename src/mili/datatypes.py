@@ -5,6 +5,7 @@ SPDX-License-Identifier: (MIT)
 # defer evaluation of type-annotations until after the module is processed, allowing class members to refer to the class
 from __future__ import annotations
 # standard imports
+import copy
 import dataclasses
 import numpy as np
 import numpy.typing as npt
@@ -55,6 +56,10 @@ class MiliType(IntEnum):
   def struct_repr(self):
     return 'sffdiiq '[self.value-1]
 
+class ParameterType(IntEnum):
+  SCALAR = 0
+  ARRAY = 2
+
 class Superclass(IntEnum):
   ''' The superclass denotes what mesh class an object belongs to. '''
   M_UNIT = 0
@@ -95,7 +100,7 @@ class Param:
   dims : np.ndarray = np.empty([0],dtype = np.int32)
   data : np.ndarray = np.empty([0],dtype = np.float64)
 
-@dataclass
+@dataclass(eq=False)
 class DirectoryDecl:
   class Type(Enum):
     ''' Every directory has a type that dictates what information
@@ -119,6 +124,18 @@ class DirectoryDecl:
   offset : int = -1
   length : int = 0
   strings : List[str] = dataclasses.field(default_factory=list)
+
+  def __eq__(self, other: object) -> bool:
+    if isinstance(other, DirectoryDecl):
+      same = self.dir_type == other.dir_type
+      same = same and (self.modifier_idx1 == other.modifier_idx1)
+      same = same and (self.modifier_idx2 == other.modifier_idx2)
+      same = same and (self.str_cnt == other.str_cnt)
+      # Intentionally don't compare offset
+      same = same and (self.length == other.length)
+      same = same and (self.strings == other.strings)
+      return same
+    return False
 
 @dataclass
 class StateVariable:
@@ -159,7 +176,7 @@ class StateVariable:
   def recursive_svars(self):
     """Recusively gather the nested svars all the way down"""
     return [self] + flatten([sv.recursive_svars for sv in self.svars])
-  
+
   @property
   def comp_layout(self):
     """Get layout of component state variables for this svar."""
@@ -189,7 +206,7 @@ class StateVariable:
       return int( prod( self.dims ) ) * sum( svar.atom_qty for svar in self.svars )
     return 1
 
-@dataclass
+@dataclass(eq=False)
 class Subrecord:
   class Org(IntEnum):
     ''' The organization of data in a subrecord is either ordered by variable or object. '''
@@ -225,6 +242,19 @@ class Subrecord:
   svar_byte_offsets : np.ndarray = np.empty([0], dtype = np.int64)
   srec_fmt_id: int = 0
 
+  def __eq__(self, other: object):
+    if isinstance(other, Subrecord):
+      same = True
+      same = same and (self.name == other.name)
+      same = same and (self.class_name == other.class_name)
+      same = same and (self.superclass == other.superclass)
+      same = same and (self.organization == other.organization)
+      same = same and (self.qty_svars == other.qty_svars)
+      same = same and (self.svar_names == other.svar_names)
+      same = same and (self.ordinal_blocks == other.ordinal_blocks).all()
+      return same
+    return False
+
   # def __repr__( self ) -> str:
   #   r = reprlib.Repr()
   #   r.maxlevel = 1
@@ -237,7 +267,7 @@ class Subrecord:
       if ( svar_name == aggregate_match or aggregate_match == "" ) and len( matches ) > 0:
         coords.append( matches )
     return np.array( *coords )
-  
+
   def calculate_memory_offsets( self, match_aggregate_svar: str, svars_to_query: List[str], ordinals: npt.ArrayLike, matching_int_points: dict ):
     """Calculate the memory offsets into the subrecord for the passed in ordinals"""
     #  determine if any of the queried svar components are in the StateRecord.. and extract only the comps we're querying for
@@ -310,7 +340,7 @@ class Subrecord:
     elif self.organization == Subrecord.Org.RESULT:
       for idx_col, comp in zip( srec_memory_offsets.T[::-1,:], qd_svar_comps[::-1,:]):
         idx_col[:] = self.svar_atom_offsets[ comp[0] ] * self.total_ordinal_count + self.svar_atom_lengths[ comp[0] ] * srec_memory_offsets[:,0] + comp[1]
-  
+
     return srec_memory_offsets, ordinals_in_srec
 
   # right now we're assuming we have the ordinals, we could add bounds checking as a debug version, or auto-filter for parallel versions
@@ -371,7 +401,7 @@ class MeshObjectClass:
   idents_exist: bool = True
 
 
-@dataclass
+@dataclass(eq=False)
 class AFile:
   class Section(Enum):
     HEADER = 0
@@ -389,11 +419,14 @@ class AFile:
     MIN = 1
     MAX = 3
   class Endian:
-    LITTLE = 1
-    BIG = 2
+    BIG = 1
+    LITTLE = 2
   class Precision:
     SINGLE = 1
     DOUBLE = 2
+  class PartitionScheme:
+    STATE_COUNT = 1
+    BYTE_COUNT = 2
 
   file_format : str = Format.MILI
   file_version : int = 3
@@ -401,14 +434,52 @@ class AFile:
   endian_flag : int = Endian.LITTLE if sys.byteorder == 'little' else Endian.BIG
   precision_flag : int = Precision.DOUBLE
   sfile_suffix_length : int = 2
-  partition_scheme : int = 0
+  partition_scheme : int = PartitionScheme.STATE_COUNT
   string_bytes : int = 0
   commit_count : int = 0
   directory_count : int = 0
-  srec_count : int = 0
+  state_map_count : int = 0
 
   strings : List[str] = dataclasses.field(default_factory=list)
   smaps : List[StateMap] = dataclasses.field(default_factory=list)
   dir_decls_list : List[DirectoryDecl] = dataclasses.field(default_factory=list)
   dir_decls : DefaultDict[DirectoryDecl.Type,List[DirectoryDecl]] = dataclasses.field(default_factory=lambda : defaultdict(list))
   dirs : DefaultDict[DirectoryDecl.Type,DefaultDict[str,List]] = dataclasses.field(default_factory=lambda : defaultdict(lambda : defaultdict(list)))
+
+
+  def __eq__(self, other: object) -> bool:
+    if isinstance(other, AFile):
+      same = self.file_format == other.file_format
+      same = same and (self.file_version == other.file_version)
+      same = same and (self.directory_version == other.directory_version)
+      same = same and (self.endian_flag == other.endian_flag)
+      same = same and (self.precision_flag == other.precision_flag)
+      same = same and (self.sfile_suffix_length == other.sfile_suffix_length)
+      same = same and (self.partition_scheme == other.partition_scheme)
+      same = same and (self.string_bytes == other.string_bytes)
+      same = same and (self.commit_count == other.commit_count)
+      same = same and (self.directory_count == other.directory_count)
+      same = same and (self.state_map_count == other.state_map_count)
+      same = same and (sorted(self.strings) == sorted(other.strings))
+      same = same and (self.smaps == other.smaps)
+      same = same and (sorted(self.dir_decls_list, key=lambda x: x.dir_type.value)
+                       == sorted(other.dir_decls_list, key=lambda x: x.dir_type.value))
+      same = same and (self.dir_decls == other.dir_decls)
+      same = same and (self.dirs.keys() == other.dirs.keys())
+      same = same and (str(self.dirs.values()) == str(other.dirs.values()))
+      return same
+    return False
+
+  def copy_non_state_data(self) -> AFile:
+    """Copy the geometry, states variables, subrecords and parameters from an existing AFile object
+       into a new AFile object.
+    """
+    new_afile = copy.deepcopy(self)
+
+    # Remove/Update all State information
+    new_afile.smaps = []
+    new_afile.state_map_count = 0
+    if 'state_count' in new_afile.dirs[DirectoryDecl.Type.APPLICATION_PARAM]:
+      new_afile.dirs[DirectoryDecl.Type.APPLICATION_PARAM]['state_count'] = 0
+
+    return new_afile

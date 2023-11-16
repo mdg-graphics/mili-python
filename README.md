@@ -12,6 +12,7 @@
 - [Querying Results](#querying-results)
 - [Derived Variables](#derived-variables)
 - [Modifying Results](#modifying-results)
+- [Appending States with mili-append](#appending-states-with-mili-append)
 - [Adjacency Queries](#adjacency-queries)
 - [MiliDatabase Member Functions](#milidatabase-class-member-functions)
     - [mesh_dimensions](#mesh_dimensions)
@@ -32,6 +33,9 @@
     - [class_labels_of_material](#class_labels_of_material)
     - [all_labels_of_material](#all_labels_of_material)
     - [nodes_of_material](#nodes_of_material)
+    - [int_points_of_state_variable](#int_points_of_state_variable)
+    - [append_state](#append_state)
+    - [copy_non_state_data](#copy_non_state_data)
 - [Development Nodes](#development-notes)
 
 
@@ -411,6 +415,143 @@ Will write modified data back to the database. The `write_data` must have the sa
 
 > **Note:** minimal enforcement/checking of the `write_data` structure is currently done and malformed `write_data` *could* possibly (unlikely) cause database corruption, use at your own discretion. Create backups, test on smaller databases first, etc. A python expection is the most likely outcome here, but caution is best.
 
+# Appending States with `mili-append`
+
+`mili-append` is a script that provides users with a framework for adding additional states to a database. New states and data can be appended to the end of an existing database or added to a new database (A copy of the existing database with just the new states added). Users can specify the states and data to be appended by creating the dictionary `append_states_spec` in a separate python file. This file is then the input to the tool. A complete list of available fields in the `append_states_spec` dictionary as well as an example of defining the dictionary is shown below:
+
+Available fields in `append_states_spec`:
+
+| Field              |Type         |Description                                              |Required                        |
+|--------------------|-------------|---------------------------------------------------------|--------------------------------|
+|database_basename   |str          |The name of the input database.                          |Always                          |
+|output_type         |List[str]    |List of outputs. Options include: "mili".                |Always                          |
+|output_mode         |str          |"write" or "append".                                     |Always                          |
+|output_basename     |str          |The name of the new database if output_mode is "write".  |When `output_mode` is "write"   |
+|states              |int          |The number of states to add.                             |Always                          |
+|state_times         |List[float]  |The new state times to append to the database.           |If `time_inc` is not provided   |
+|time_inc            |float        |The increment for each new state to add.                 |If `state_times` is not provided|
+|state_variables     |dict         |The state variable data to append                        |Always                          |
+
+The format of the `state_variables` dictionary is:
+```python
+"state_variables": {
+
+  "class-name-1": {
+    "state-variable-1": {
+      # Labels is a list of integers
+      "labels": [1,2,3,...],
+      # int_point specifies the integration point you are writing out data for (Only needed for results with multiple integration points)
+      # If this value is omitted for a state variable that has multiple integration points, then "data" must have values for all integration points
+      # that exist
+      "int_point": 2,
+      # Data is a 2d-array that is num_states_to_append by (num_elems * values_per_element)
+      # Data can also be a 1d-array of length num_states_to_append * num_elems * values_per_element
+      "data": [
+        [1.0, 2.0, 3.0, ...],
+        [1.0, 2.0, 3.0, ...],
+        ...
+      ]
+    },
+    "state-variable-2": {
+      "labels": [10, 11, 12],
+      "data": [
+        [1.0, 2.0, 3.0, ...],
+        [1.0, 2.0, 3.0, ...],
+        ...
+      ]
+    }
+  },
+
+  "class-name-2": {
+    # ...
+  }
+  # ...
+}
+```
+
+An example of the `append_states_spec` and how to run the tool:
+
+```python
+# example_input.py
+import numpy as np
+from mili.reader import open_database
+
+"""
+The code below demonstrates one of the main advantages of having this defined in a python file
+that the tool can then import. It allows users to write their own code to read in/setup the new
+data that will be appended. This means that users can get data from multiple different sources or
+file formats as long as they format it correctly. Below are examples of reading in the data from a txt
+file using numpy, hard coding your own values, and reading in data from another mili database.
+"""
+stress_data = np.loadtxt("example_stress_data.txt", comments="#", dtype=object)
+brick_labels = stress_data[:,1]
+brick_data = np.array( [stress_data[:,3]] )
+
+node_labels = [1,2,3,4,5]
+node_data = [ [1.0, 2.0, 3.0, 4.0, 5.0] ]
+
+different_database = open_database("some-other-database-name")
+shell_results = different_database.query("ey", "shell", states=[55], labels=[1,2,3], ips=[1])
+shell_labels = shell_results['ey']['layout']['labels']
+shell_data = np.reshape( shell_result['ey']['data'], (1,len(shell_labels)) )
+
+# The name of the dictionary must be append_states_spec
+append_states_spec = {
+  "database_basename": "dblplt",    # The name of the database we are appending data to.
+  "output_type": ["mili"],          # Output is a mili database. "mili" is currently the only option but we will likely support for outputs in the future
+  "output_mode": "write",           # Write out a new database with 0 states and append the new states/data to it.
+  "output_basename": "new_dblplt",  # The new database to write. Required because output_mode is "write"
+
+  "states": 1,        # We want to append 1 states to the database
+  "time_inc": 0.001,  # New time will increment 0.001 from the last state of the input database
+
+  # The state variable data to append to the database
+  "state_variables": {
+    "node": {
+      "evec_dx": {
+        "labels": node_labels,
+        "data": node_data
+      }
+    },
+    "brick": {
+      "sx": {
+        "labels": brick_labels,
+        "data": brick_data
+      }
+    },
+    "shell": {
+      "ey": {
+        "labels": shell_labels,
+        "data": shell_data
+      }
+    }
+  }
+}
+```
+
+## Usage
+
+`mili-append` is a script that is installed with mili-python. To run with `example_input.py` shown above:
+
+> `mili-append -i example_input.py`
+
+**NOTE**: This assumes you have installed mili locally or in an active virtual environment.
+
+## Using the Append States Tool in a Script
+
+It is also possible to use the append states tool from within a script as shown below. The dictionary passed to the `AppendStatesTool` object must still have the same format as `append_states_spec`.
+
+```python
+from mili.append_states import AppendStatesTool
+
+append_states_spec = {
+  # ...
+}
+
+append_tool = AppendStatesTool(append_states_spec)
+append_tool.write_states()
+```
+
 # Adjacency Queries
 
 The mili-python reader provides some support for querying element adjacencies through the `AdjacencyMapping` wrapper. The current list of supported adjacency queries includes:
@@ -479,10 +620,12 @@ class_name, label, distance = adj.nearest_element( [0.0, 0.0, 0.0], 1)
 def mesh_dimensions(self) -> int
 ```
 **Description**: Get the mesh dimensions
+
 **Arguments**:
-    - `None`
+- `None`
+
 **Returns**:
-    - `int`: The dimensions (2 or 3).
+- `int`: The dimensions (2 or 3).
 
 ### Example
 ```python
@@ -495,10 +638,12 @@ dims = db.mesh_dimensions()
 def state_maps(self) -> List[StateMap]
 ```
 **Description**: Getter for the state maps
+
 **Arguments**:
-    - `None`
+- `None`
+
 **Returns**:
-    - `List[StateMap]`: The list of state map objects for the database.
+- `List[StateMap]`: The list of state map objects for the database.
 
 ### Example
 ```python
@@ -510,10 +655,12 @@ state_maps = db.state_maps()
 def times( self, states : Optional[Union[List[int],int]] = None )
 ```
 **Description**: Get the times for specific states numbers in the database.
+
 **Arguments**:
-    - `states`: The List of states to get the times for. None means all states.
+- `states`: The List of states to get the times for. None means all states.
+
 **Returns**:
-    - `numpy.ndarray`: List of state times.
+- `numpy.ndarray`: List of state times.
 
 ### Example
 ```python
@@ -554,10 +701,12 @@ array([0.00000000e+00, 9.99999975e-06, 1.99999995e-05, 2.99999992e-05,
 def nodes(self)
 ```
 **Description**: Getter function for the initial nodal positions.
+
 **Arguments**:
-    - `None`
+- `None`
+
 **Returns**:
-    - `numpy.ndarray`: The initial nodal positions.
+- `numpy.ndarray`: The initial nodal positions.
 
 ### Example
 ```python
@@ -581,10 +730,12 @@ array([[ 1.0000000e+00,  0.0000000e+00,  0.0000000e+00],
 def labels(self, class_name: Optional[str] = None)
 ```
 **Description**: Get the element labels for an element class.
+
 **Arguments**:
-    - `class_name`:  The class name to retrieve labels for. If None, returns labels for all classes.
+- `class_name`:  The class name to retrieve labels for. If None, returns labels for all classes.
+
 **Returns**:
-    - `Union[ Dict[str,numpy.ndarray], numpy.ndarray ]`: If a class name is specified returns a list containing all element labels. If no class name is specified then returns a dictionary containing a list of the element labels for each class.
+- `Union[ Dict[str,numpy.ndarray], numpy.ndarray ]`: If a class name is specified returns a list containing all element labels. If no class name is specified then returns a dictionary containing a list of the element labels for each class.
 
 ### Example
 ```python
@@ -600,11 +751,13 @@ array([ 1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12], dtype=int32)
 def parameter(self, name: str, default: Optional[Any] = None) -> Any
 ```
 **Description**: Getter for a single Mili parameter.
+
 **Arguments**:
-    - `name`: The name of the parameter to retrieve.
-    - `default`: An optional value specifying what to return if the parameter does not exist. Defaults to None.
+- `name`: The name of the parameter to retrieve.
+- `default`: An optional value specifying what to return if the parameter does not exist. Defaults to None.
+
 **Returns**:
-    - `Any`: The value of the specified parameter if it exists, else default value.
+- `Any`: The value of the specified parameter if it exists, else default value.
 
 ### Example
 ```python
@@ -616,10 +769,12 @@ db_job_id = db.parameter('job_id')
 def parameters(self) -> Dict[str,Any]
 ```
 **Description**: Getter function for the Mili database parameters dictionary.
+
 **Arguments**:
-    - `None`
+- `None`
+
 **Returns**:
-    - `Dict[str,Any]`: Parameters dictionary.
+- `Dict[str,Any]`: Parameters dictionary.
 
 ### Example
 ```python
@@ -631,10 +786,12 @@ params = db.parameters()
 def class_names(self) -> List[str]
 ```
 **Description**: Getter function for the element class names.
+
 **Arguments**:
-    - `None`
+- `None`
+
 **Returns**:
-    - `List[str]`: List of element class names.
+- `List[str]`: List of element class names.
 
 ### Example
 ```python
@@ -650,10 +807,12 @@ print(class_names)
 def mesh_object_classes(self) -> Dict[str,MeshObjectClass]
 ```
 **Description**: Getter function mesh object class dictionary.
+
 **Arguments**:
-    - `None`
+- `None`
+
 **Returns**:
-    - `Dict[str,MeshObjectClass]`: The Mesh object classes in the database.
+- `Dict[str,MeshObjectClass]`: The Mesh object classes in the database.
 
 ### Example
 ```python
@@ -671,10 +830,12 @@ MeshObjectClass(mesh_id=0, short_name='brick', long_name='Bricks', sclass=<Super
 def connectivity( self, class_name : Optional[str] = None )
 ```
 **Description**: Get the element connectivity for a specified element class.
+
 **Arguments**:
-    - `class_name`: The name of the element class to get the connectivity for. If none, gets connectivity for all classes.
+- `class_name`: The name of the element class to get the connectivity for. If none, gets connectivity for all classes.
+
 **Returns**:
-    - `Union[ Dict[str,numpy.ndarray], numpy.ndarray ]`: The element connecivity. If class name is specified then returns a numpy.ndarray of integers. If class name is None, then dictionary is returned with keys being class_names and values being numpy.ndarray.
+- `Union[ Dict[str,numpy.ndarray], numpy.ndarray ]`: The element connecivity. If class name is specified then returns a numpy.ndarray of integers. If class name is None, then dictionary is returned with keys being class_names and values being numpy.ndarray.
 
 ### Example
 ```python
@@ -727,11 +888,13 @@ array([[ 64,  80,  84,  68,  65,  81,  85,  69],
 def nodes_of_elems( self, class_sname, elem_labels )
 ```
 **Description**: Get a list of nodes associated with elements by label.
+
 **Arguments**:
-    - `class_sname`: The element class name.
-    - `elem_labels`: The list of element labels.
+- `class_sname`: The element class name.
+- `elem_labels`: The list of element labels.
+
 **Returns**:
-    - `numpy.ndarray, numpy.ndarray`: The list of element labels retrieved and the nodes associated with those labels.
+- `numpy.ndarray, numpy.ndarray`: The list of element labels retrieved and the nodes associated with those labels.
 
 ### Example
 ```python
@@ -750,11 +913,13 @@ array([[1], [2]], dtype=int32)
 def queriable_svars(self, vector_only = False, show_ips = False)
 ```
 **Description**: Get a list of queriable svar names for the database.
+
 **Arguments**:
-    - `vector_only`: Only return vector state variables.
-    - `show_ips`: Return all integration points for each state variable.
+- `vector_only`: Only return vector state variables.
+- `show_ips`: Return all integration points for each state variable.
+
 **Returns**:
-    - `List[str]`: List of state variable names.
+- `List[str]`: List of state variable names.
 
 ### Example
 ```python
@@ -766,10 +931,12 @@ svars = db.queriable_svars()
 def classes_of_state_variable(self, svar: str)
 ```
 **Description**: Get the element class names for which a state variable exists.
+
 **Arguments**:
-    - `svar`:  The name of the state variable.
+- `svar`:  The name of the state variable.
+
 **Returns**:
-    - `List[str]`: The names of the element classes for which the result exists.
+- `List[str]`: The names of the element classes for which the result exists.
 
 ### Example
 ```python
@@ -785,10 +952,12 @@ print(classes)
 def material_numbers(self)
 ```
 **Description**: Get the material numbers in the database.
+
 **Arguments**:
-    - `None`
+- `None`
+
 **Returns**:
-    - `List[int]`: The material numbers in the database.
+- `List[int]`: The material numbers in the database.
 
 ### Example
 ```python
@@ -804,10 +973,12 @@ print(mat_nums)
 def materials_of_class_name( self, class_name: str )
 ```
 **Description**: Get List of materials for all elements of a given class name.
+
 **Arguments**:
-    - `class_name`: The Element class name.
+- `class_name`: The Element class name.
+
 **Returns**:
-    - `numpy.ndarray`: The material number for each element of the specified element class.
+- `numpy.ndarray`: The material number for each element of the specified element class.
 
 ### Example
 ```python
@@ -823,11 +994,13 @@ array([4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5], 
 def class_labels_of_material( self, mat, class_name )
 ```
 **Description**: Convert a material name into labels of the specified class (if any).
+
 **Arguments**:
-    - `mat`: The material name or number.
-    - `class_name`: The Element class name.
+- `mat`: The material name or number.
+- `class_name`: The Element class name.
+
 **Returns**:
-    - `numpy.ndarray`: The labels of the specified element class that are the specified material.
+- `numpy.ndarray`: The labels of the specified element class that are the specified material.
 
 ### Example
 ```python
@@ -843,10 +1016,12 @@ array([ 1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12])
 def all_labels_of_material( self, mat )
 ```
 **Description**: Given a specific material. Find all labels with that material and return their values.
+
 **Arguments**:
-    - `mat`: The material name or number.
+- `mat`: The material name or number.
+
 **Returns**:
-    - `Dict[str,numpy.ndarray]`: The labels of the specified material.
+- `Dict[str,numpy.ndarray]`: The labels of the specified material.
 
 ### Example
 ```python
@@ -864,10 +1039,12 @@ print(lbls)
 def nodes_of_material( self, mat )
 ```
 **Description**: Get a list of nodes associated with a specific material number.
+
 **Arguments**:
-    - `mat`: The material name or number.
+- `mat`: The material name or number.
+
 **Returns**:
-    - `numpy.ndarray`: The list of nodes associated with the material number.
+- `numpy.ndarray`: The list of nodes associated with the material number.
 
 ### Example
 ```python
@@ -877,6 +1054,48 @@ array([ 65,  69,  73,  77,  81,  85,  89,  93,  97, 101, 105, 109, 113,
         117, 121, 125, 129, 133, 137, 141], dtype=int32)
 """
 ```
+
+## int_points_of_state_variable
+```python
+def int_points_of_state_variable( self, svar_name: str, class_name: str)
+```
+**Description**: Get a list of integration points available for a given state variable, class name combination.
+
+**Arguments**:
+- `svar_name`: The state variable name.
+- `class_name`: The element class name.
+
+**Returns**:
+- `List[int]`: The list of integration points.
+
+## append_state
+```python
+def append_state( self, new_state_time: float, zero_out: bool = True ) -> int
+```
+**Description**: Appends a new state to the end of an existing Mili database.
+
+**Arguments**:
+- `new_state_time`: The time of the new state.
+- `zero_out`: If True, all results for the new timestep are set to zero (With the exception of
+    nodal positions and sand flags. nodal_positions are copied from the previous state and sand flags are set to 1).
+    If false, the data from the previous state (if available) will be copied to the new state.
+
+**Returns**:
+- `int`: The new number of states in the database.
+
+## copy_non_state_data
+```python
+def copy_non_state_data(self, new_base_name: str)
+```
+**Description**: Copy the geometry, states variables, subrecords and parameters from an existing Mili database into a new database without any states (Just the A file).
+
+**Arguments**:
+- `new_base_name`: The base name for the new database.
+
+**Returns**:
+- `None`
+
+----------------
 
 # Development Notes
 

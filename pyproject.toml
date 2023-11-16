@@ -72,11 +72,11 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 include = [
   "mili*",
+  "scripts*",
 ]
 # The ./src/scripts and ./src/tests directories are excluded by default, but
 # explicity excluding them here for clarity since they are in the ./src directory
 exclude = [
-  "scripts*",
   "tests*",
 ]
 
@@ -86,3 +86,6 @@ mili = ["py.typed"]
 
 [tool.setuptools.dynamic]
 version = {attr = "mili.__init__.__version__"}
+
+[project.scripts]
+mili-append = "scripts.append_states:main"

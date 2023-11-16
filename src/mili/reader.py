@@ -5,13 +5,13 @@ SPDX-License-Identifier: (MIT)
 # TODO : account for endianness
 #        for numpy: modify the dtype to account for endianness: https://numpy.org/doc/stable/reference/generated/numpy.frombuffer.html
 from __future__ import annotations
-import copy
 import itertools
 import numpy as np
 import numpy.typing as npt
 import os
 import re
 import sys
+import io
 
 from collections import defaultdict
 from numpy.lib.function_base import iterable
@@ -31,6 +31,17 @@ if tuple( int(vnum) for vnum in np.__version__.split('.') ) < (1,20,0):
 
 def np_empty(dtype):
   return np.empty([0],dtype=dtype)
+
+def dictionary_merge_concat(dictionaries):
+  """Merge dictionaries. When same key appears in multiple dictionaries, concatenate results."""
+  combined_dictionary = {}
+  for dictionary in dictionaries:
+    for key, value in dictionary.items():
+      if key not in combined_dictionary:
+        combined_dictionary[key] = value
+      else:
+        combined_dictionary[key] = np.append(combined_dictionary[key], value)
+  return combined_dictionary
 
 # Set up Logging
 mili_python_logger = logging.getLogger(__name__)
@@ -179,28 +190,32 @@ class MiliDatabase:
             self.__int_points['strain'][svar.name] = self.__int_points[svar.name[:-1]]
 
         addIntPoints( svar.name, svar_comp_names )
+        # This allows us to query by element set name
+        self.__int_points[svar.name][svar.name] = self.__int_points[svar.name[:-1]]
 
     # the class def info is stored in the DirectoryDecl, not in a parsed directory data structure
     for class_def in self.__afile.dir_decls[DirectoryDecl.Type.CLASS_DEF]:
       self.__class_to_sclass[ class_def.strings[0] ] = Superclass( class_def.modifier_idx2 )
 
-    for sname, mesh_ident in self.__afile.dirs[DirectoryDecl.Type.CLASS_IDENTS].items():
+    for sname, class_ident_data in self.__afile.dirs[DirectoryDecl.Type.CLASS_IDENTS].items():
+      mesh_ident = class_ident_data['idents']
       if sname not in self.__labels.keys():
         self.__labels[ sname ] = np_empty( np.int32 )
       self.__labels[ sname ] = np.append( self.__labels[sname], np.arange( mesh_ident[0], mesh_ident[1] + 1, dtype = np.int32 ) )
 
     self.__nodes = np.empty( [0, self.__mesh_dim], np.float32 )
-    for _, nodes in self.__afile.dirs[DirectoryDecl.Type.NODES].items():
-      self.__nodes = np.concatenate( (self.__nodes, nodes) )
+    for _, node_data in self.__afile.dirs[DirectoryDecl.Type.NODES].items():
+      self.__nodes = np.concatenate( (self.__nodes, node_data['nodes']) )
 
     for sname, mo_class_data in self.__afile.dirs[DirectoryDecl.Type.CLASS_DEF].items():
       self.__MO_class_data[sname] = mo_class_data
       self.__class_to_sclass[sname] = mo_class_data.sclass
 
-    for sname, elem_conn in self.__afile.dirs[DirectoryDecl.Type.ELEM_CONNS].items():
+    for sname, elem_conn_data in self.__afile.dirs[DirectoryDecl.Type.ELEM_CONNS].items():
+      elem_conn = elem_conn_data.get('conns', np_empty(np.int32))
       if sname not in self.__conns.keys():
         self.__conns[ sname ] = np.ndarray( (0,elem_conn.shape[1]-1), dtype = np.int32 )
-      self.__conns[ sname ] = elem_conn[:,:-1]  # remove the part id, keep material number
+      self.__conns[ sname ] = elem_conn[:,:-1].copy()  # remove the part id, keep material number
       self.__conns[ sname ][:,:-1] -= 1  # Account for fortran indexing (Except for material number)
       mats = np.unique( elem_conn[:,-2] )
       for mat in mats:
@@ -214,7 +229,7 @@ class MiliDatabase:
 
     offset = 0
     self.__srec_fmt_qty = 1
-    for sname, srec in self.__afile.dirs[DirectoryDecl.Type.SREC_DATA].items():
+    for sname, srec in self.__afile.dirs[DirectoryDecl.Type.SREC_DATA]['subrecords'].items():
       srec : Subrecord
       # add all svars to srec
       srec.svars = [ self.__afile.dirs[DirectoryDecl.Type.STATE_VAR_DICT][svar_name] for svar_name in srec.svar_names ]
@@ -342,6 +357,14 @@ class MiliDatabase:
   def int_points(self) -> dict:
     return self.__int_points
 
+  def int_points_of_state_variable(self, svar_name: str, class_name: str):
+    int_points = []
+    if svar_name in self.__int_points:
+      for es_name in self.__int_points[svar_name]:
+        if class_name in self.classes_of_state_variable(es_name):
+          int_points = self.__int_points[svar_name][es_name][:-1]
+    return int_points
+
   def element_sets(self) -> dict:
     return {k:v for k,v in self.__int_points.items() if k.startswith("es_")}
 
@@ -377,7 +400,7 @@ class MiliDatabase:
         if not vector_only:
           queriable.append( sname )
     return queriable
-  
+
   def supported_derived_variables(self):
     return self.__derived.supported_variables()
 
@@ -510,7 +533,7 @@ class MiliDatabase:
     indices = (self.__labels[class_sname][:,None] == elem_labels).argmax(axis=0)
     elem_conn = self.__conns[class_sname][indices][:,:-1]
     return self.__labels['node'][elem_conn], self.__labels[class_sname][indices,None]
-  
+
   def nodes_of_material( self, mat ):
     ''' Find nodes associated with a material number '''
     if not self.__valid_material_type(mat):
@@ -591,6 +614,8 @@ class MiliDatabase:
     if np.any( states < min_st ) or np.any( states > max_st ):
         raise ValueError((f"Attempting to query states that do not exist. "
                           f"Minimum state = {min_st}, Maximum state = {max_st}"))
+    if len(states) == 0:
+      raise ValueError(f"Query failed because no states exist")
 
     if not isinstance( states, np.ndarray ):
       raise TypeError( f"'states' must be None, an integer, or a list of integers" )
@@ -784,7 +809,7 @@ class MiliDatabase:
       if write_data is not None and queried_name in write_data:
         filtered_write_data = {}
         for srec in srecs_to_query:
-          elements_to_write = self.__labels[class_sname][srec_element_ordinals[srec.name]] 
+          elements_to_write = self.__labels[class_sname][srec_element_ordinals[srec.name]]
           if elements_to_write.size > 0:
             rows_to_write = np.where( np.isin(write_data[queried_name]['layout']['labels'], elements_to_write) )[0]
             filtered_write_data[srec.name] = write_data[queried_name]['data'][:,rows_to_write,:]
@@ -852,10 +877,153 @@ class MiliDatabase:
 
     return res
 
+  def __get_state_byte_data(self, state: int, zero_out: bool, byte_data: BinaryIO):
+    state_size = np.sum([srec.byte_size for srec in self.__srecs])
+    if state == 0 or zero_out:
+      # No data exists, just write out zeros
+      byte_data.write( bytes(state_size) )
+    else:
+      # Copy previous states data
+      smap = self.__smaps[state-1]
+      state_file_name = self.__state_files[smap.file_number]
+      with open(state_file_name, 'rb') as state_file:
+        state_file.seek( smap.file_offset + 8 )
+        byte_data.write( state_file.read( state_size ) )
+
+  @_clear_return_code
+  def append_state(self, new_state_time: float, zero_out: bool = True) -> int:
+    """Appends a new state to the end of an existing Mili database.
+
+    Args:
+      new_state_time (float): The time of the new state.
+      zero_out (bool, default=True): If True, all results for the new timestep are set to zero (With the exception of
+        nodal positions and sand flags. nodal_positions are copied from the previous state and sand flags are set to 1).
+        If false, the data from the previous state (if available) will be copied to the new state.
+
+    Returns:
+      int: The updated number of states in the database.
+    """
+    n_states = len(self.__smaps)
+    creating_new_state_file = False
+
+    # Verify state_time makes sense
+    if n_states > 0 and new_state_time <= self.__smaps[-1].time:
+      self.__return_code = (ReturnCode.ERROR, "The time of the appended state must be greater than the current last state.")
+      raise ValueError("The time of the appended state must be greater than the current last state.")
+
+    # Handle state/size limit parameters
+    limit_states_per_file = None
+    limit_bytes_per_file = None
+    if self.__afile.partition_scheme == AFile.PartitionScheme.STATE_COUNT:
+      max_states_per_file = self.__params.get("states per file", 0)
+      if max_states_per_file > 0:
+        limit_states_per_file = max_states_per_file
+    elif self.__afile.partition_scheme == AFile.PartitionScheme.BYTE_COUNT:
+      max_bytes_per_file = self.__params.get('max size per file', 0)
+      if max_bytes_per_file > 0:
+        limit_bytes_per_file = max_bytes_per_file
+
+    if len(self.__srecs) == 0:
+      self.__return_code = (ReturnCode.ERROR, "Cannot append a state. No subrecords exist.")
+      raise ValueError("Cannot append a state. No subrecords exist.")
+    state_size = np.sum([srec.byte_size for srec in self.__srecs]) + 8
+
+    # Compute the offset of the new state
+    if n_states == 0:
+      # We assume the subrecords already exist and we just need update the state maps/file
+      new_smap_offset = 0
+      new_state_file = 0
+      creating_new_state_file = True
+    else:
+      new_smap_offset = self.__smaps[-1].file_offset + state_size
+      # Assume we are writing to same state file as previous state
+      new_state_file = self.__smaps[-1].file_number
+
+    # Handle state count and file size limits
+    if limit_states_per_file and n_states + 1 > limit_states_per_file:
+      creating_new_state_file = True
+      new_state_file += 1
+      new_smap_offset = 0
+    if limit_bytes_per_file and (new_smap_offset + state_size) > limit_bytes_per_file:
+      creating_new_state_file = True
+      new_state_file += 1
+      new_smap_offset = 0
+
+    # Create new StateMap object
+    new_smap = StateMap(new_state_file, new_smap_offset, new_state_time, 0)
+
+    # Update Afile
+    self.__afile.smaps.append(new_smap)
+    self.__afile.state_map_count += 1
+    if 'state_count' in self.__afile.dirs[DirectoryDecl.Type.APPLICATION_PARAM]:
+      self.__afile.dirs[DirectoryDecl.Type.APPLICATION_PARAM]['state_count'] += 1
+
+    afile_writer = AFileWriter()
+    afile_name = f"{os.path.join( self.__dir_name, self.__base_filename )}"
+    afile_writer.write(self.__afile, afile_name)
+
+    # Update State file
+    state_file_suffix = "{:02d}".format(new_smap.file_number)
+    state_filename = os.path.join( self.__dir_name, f"{self.__base_filename}{state_file_suffix}" )
+    if creating_new_state_file:
+      self.__state_files.append(state_filename)
+
+    # Set up bytes to be written to new state
+    bytes_to_write = io.BytesIO()
+    bytes_to_write.write( struct.pack('fi', new_smap.time, new_smap.state_map_id) )
+    self.__get_state_byte_data( n_states, zero_out, bytes_to_write )
+
+    # Write out new state
+    access_mode = 'wb' if creating_new_state_file else 'rb+'
+    with open(state_filename, access_mode) as state_file:
+      state_file.seek( new_smap.file_offset )
+      state_file.write( bytes_to_write.getvalue() )
+
+    # We need to write out the nodal positions and sand flags so the database can be visualized.
+    if n_states == 0 or zero_out:
+      state_to_write = n_states + 1
+      if n_states == 0:
+        # If this is the first state being written to the database
+        # then we need to write out the initial nodal positions (db.nodes())
+        nodpos = self.query("nodpos", "node", states=[state_to_write])
+        nodpos['nodpos']['data'][0] = self.__nodes
+        self.query("nodpos", "node", states=[state_to_write], write_data=nodpos)
+      else:
+        # We need to query the previous states nodal positions and copy them to the current state
+        nodpos = self.query("nodpos", "node", states=[state_to_write-1])
+        nodpos['nodpos']['layout']['states'][0] = state_to_write
+        self.query("nodpos", "node", states=[state_to_write], write_data=nodpos)
+
+      # Need to set sand flags as well so everything can be visualized
+      sand_classes = self.classes_of_state_variable("sand")
+      for class_name in sand_classes:
+        sand_flags = self.query("sand", class_name, states=[state_to_write])
+        sand_flags['sand']['data'][0] = 1.0
+        self.query("sand", class_name, states=[state_to_write], write_data=sand_flags)
+
+    return len(self.__smaps)
+
+  def copy_non_state_data(self, new_base_name: str):
+    """Copy the geometry, states variables, subrecords and parameters from an existing Mili database
+       into a new database without any states (Just the A file).
+
+    Args:
+      new_base_name (str): The base name of the new database.
+    """
+    new_afile =  self.__afile.copy_non_state_data()
+
+    # Write out the new AFile
+    afile_writer = AFileWriter()
+    # Copy trailing digits from basename to mimic processor numbers for uncombined databases
+    trailing_digits_regex = re.compile(r'(\d+)$').search(self.__base_filename)
+    trailing_digits = "" if trailing_digits_regex is None else trailing_digits_regex.group(1)
+    new_base_name = new_base_name + trailing_digits
+    afile_writer.write(new_afile, new_base_name)
+
 def combine( results_dict: List[Dict] ) -> dict:
   """Given a parallel result dictionary, Merge data into a single dictionary.
 
-  NOTE: This does not take an insignificant amount of time 
+  NOTE: This does not take an insignificant amount of time
   """
   # If result_dict is already a dictionary, just return it.
   if isinstance( results_dict, dict ):
@@ -880,7 +1048,7 @@ def combine( results_dict: List[Dict] ) -> dict:
       if np.any(counts > 1):
         merged_results[svar]['data'] = merged_results[svar]['data'][:,indexes,:]
         merged_results[svar]['layout']['labels'] = merged_results[svar]['layout']['labels'][indexes]
-  
+
   return merged_results
 
 def results_by_element( result_dict: Union[Dict,List[Dict]] ) -> dict:
@@ -893,7 +1061,7 @@ def results_by_element( result_dict: Union[Dict,List[Dict]] ) -> dict:
     for svar in processor_result:
       if svar not in reorganized_data:
         reorganized_data[svar] = {}
-      
+
       for elem_idx, element in enumerate(processor_result[svar]['layout']['labels']):
         if element not in reorganized_data:
           reorganized_data[svar][element] = processor_result[svar]['data'][:,elem_idx,:]

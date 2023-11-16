@@ -88,5 +88,37 @@ class ParseDatabase(unittest.TestCase):
     self.assertTrue( rvals[0] )
     self.assertEqual( afile_v2.file_version, 2 )
 
+class AFileWriter(unittest.TestCase):
+  data_dir = os.path.join( dir_path,'data','serial','sstate' )
+  base_name = 'd3samp6.plt'
+  new_base_name = 'new_d3samp6.plt'
+
+  def setUp(self):
+    # Read in A File.
+    afiles, rvals = afileIO.parse_database( os.path.join( AFileWriter.data_dir, AFileWriter.base_name ) )
+    afile = afiles[0]
+    self.assertTrue( rvals[0] )
+
+    # Write out same A File.
+    rvals = afileIO.write_database( afile, os.path.join(AFileWriter.data_dir, AFileWriter.new_base_name) )
+    self.assertEqual( rvals[0], 0 )
+
+  def tearDown(self):
+    # Delete A files
+    os.remove( f"{os.path.join(AFileWriter.data_dir, AFileWriter.new_base_name)}A" )
+
+  def test_read_afile(self):
+    # Test that we can read in new A file
+    afiles, rvals = afileIO.parse_database( os.path.join(AFileWriter.data_dir, AFileWriter.new_base_name) )
+    afile = afiles[0]
+    self.assertTrue( rvals[0] )
+
+    # Read in original A file and compare with new one
+    afiles, rvals = afileIO.parse_database( os.path.join(AFileWriter.data_dir, AFileWriter.base_name) )
+    original = afiles[0]
+    self.assertTrue( rvals[0] )
+
+    self.assertEqual( afile, original )
+
 if __name__ == "__main__":
     unittest.main()

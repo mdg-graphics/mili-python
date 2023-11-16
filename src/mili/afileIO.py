@@ -10,6 +10,7 @@ import logging
 import os
 import re
 import struct
+import math
 from typing import *
 import typing
 if hasattr( typing, 'io' ):
@@ -73,7 +74,7 @@ class AFileReader:
   def __parse_header( self, header_data : bytes ):
     self.__mili_file_version = int(header_data[4])
     self.__dir_dtype = 'i' if int(header_data[5]) <= 2 else 'q'
-    self.__endian_str = 'big' if int(header_data[6]) == 1 else 'little'
+    self.__endian_str = 'big' if int(header_data[6]) == AFile.Endian.BIG else 'little'
 
   def __parse_footer( self, footer_data : bytes ):
     self.__string_bytes = int.from_bytes( footer_data[0:3], byteorder = self.__endian_str )
@@ -117,8 +118,8 @@ class AFileReader:
     dirs_bytes = 24 if header[5] <= 2 else 48
 
     if t is None:
-    	self.__has_tfile = False
-    	
+      self.__has_tfile = False
+
     f.seek(-16, os.SEEK_END)
     footer = f.read(16)
 
@@ -172,11 +173,11 @@ class AFileParser:
       dir_whitelist = [ DirectoryDecl.Type.MILI_PARAM,
                         DirectoryDecl.Type.APPLICATION_PARAM,
                         DirectoryDecl.Type.TI_PARAM,
-                        DirectoryDecl.Type.STATE_VAR_DICT,
-                        DirectoryDecl.Type.CLASS_IDENTS,
                         DirectoryDecl.Type.CLASS_DEF,
+                        DirectoryDecl.Type.CLASS_IDENTS,
                         DirectoryDecl.Type.NODES,
                         DirectoryDecl.Type.ELEM_CONNS,
+                        DirectoryDecl.Type.STATE_VAR_DICT,
                         DirectoryDecl.Type.SREC_DATA ]
 
     dir_callbacks = { AFile.Section.HEADER : functools.partial(self.__parse_header, afile),
@@ -184,14 +185,14 @@ class AFileParser:
                       AFile.Section.STATE_MAP : functools.partial(self.__parse_smap, afile),
                       AFile.Section.DIR_DECL : functools.partial(self.__parse_dir_decl, afile),
                       AFile.Section.STRINGS : functools.partial(self.__parse_strings, afile),
-                      DirectoryDecl.Type.MILI_PARAM : functools.partial(self.__parse_mili_param, afile),
-                      DirectoryDecl.Type.APPLICATION_PARAM : functools.partial(self.__parse_app_param, afile),
-                      DirectoryDecl.Type.TI_PARAM : functools.partial(self.__parse_ti_param, afile),
-                      DirectoryDecl.Type.STATE_VAR_DICT : functools.partial(self.__parse_svars, afile),
+                      DirectoryDecl.Type.MILI_PARAM : functools.partial(self.__parse_param, afile),
+                      DirectoryDecl.Type.APPLICATION_PARAM : functools.partial(self.__parse_param, afile),
+                      DirectoryDecl.Type.TI_PARAM : functools.partial(self.__parse_param, afile),
                       DirectoryDecl.Type.CLASS_IDENTS : functools.partial(self.__parse_class_ident, afile),
                       DirectoryDecl.Type.CLASS_DEF : functools.partial(self.__parse_class_def, afile),
                       DirectoryDecl.Type.NODES : functools.partial(self.__parse_nodes, afile),
                       DirectoryDecl.Type.ELEM_CONNS : functools.partial(self.__parse_elem_conn, afile),
+                      DirectoryDecl.Type.STATE_VAR_DICT : functools.partial(self.__parse_svars, afile),
                       DirectoryDecl.Type.SREC_DATA : functools.partial(self.__parse_srec, afile) }
 
     reader = AFileReader( )
@@ -232,7 +233,7 @@ class AFileParser:
     if len( header_data ) != 16 :
       raise MiliAParseError( "Header data is not 16 bytes. This should never be seen unless something is wrong with I/O itself.")
     formats = [ dmem[1] for dmem in getdatamembers( AFile.Format ) ]
-    afile.file_format = self.verify('header/file_format', str(header_data[0:4].decode('utf-8')), lambda x : x in formats )
+    afile.file_format = self.verify('header/file_format', str(header_data[0:4].decode('ascii')), lambda x : x in formats )
     version_validator = lambda x : AFile.Version.MIN <= x <= AFile.Version.MAX
     afile.file_version = self.verify('header/file_version', int(header_data[4]), version_validator )
     directory_version_validator = lambda x : AFile.DirectoryVersion.MIN <= x <= AFile.DirectoryVersion.MAX
@@ -240,7 +241,7 @@ class AFileParser:
     self.__dir_dtype = 'i' if afile.directory_version <= 2 else 'q'
     endians = [ dmem[1] for dmem in getdatamembers( AFile.Endian ) ]
     afile.endian_flag = self.verify('header/endian_flag', int(header_data[6]), lambda x : x in endians)
-    self.__endian_str = 'big' if afile.endian_flag == 1 else 'little'
+    self.__endian_str = 'big' if afile.endian_flag == AFile.Endian.BIG else 'little'
     precisions = [ dmem[1] for dmem in getdatamembers( AFile.Precision ) ]
     afile.precision_flag = self.verify('header/precision_flag', int(header_data[7]), lambda x : x in precisions )
     afile.sfile_suffix_length = self.verify('header/sfile_suffix_length', int(header_data[8]) )
@@ -252,7 +253,7 @@ class AFileParser:
     afile.string_bytes = self.verify( 'footer/string_bytes', int.from_bytes( footer_data[0:3], byteorder = self.__endian_str ) )
     afile.commit_count = self.verify( 'footer/commit_count', int.from_bytes( footer_data[4:7], byteorder = self.__endian_str ) )
     afile.directory_count = self.verify( 'footer/directory_count', int.from_bytes( footer_data[8:11], byteorder = self.__endian_str ) )
-    afile.srec_count = self.verify( 'footer/srec_count', int.from_bytes( footer_data[12:15], byteorder = self.__endian_str ) )
+    afile.state_map_count = self.verify( 'footer/state_map_count', int.from_bytes( footer_data[12:15], byteorder = self.__endian_str ) )
 
   def __parse_smap( self, afile : AFile, smap_data : bytes ):
     smap = StateMap( *struct.unpack('<iqfi',smap_data) )
@@ -288,45 +289,29 @@ class AFileParser:
       str_offset += dir.str_cnt
     afile.strings = strings
 
-  def __parse_mili_param( self, afile : AFile, param_data : bytes, dir_decl : DirectoryDecl ):
+  def __parse_param( self, afile : AFile, param_data : bytes, dir_decl : DirectoryDecl ):
     sname = dir_decl.strings[0]
-    if sname in [ "mesh dimensions", "states per file", "mesh type" ]:
-      # single int params
-      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'MILI_PARAM/{sname}', int.from_bytes(param_data, byteorder = self.__endian_str ) )
-    else:
-      # default to strings
-      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'MILI_PARAM/{sname}', struct.unpack(f"{dir_decl.length}s", param_data)[0].decode('utf-8').split('\x00')[0] )
-
-  def __parse_app_param( self, afile : AFile, param_data : bytes, dir_decl : DirectoryDecl ):
-    sname = dir_decl.strings[0]
-    if sname in [ "state_count", "OPEN_FOR_WRITE", "max size per file" ]:
-      # single int params
-      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'APPLICATION_PARAM/{sname}', int.from_bytes(param_data, byteorder = self.__endian_str ) )
-    elif sname in [ "title", "job_id" ]:
-      # strings
-      param = struct.unpack(f"{dir_decl.length}s", param_data)[0].decode('utf-8').split('\x00')[0]
-      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'APPLICATION_PARAM/{sname}', param )
-    else:
-      # default to just byte data
-      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'APPLICATION_PARAM/{sname}', param_data )
-
-  def __parse_ti_param( self, afile : AFile, param_data : bytes, dir_decl : DirectoryDecl ):
-    sname = dir_decl.strings[0]
-    if "Labels" in sname or sname.startswith('GLOBAL_IDS') or sname.startswith('IntLabel_es_'):
-      # int arrays
-      param = np.frombuffer( param_data[8:], dtype = np.int32 )
-      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'TI_PARAM/{sname}', param )
-    elif sname.startswith("SetRGB"):
-      # float arrays
-      param = np.frombuffer( param_data[8:], dtype = np.float32 )
-      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'TI_PARAM/{sname}', param )
-    elif sname.startswith('GLOBAL_COUNT') or sname.startswith('LOCAL_COUNT') or sname in [ "nproc", "particles_on" ]:
-      # single int params
-      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'TI_PARAM/{sname}', int.from_bytes(param_data, byteorder = self.__endian_str ) )
-    else:
-      # default to string
-      param = struct.unpack(f"{dir_decl.length}s", param_data)[0].decode('utf-8').split('\x00')[0]
-      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'TI_PARAM/{sname}', param )
+    log_str = f'{dir_decl.dir_type.name}/{sname}'
+    # modifier_idx1 is the type of the parameter
+    # modified_idx2 is SCALAR (0) or ARRAY (2)
+    param_dtype = MiliType(dir_decl.modifier_idx1)
+    param_type = ParameterType(dir_decl.modifier_idx2)
+    if param_type == ParameterType.SCALAR:
+      if param_dtype in (MiliType.M_INT, MiliType.M_INT4, MiliType.M_INT8):
+        afile.dirs[dir_decl.dir_type][sname] = self.verify( log_str, int.from_bytes(param_data, byteorder = self.__endian_str ) )
+      elif param_dtype in (MiliType.M_FLOAT, MiliType.M_FLOAT4, MiliType.M_FLOAT8):
+        afile.dirs[dir_decl.dir_type][sname] = self.verify( log_str, struct.unpack( param_dtype.struct_repr(), param_data ) )
+      elif param_dtype == MiliType.M_STRING:
+        param = struct.unpack(f"{dir_decl.length}s", param_data)[0].decode('ascii').split('\x00')[0]
+        afile.dirs[dir_decl.dir_type][sname] = self.verify( log_str, param )
+    elif param_type == ParameterType.ARRAY:
+      # The first 2 integers are order and rank
+      ndims = int.from_bytes(param_data[:4], byteorder=self.__endian_str)
+      dim_bytes = 4 + 4 * ndims
+      shape = np.frombuffer( param_data[4:dim_bytes], np.int32 )
+      param = np.frombuffer( param_data[8:], dtype = param_dtype.numpy_dtype() )
+      param = np.reshape( param, shape )
+      afile.dirs[dir_decl.dir_type][sname] = self.verify( log_str, param )
 
   def __parse_svars( self, afile : AFile, svar_data : bytes, dir_decl : DirectoryDecl ):
     header_bytes = 8
@@ -335,7 +320,7 @@ class AFileParser:
     int_bytes = int_cnt * 4
 
     int_data = np.frombuffer( svar_data[ header_bytes : header_bytes + int_bytes ], np.int32 )
-    strings = struct.unpack(f'{svar_bytes}s', svar_data[ header_bytes + int_bytes : ])[0].decode('utf-8').split('\x00')
+    strings = struct.unpack(f'{svar_bytes}s', svar_data[ header_bytes + int_bytes : ])[0].decode('ascii').split('\x00')
     strings = list(filter(('').__ne__,strings))
 
     iidx = 0
@@ -364,25 +349,27 @@ class AFileParser:
       for comp_sname in comp_snames:
         if comp_sname not in afile.dirs[dir_decl.dir_type].keys():
           iidx, sidx = self.__parse_svar( afile, iidx, int_data, sidx, strings, dir_decl )
-    # if sname == "stress":
-    #   breakpoint()
-    afile.dirs[dir_decl.dir_type][sname] = self.verify( f'STATE_VAR_DICT/{sname}', StateVariable( **kwargs ) )
+    afile.dirs[dir_decl.dir_type][sname] = self.verify( f'{dir_decl.dir_type.name}/{sname}', StateVariable( **kwargs ) )
     return iidx, sidx
 
   def __parse_class_ident( self, afile : AFile, class_data : bytes, dir_decl : DirectoryDecl ):
     sname = dir_decl.strings[0]
+    superclass = int.from_bytes( class_data[:4], byteorder=self.__endian_str )
     if sname not in afile.dirs[dir_decl.dir_type].keys():
-      afile.dirs[dir_decl.dir_type][sname] = np.empty([0],np.int32)
-    append_to = afile.dirs[dir_decl.dir_type][sname]
+      afile.dirs[dir_decl.dir_type][sname] = {
+        "superclass": superclass,
+        "idents": np.empty([0],np.int32)
+      }
+    append_to = afile.dirs[dir_decl.dir_type][sname]['idents']
     append = np.frombuffer( class_data[4:12], dtype = np.int32 )
-    afile.dirs[dir_decl.dir_type][sname] = self.verify( f'CLASS_IDENTS/{sname}', np.append( append_to, append ) )
+    afile.dirs[dir_decl.dir_type][sname]['idents'] = self.verify( f'{dir_decl.dir_type.name}/{sname}', np.append( append_to, append ) )
 
   def __parse_class_def( self, afile : AFile, _ : bytes, dir_decl : DirectoryDecl ):
     short_name = dir_decl.strings[0]
     long_name = dir_decl.strings[1]
     mesh_id = dir_decl.modifier_idx1
     sclass = Superclass(dir_decl.modifier_idx2)
-    afile.dirs[dir_decl.dir_type][short_name] =  self.verify( f'CLASS_DEF/{short_name}', MeshObjectClass(mesh_id, short_name, long_name, sclass) )
+    afile.dirs[dir_decl.dir_type][short_name] =  self.verify( f'{dir_decl.dir_type.name}/{short_name}', MeshObjectClass(mesh_id, short_name, long_name, sclass) )
 
   def __parse_nodes( self, afile : AFile, nodes_data : bytes, dir_decl : DirectoryDecl ):
     sname = dir_decl.strings[0]
@@ -392,30 +379,44 @@ class AFileParser:
     mesh_dim = afile.dirs[DirectoryDecl.Type.MILI_PARAM]["mesh dimensions"]
     append = np.reshape( np.frombuffer( f.read( 4 * blocks_atoms * mesh_dim ), dtype = np.float32 ), [-1, mesh_dim] )
     if sname not in afile.dirs[dir_decl.dir_type]:
-      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'NODES/{sname}', append )
+      afile.dirs[dir_decl.dir_type][sname] = {
+        'nodes': self.verify( f'{dir_decl.dir_type.name}/{sname}', append ),
+        'blocks': blocks
+      }
     else:
-      afile.dirs[dir_decl.dir_type][sname] = np.append( afile.dirs[dir_decl.dir_type][sname], self.verify( f'NODES/{sname}', append ), axis=0 )
+      afile.dirs[dir_decl.dir_type][sname]['nodes'] = np.append( afile.dirs[dir_decl.dir_type][sname]['nodes'], self.verify( f'{dir_decl.dir_type.name}/{sname}', append ), axis=0 )
+      afile.dirs[dir_decl.dir_type][sname]['blocks'] = np.concatenate( afile.dirs[dir_decl.dir_type][sname]['blocks'], blocks )
 
   def __parse_elem_conn( self, afile : AFile, conn_data : bytes, dir_decl : DirectoryDecl ):
     f = io.BytesIO( conn_data )
     sname = dir_decl.strings[0]
     sclass, block_cnt = struct.unpack( '2i', f.read(8) )
-    f.read( 8 * block_cnt )
+    blocks = np.frombuffer( f.read( 8 * block_cnt ), dtype=np.int32 )
     elem_qty = dir_decl.modifier_idx2
     conn_qty = Superclass(sclass).node_count()
     word_qty = conn_qty + 2
     conn = np.reshape( np.frombuffer( f.read( elem_qty * word_qty * 4 ), dtype = np.int32 ), [-1,word_qty] )
     if not sname in afile.dirs[dir_decl.dir_type].keys():
-      afile.dirs[dir_decl.dir_type][sname] = np.empty( (0,word_qty), dtype = np.int32 )
-    afile.dirs[dir_decl.dir_type][sname] = np.concatenate( ( afile.dirs[dir_decl.dir_type][sname], self.verify( f'ELEM_CONN/{sname}', conn ) ) )
+      afile.dirs[dir_decl.dir_type][sname] = {
+        'conns': np.empty( (0,word_qty), dtype = np.int32 ),
+        'superclass': sclass,
+        'block_cnt': 0,
+        'blocks': np.empty([0],dtype=np.int32),
+      }
+    afile.dirs[dir_decl.dir_type][sname]['conns'] = np.concatenate( ( afile.dirs[dir_decl.dir_type][sname]['conns'], self.verify( f'{dir_decl.dir_type.name}/{sname}', conn ) ) )
+    afile.dirs[dir_decl.dir_type][sname]['blocks'] = np.concatenate( (afile.dirs[dir_decl.dir_type][sname]['blocks'], blocks) )
+    afile.dirs[dir_decl.dir_type][sname]['block_cnt'] += block_cnt
 
   def __parse_srec( self, afile : AFile, srec_data : bytes, dir_decl : DirectoryDecl ):
     srec_count = int.from_bytes( srec_data[12:16], self.__endian_str )
+    # We store the subrecord data header information to be use when writing an A file
+    afile.dirs[dir_decl.dir_type]['header'] = struct.unpack('4i', srec_data[0:16])
+    afile.dirs[dir_decl.dir_type]['subrecords'] = {}
     srec_header_bytes = 16
     srec_idata_bytes = ( dir_decl.modifier_idx1 - 4 ) * 4
     srec_strdata_bytes = dir_decl.modifier_idx2
     int_data = np.frombuffer( srec_data[ srec_header_bytes : srec_header_bytes + srec_idata_bytes ], np.int32 )
-    strings = [ name.rstrip('\x00') for name in struct.unpack(str(srec_strdata_bytes) + 's', srec_data[ srec_header_bytes + srec_idata_bytes : ])[0].decode('utf-8').split('\x00') ]
+    strings = [ name.rstrip('\x00') for name in struct.unpack(str(srec_strdata_bytes) + 's', srec_data[ srec_header_bytes + srec_idata_bytes : ])[0].decode('ascii').split('\x00') ]
     strings.remove('')
     sidx = iidx = 0
     for _ in range( srec_count ):
@@ -458,11 +459,12 @@ class AFileParser:
         # Recalculate ordinal_block_counts
         ordinal_block_counts = np.concatenate( ( [0], np.diff( ordinal_blocks.reshape(-1,2), axis=1 ).flatten( ) ) ) # sum stop - start + 1 over all blocks
 
+      kwargs['superclass'] = Superclass(superclass)
       kwargs['ordinal_blocks'] = ordinal_blocks
       kwargs['ordinal_block_counts'] = ordinal_block_counts
       kwargs['ordinal_block_offsets'] = ordinal_block_offsets
       iidx += 2 * block_count
-      afile.dirs[dir_decl.dir_type][sname] = self.verify( f'STATE_REC_DATA/{sname}', Subrecord( **kwargs ) )
+      afile.dirs[dir_decl.dir_type]['subrecords'][sname] = self.verify( f'{dir_decl.dir_type.name}/{sname}', Subrecord( **kwargs ) )
 
 class AFileParallelHelper:
   def __init__( self, base : os.PathLike, allow_exceptions : bool = True ):
@@ -473,6 +475,307 @@ class AFileParallelHelper:
     return self.__afile
   def rval( self ):
     return self.__rval
+
+_log_dir = lambda sname, dir_decl, data : logging.debug( f'ti\n  sname = {sname}\n  dd = {dir_decl}\n  data = {data}')
+_ceil_to_nearest = lambda val, mult : mult * math.ceil( val / mult )
+
+def endian_info( endian_flag ):
+  if endian_flag == AFile.Endian.BIG:
+    return 'big', '>'
+  elif endian_flag == AFile.Endian.LITTLE:
+    return 'little', '<'
+
+class AFileWriter:
+  def __init__(self):
+    self.__byteorder = sys.byteorder
+    self.__bo = '>' if self.__byteorder == 'big' else '<'
+    self.__callbacks = {
+      DirectoryDecl.Type.MILI_PARAM : self.__write_param,
+      DirectoryDecl.Type.APPLICATION_PARAM : self.__write_param,
+      DirectoryDecl.Type.TI_PARAM : self.__write_param,
+      DirectoryDecl.Type.CLASS_DEF : self.__write_class_def,
+      DirectoryDecl.Type.CLASS_IDENTS : self.__write_class_ident,
+      DirectoryDecl.Type.NODES : self.__write_nodes,
+      DirectoryDecl.Type.ELEM_CONNS : self.__write_elem_conn,
+      # DirectoryDecl.Type.STATE_VAR_DICT : self.__write_svars,
+      # DirectoryDecl.Type.STATE_REC_DATA : self.__write_srecs
+    }
+
+  def write( self, afile : AFile, base : os.PathLike, allow_tfile: bool = False ):
+    self.__byteorder, self.__bo = endian_info( afile.endian_flag )
+
+    # TODO: check for file existence and reject if they already exist
+    afilename = base + 'A'
+    tfilename = base + 'T'
+
+    adata = io.BytesIO( )
+    tdata = io.BytesIO( )
+
+    self.__write_header( afile, adata )
+    strings = []
+    dir_order = [ DirectoryDecl.Type.MILI_PARAM,
+                  DirectoryDecl.Type.APPLICATION_PARAM,
+                  DirectoryDecl.Type.TI_PARAM,
+                  DirectoryDecl.Type.CLASS_DEF,
+                  DirectoryDecl.Type.CLASS_IDENTS,
+                  DirectoryDecl.Type.NODES,
+                  DirectoryDecl.Type.ELEM_CONNS ]
+    for dir_type in dir_order:
+      _, dirs_strings = self.__write_directories( afile, adata, dir_type ) # modifies the offset and length of the decls based on the write, str_count stays the same
+      strings.extend( dirs_strings )
+
+    # if we can have more than 1 this needs to change
+    svars = afile.dirs[ DirectoryDecl.Type.STATE_VAR_DICT ].values()
+    svar_dd : DirectoryDecl = afile.dir_decls[ DirectoryDecl.Type.STATE_VAR_DICT ][ 0 ]
+    svar_dd.offset = adata.tell( )
+    svar_dd.length = self.__write_svars( svars, adata )
+
+    # again if we can have more than 1 this needs to changes
+    srecs = afile.dirs[ DirectoryDecl.Type.SREC_DATA ]
+    srec_dd : DirectoryDecl = afile.dir_decls[ DirectoryDecl.Type.SREC_DATA ][ 0 ]
+    srec_dd.offset = adata.tell( )
+    srec_dd.length = self.__write_srecs( srecs, adata, srec_dd )
+
+    afile.strings = strings
+    afile.string_bytes = self.__write_strings( afile, adata ) # write the strings in their new order (based on the order we wrote the dirs)
+
+    # we write the decls in offset order.. which since we change the offsets based on the above order, is the same order, so the reordered strings are valid
+    afile.directory_count = self.__write_dir_decls( afile, adata )
+
+    afile.state_map_count = self.__write_smaps( afile, tdata )
+    if afile.file_version < 3 or not allow_tfile: # write smaps directly to AFile before v3 file format
+      adata.write( tdata.getvalue() )
+    footer_binary = io.BytesIO()
+    self.__write_footer( afile, footer_binary )
+    adata.write( footer_binary.getvalue() )
+
+    # actually write to file(s)
+    with open(afilename,'wb') as af:
+      af.write( adata.getvalue() )
+    if afile.file_version > 2 and allow_tfile:
+      with open(tfilename, 'wb') as tf:
+        tf.write( tdata.getvalue() )
+        tf.write( b'~' )
+    return 0
+
+  def __write_header( self, afile : AFile, out : BinaryIO ):
+    out.write( bytes( afile.file_format, 'ascii' ) )
+    out.write( afile.file_version.to_bytes( 1, byteorder = self.__byteorder ) )
+    out.write( afile.directory_version.to_bytes( 1, byteorder = self.__byteorder ) )
+    out.write( afile.endian_flag.to_bytes( 1, byteorder = self.__byteorder ) )
+    out.write( afile.precision_flag.to_bytes( 1, byteorder = self.__byteorder ) )
+    out.write( afile.sfile_suffix_length.to_bytes( 1, byteorder = self.__byteorder ) )
+    out.write( afile.partition_scheme.to_bytes( 1, byteorder = self.__byteorder ) )
+    out.write( bytes(6) )
+
+  def __write_directories( self, afile : AFile, out : BinaryIO, dir_type : DirectoryDecl.Type ):
+    init = out.tell( )
+    strings = []
+    for sname, data in afile.dirs[ dir_type ].items():
+      dd = next( filter( lambda x: x.strings[0] == sname, afile.dir_decls[dir_type]) )
+      dd : DirectoryDecl
+      dd.offset = out.tell( ) # this assumes the out argument is the final buffer / file
+      dd.length = self.__callbacks[ dir_type ]( data, out, dd )
+      strings.extend( dd.strings )
+    return out.tell( ) - init, strings
+
+  def __write_nodes( self, data, out : BinaryIO, _ : DirectoryDecl ):
+    init = out.tell( )
+    out.write( data['blocks'].tobytes( ) ) # node block
+    out.write( data['nodes'].tobytes( ) ) # coord data for the block
+    return out.tell( ) - init
+
+  def __write_elem_conn( self, data, out : BinaryIO, _ : DirectoryDecl ):
+    init = out.tell( )
+    out.write( int(data['superclass']).to_bytes( 4, byteorder = self.__byteorder ) )
+    out.write( int(data['block_cnt']).to_bytes( 4, byteorder = self.__byteorder ) )
+    out.write( data['blocks'].tobytes() ) # we never bother converting the blocks from bytes internally
+    out.write( data['conns'].tobytes() )  # elem_conns
+    return out.tell( ) - init
+
+  def __write_class_ident( self, data, out : BinaryIO, dir_decl : DirectoryDecl ):
+    init = out.tell( )
+    superclass = data['superclass']
+    out.write( superclass.to_bytes( 4, byteorder = self.__byteorder ) )
+    out.write( data['idents'].tobytes() )
+    return out.tell() - init
+
+  def __write_class_def( self, _1, _2 : BinaryIO, _3 : DirectoryDecl ):
+    # we actually just don't do anything here, the dir_decl is the class identifier
+    return 0
+
+  def __write_param( self, data, out : BinaryIO, dir_decl : DirectoryDecl ):
+    init = out.tell( )
+    # modifier_idx1 is the type of the parameter
+    # modified_idx2 is SCALAR (0) or ARRAY (2)
+    param_dtype = MiliType(dir_decl.modifier_idx1)
+    param_type = ParameterType(dir_decl.modifier_idx2)
+    if param_type == ParameterType.SCALAR:
+      if param_dtype in (MiliType.M_INT, MiliType.M_INT4, MiliType.M_INT8):
+        out.write( data.to_bytes( param_dtype.byte_size(), byteorder = self.__byteorder ) )
+      elif param_dtype in (MiliType.M_FLOAT, MiliType.M_FLOAT4, MiliType.M_FLOAT8):
+        out.write( struct.pack( param_dtype.struct_repr(), data ) )
+      elif param_dtype == MiliType.M_STRING:
+        out.write( bytes( data, 'ascii' ) )
+        out.write( bytes(1) )
+        str_bytes = out.tell( ) - init
+        align_bytes = _ceil_to_nearest( str_bytes, 8 ) - str_bytes # param strings get rounded to the nearest 8 instead of 4...
+        out.write( bytes( align_bytes ) )
+    elif param_type == ParameterType.ARRAY:
+      order = data.ndim
+      dims = np.array(data.shape, dtype=np.int32)
+      out.write( order.to_bytes( 4, byteorder = self.__byteorder ) )
+      out.write( dims.tobytes() )
+      out.write( data.tobytes() )
+    bytes_written = out.tell( ) - init
+    return bytes_written
+
+  def __write_svars( self, svars, out : BinaryIO  ):
+    init = out.tell( )
+    int_data = []
+    str_data = []
+    processed = set()
+    for svar in svars:
+      svar : StateVariable
+      if svar.name not in processed:
+        self.__collect_svar_data( svar, int_data, str_data, svars, processed )
+
+    # write an intermediate buffer of the int and str data to get the sizes
+    svar_out = io.BytesIO()
+    svar_out.write( struct.pack(f'{len(int_data)}i', *int_data ) )
+    int_bytes = svar_out.tell( )
+    for ss in str_data:
+      svar_out.write( bytes( ss, 'ascii' ) + bytes(1) )
+    int_cnt = ( int_bytes // 4 ) + 2
+    str_bytes = svar_out.tell() - int_bytes
+    align_bytes = _ceil_to_nearest( str_bytes, 4 ) - str_bytes # round up to the nearest 4-byte word (to mimic the core mili library)
+    svar_out.write( bytes( align_bytes ) )
+    str_bytes = str_bytes + align_bytes
+
+    # do the actual write
+    out.write( int_cnt.to_bytes( 4, byteorder = self.__byteorder ) )
+    out.write( str_bytes.to_bytes( 4, byteorder = self.__byteorder ) )
+    out.write( svar_out.getvalue() )
+
+    return out.tell() - init
+
+  def __collect_svar_data( self, svar : StateVariable, int_data : List[int], str_data : List[str], svars : List[StateVariable], processed : Set[str] ):
+    processed.add( svar.name )
+    int_data.append( svar.agg_type )
+    int_data.append( svar.data_type.value )
+    str_data.append( svar.name )
+    str_data.append( svar.title )
+    if svar.agg_type in [ StateVariable.Aggregation.ARRAY, StateVariable.Aggregation.VEC_ARRAY ]:
+      int_data.append( svar.order )
+      int_data.extend( svar.dims )
+    if svar.agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:
+      int_data.append( svar.list_size )
+      str_data.extend( svar.comp_names )
+      for comp_name in svar.comp_names:
+        if comp_name not in processed:
+          comp_svar = next( filter( lambda x : x.name == comp_name, svars ) )
+          self.__collect_svar_data( comp_svar, int_data, str_data, svars, processed )
+
+  def __write_srecs( self, srecs, out : BinaryIO, srec_dd : DirectoryDecl ):
+    init = out.tell()
+    int_data = []
+    str_data = []
+    for _, srec in srecs['subrecords'].items():
+      srec : Subrecord
+      int_data.append( srec.organization )
+      int_data.append( srec.qty_svars )
+      if srec.superclass != Superclass.M_MESH:
+        int_data.append( np.size( srec.ordinal_blocks, 0 ) // 2 )
+        ordinal_blocks = srec.ordinal_blocks + 1
+        ordinal_blocks[1::2] = ordinal_blocks[1::2] - 1 # undo parse-in change to speed up query algo
+        int_data.extend( ordinal_blocks.flatten().tolist() )
+      else:
+        # block size is zero for M_MESH
+        int_data.append( 0 )
+      str_data.append( srec.name )
+      str_data.append( srec.class_name )
+      str_data.extend( srec.svar_names )
+
+    srec_out = io.BytesIO()
+    srec_out.write( struct.pack( f'{len(int_data)}i', *int_data ) )
+    int_bytes = srec_out.tell( )
+    for ss in str_data:
+      srec_out.write( bytes( ss, 'ascii' ) + bytes(1) )
+    str_bytes = srec_out.tell() - int_bytes
+    align_bytes = _ceil_to_nearest( str_bytes, 4 ) - str_bytes  # round up to the nearest 4-byte word (to mimic the core mili library)
+    srec_out.write( bytes( align_bytes ) )
+    str_bytes = str_bytes + align_bytes
+
+    srec_dd.modifier_idx1 = ( int_bytes // 4 ) + 4
+    srec_dd.modifier_idx2 = str_bytes
+
+    srec_count = len( srecs )
+    srec_id, mesh_id, size, srec_count = srecs['header']
+    out.write( srec_id.to_bytes( 4, byteorder = self.__byteorder ) )
+    out.write( mesh_id.to_bytes( 4, byteorder = self.__byteorder ) )
+    out.write( size.to_bytes( 4, byteorder = self.__byteorder ) )
+    out.write( srec_count.to_bytes( 4, byteorder = self.__byteorder ) )
+    out.write( srec_out.getvalue() )
+
+    return out.tell() - init
+
+  def __write_dir_decls( self, afile : AFile, out : BinaryIO ):
+    size = 4 if afile.directory_version == 1 else 8
+    dir_decl_order = [ DirectoryDecl.Type.MILI_PARAM,
+                       DirectoryDecl.Type.APPLICATION_PARAM,
+                       DirectoryDecl.Type.TI_PARAM,
+                       DirectoryDecl.Type.CLASS_DEF,
+                       DirectoryDecl.Type.CLASS_IDENTS,
+                       DirectoryDecl.Type.NODES,
+                       DirectoryDecl.Type.ELEM_CONNS,
+                       DirectoryDecl.Type.STATE_VAR_DICT,
+                       DirectoryDecl.Type.SREC_DATA ]
+    dir_count = 0
+    for dir_type in dir_decl_order:
+      for dd in afile.dir_decls[dir_type]:
+        out.write( int(dd.dir_type.value).to_bytes( size, byteorder = self.__byteorder ) )
+        out.write( dd.modifier_idx1.to_bytes( size, byteorder = self.__byteorder ) )
+        out.write( dd.modifier_idx2.to_bytes( size, byteorder = self.__byteorder ) )
+        out.write( dd.str_cnt.to_bytes( size, byteorder = self.__byteorder ) )
+        out.write( dd.offset.to_bytes( size, byteorder = self.__byteorder ) )
+        out.write( dd.length.to_bytes( size, byteorder = self.__byteorder ) )
+        dir_count += 1
+    return dir_count
+
+  def __write_strings( self, afile : AFile, out : BinaryIO ):
+    init = out.tell()
+    for strdata in afile.strings:
+      out.write( bytes( strdata, 'ascii' ) + bytes(1) )
+    str_bytes = out.tell( ) - init
+    align_bytes = _ceil_to_nearest( str_bytes, 4 ) - str_bytes  # round up to the nearest 4-byte word (to mimic the core mili library)
+    out.write( bytes( align_bytes ) )
+    str_bytes = str_bytes + align_bytes
+    return str_bytes
+
+  def __write_smaps( self, afile : AFile, out : BinaryIO ):
+    smap_count = 0
+    for smap in afile.smaps:
+      smap : StateMap
+      out.write( struct.pack( f'{self.__bo}iqfi', smap.file_number, smap.file_offset, smap.time, smap.state_map_id ) )
+      smap_count += 1
+    return smap_count
+
+  def __write_footer( self, afile : AFile, out : BinaryIO ):
+    out.write( afile.string_bytes.to_bytes( 4, byteorder = self.__byteorder ) )
+    out.write( afile.commit_count.to_bytes( 4, byteorder = self.__byteorder ) )
+    out.write( afile.directory_count.to_bytes( 4, byteorder = self.__byteorder ) )
+    out.write( afile.state_map_count.to_bytes( 4, byteorder = self.__byteorder ) )
+
+class AFileWriteParallel:
+  '''
+    Just a small utility class to make the default writer usage in write_database cleaner with the parallel wrappers.
+  '''
+  def __init__( self, base : os.PathLike, afile : AFile ):
+    self.__writer = AFileWriter( )
+    self.__rval = self.__writer.write( afile, base )
+  def rval( self ):
+    return self.__rval
+
 
 def parse_database( base : os.PathLike, procs = [], suppress_parallel = False, experimental = False ) -> List[AFile]:
   """
@@ -503,3 +806,26 @@ def parse_database( base : os.PathLike, procs = [], suppress_parallel = False, e
   afiles = parse_wrapper.afile()
   rvals = parse_wrapper.rval()
   return afiles, rvals
+
+def write_database( afiles : Union[AFile,List[AFile]],
+                    afilenames : Union[os.PathLike,List[os.PathLike]],
+                    suppress_parallel = False,
+                    experimental = False ) -> List[int]:
+  """
+   Write a mili database. This only writes the database metadata files, and can be useful for repairing invalid/broken metadata files.
+
+  Args:
+    base (os.PathLike): the base filename of the mili database (e.g. for 'pltA', just 'plt', for parallel
+                            databases like 'dblplt00A', also exclude the rank-digits, giving 'dblplt')
+    afiles (Union[AFile,List[Afile]]):
+    afilenames (Union[os.PathLike,List[os.PathLike]]):
+    suppress_parallel (Optional[Bool]) : optionally execute write operations serially
+    experimental (Optional[Bool]) : optional developer-only argument to try experimental parallel features
+  """
+  if isinstance( afiles, AFile ) and isinstance( afilenames, str ):
+    afiles = [afiles]
+    afilenames = [afilenames]
+  proc_pargs = list(zip(afilenames,afiles))
+  write_wrapper = get_wrapper( suppress_parallel, experimental )( AFileWriteParallel, proc_pargs )
+  rvals = write_wrapper.rval()
+  return rvals
