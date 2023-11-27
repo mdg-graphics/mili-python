@@ -158,6 +158,14 @@ class MiliDatabase:
           svar.svars.append( comp )
           addComps( comp )
 
+    def addContaining( svar ):
+      """small recursive function to populate svar.containing_svars[] all the way down"""
+      if svar.agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:
+        for comp_name in svar.comp_names:
+          comp = self.__svars[comp_name]
+          comp.containing_svar_names.append( svar.name )
+          addContaining( comp )
+
     def addIntPoints( es_name, svar_comp_names ):
       """small recursive function to populate self.__int_points all the way down"""
       for svar_comp_name in svar_comp_names:
@@ -171,6 +179,7 @@ class MiliDatabase:
     # add component svar objects to vec/vec_array aggregate svars instead of just names
     for svar in self.__svars.values():
       addComps( svar )
+      addContaining( svar )
 
       if svar.name[:-1] in self.__int_points.keys():
         svar_comp_names = svar.comp_names
@@ -453,6 +462,14 @@ class MiliDatabase:
     if state_variable:
       classes = list(set([ srec.class_name for srec in state_variable.srecs ]))
     return classes
+
+  def containing_state_variables_of_class(self, svar: str, class_name: str):
+    containing_svars = []
+    if svar in self.__svars:
+      potential_containing_svars = np.array(self.__svars[svar].containing_svar_names)
+      of_same_class = [class_name in self.classes_of_state_variable(containing_svar) for containing_svar in potential_containing_svars]
+      containing_svars = potential_containing_svars[np.nonzero(of_same_class)[0]]
+    return containing_svars
 
   def parts_of_class_name( self, class_name: str ):
     """Get List of part numbers for all elements of a given class name."""

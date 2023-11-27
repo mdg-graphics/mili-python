@@ -137,7 +137,7 @@ class DirectoryDecl:
       return same
     return False
 
-@dataclass
+@dataclass(eq=False)
 class StateVariable:
   class Aggregation(IntEnum):
     '''
@@ -159,6 +159,7 @@ class StateVariable:
   order : int = 0
   dims : List[int] = dataclasses.field(default_factory=list)
   comp_names : List[str] = dataclasses.field(default_factory=list)
+  containing_svar_names : List[str] = dataclasses.field(default_factory=list)
   svars : List[StateVariable] = dataclasses.field(default_factory=list)
   srecs : List[Subrecord] = dataclasses.field(default_factory=list)
 
@@ -166,6 +167,21 @@ class StateVariable:
   #   r = reprlib.Repr()
   #   r.maxlevel = 1
   #   return r.repr(self)
+
+  def __eq__(self, other: object):
+    if isinstance(other, StateVariable):
+      same = True
+      same = same and (self.name == other.name)
+      same = same and (self.title == other.title)
+      same = same and (self.agg_type == other.agg_type)
+      same = same and (self.data_type == other.data_type)
+      same = same and (self.list_size == other.list_size)
+      same = same and (self.order == other.order)
+      same = same and (self.dims == other.dims)
+      same = same and (self.comp_names == other.comp_names)
+      same = same and (self.containing_svar_names == other.containing_svar_names)
+      return same
+    return False
 
   @property
   def recursive_names(self):
@@ -266,6 +282,8 @@ class Subrecord:
       matches = [ ( idx, self.svar_comp_offsets[idx][jdx] ) for jdx, svar in enumerate(svar_comps) if svar == scalar_svar_name ]
       if ( svar_name == aggregate_match or aggregate_match == "" ) and len( matches ) > 0:
         coords.append( matches )
+    # flatten coords
+    coords = [[item for sublist in coords for item in sublist]]
     return np.array( *coords )
 
   def calculate_memory_offsets( self, match_aggregate_svar: str, svars_to_query: List[str], ordinals: npt.ArrayLike, matching_int_points: dict ):

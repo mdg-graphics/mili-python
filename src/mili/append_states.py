@@ -62,6 +62,17 @@ class AppendStatesTool:
 
     return variable
 
+  def __parse_svar_name( self, svar_query_input ):
+    """Handle svar names of form vector[component]"""
+    comp_start_idx = svar_query_input.find('[')
+    if comp_start_idx != -1:
+      vector = svar_query_input[:comp_start_idx]
+      svar = svar_query_input[comp_start_idx+1:-1]
+    else:
+      svar = svar_query_input
+      vector = None
+    return svar, vector
+
   def check_append_states_spec(self):
     """Check append_states_spec dictionary has required info and info is compatible with original database."""
 
@@ -153,6 +164,7 @@ class AppendStatesTool:
 
         svar_labels = np.array(svar_labels, dtype=np.int32)
 
+        svar, svar_vector_name = self.__parse_svar_name( svar )
         # Look up svar component quantity to allow overwriting arrays
         all_svars = orig_database.state_variables()
         if self.serial_database:
@@ -166,6 +178,29 @@ class AppendStatesTool:
               continue
           if svar_def is None:
             raise ValueError(f"Unable to find {svar} state variable in original database.")
+
+        if svar_vector_name is not None:
+          if self.serial_database:
+            vector_def = all_svars.get(svar_vector_name, None)
+            if vector_def is None:
+              raise ValueError(f"Unable to find {svar_vector_name} state variable in original database.")
+          else:
+            for proc_svars in all_svars:
+              vector_def = proc_svars.get(svar_vector_name, None)
+              if vector_def is None:
+                continue
+            if vector_def is None:
+              raise ValueError(f"Unable to find {svar_vector_name} state variable in original database.")
+        else:
+          # Check for special cases of stress_in|mid|out or strain_in|out
+          if self.serial_database:
+            containing_svars = np.unique(orig_database.containing_state_variables_of_class(svar, svar_class))
+          else:
+            containing_svars = np.unique(np.concatenate(orig_database.containing_state_variables_of_class(svar, svar_class)))
+          if len(containing_svars) > 1:
+            raise ValueError(f"The state variable '{svar}' exists in multiple vectors ({containing_svars}) for " \
+                             f"the class '{svar_class}'. You will need to specify the svar as vector-name[comp-name] in append_states_spec.")
+
 
         svar_atom_qty = svar_def.atom_qty
         if svar_def.agg_type == datatypes.StateVariable.Aggregation.VEC_ARRAY:
