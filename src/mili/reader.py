@@ -376,6 +376,15 @@ class MiliDatabase:
 
   def element_sets(self) -> dict:
     return {k:v for k,v in self.__int_points.items() if k.startswith("es_")}
+  
+  def integration_points(self) ->dict:
+    """Get the available integration points for each material."""
+    elem_sets = self.element_sets()
+    mat_int_points = {}
+    for eset, int_points in elem_sets.items():
+      mat = eset[-1:]
+      mat_int_points[mat] = int_points[:-1]
+    return mat_int_points
 
   def times( self, states : Optional[Union[List[int],int]] = None ):
     if isinstance(states, (int, np.integer)):

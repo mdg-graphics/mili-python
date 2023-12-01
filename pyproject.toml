@@ -57,6 +57,8 @@ dev = [
   "coverage>=4.0.0",
   "twine",
   "wheel",
+  "sphinx",
+  "myst-parser"
 ]
 
 # When used with a pyproject.toml file, setuptools must use a minimum
