@@ -43,7 +43,7 @@ class TestSerialGeometricMeshInfo(unittest.TestCase):
 
     def setUp(self):
         self.mili = reader.open_database( TestSerialGeometricMeshInfo.file_name )
-    
+
     def test_compute_centroid(self):
         """Test the compute_centroid function."""
         # Brick elements
@@ -115,6 +115,19 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
         np.testing.assert_equal( elems["brick"], [25,26,27,28,31,32,33,34] )
 
         elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3)
+        np.testing.assert_equal( elems["shell"], [3,4,5,6,9,11] )
+        np.testing.assert_equal( elems["beam"], [5,6,37,42] )
+        np.testing.assert_equal( elems["cseg"], [2,3,5,6,8,9] )
+
+    def test_mesh_entities_near_coordinate(self):
+        """Test the mesh_entities_near_coordinate function."""
+        elems = self.adjacency.mesh_entities_near_coordinate([1.0825318, 0.62499994, 3.], 1, 0.1)
+        np.testing.assert_equal( elems["brick"], [31,32,33,34] )
+
+        elems = self.adjacency.mesh_entities_near_coordinate([1.2828925, 0.34374997, 2.8666668], 1, 0.4)
+        np.testing.assert_equal( elems["brick"], [25,26,27,28,31,32,33,34] )
+
+        elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3)
         np.testing.assert_equal( elems["shell"], [3,4,5,6,9,11] )
         np.testing.assert_equal( elems["beam"], [5,6,37,42] )
         np.testing.assert_equal( elems["cseg"], [2,3,5,6,8,9] )
@@ -233,6 +246,24 @@ class ParallelAdjacencyTests:
             np.testing.assert_equal( beam_elems, [5,6,37,42] )
             np.testing.assert_equal( cseg_elems, [2,3,5,6,8,9] )
 
+        def test_mesh_entities_near_coordinate(self):
+            """Test the mesh_entities_near_coordinate function."""
+            elems = self.adjacency.mesh_entities_near_coordinate([1.0825318, 0.62499994, 3.], 1, 0.1)
+            brick_elems = np.unique(np.concatenate([e.get("brick",[]) for e in elems]))
+            np.testing.assert_equal( brick_elems, [31,32,33,34] )
+
+            elems = self.adjacency.mesh_entities_near_coordinate([1.2828925, 0.34374997, 2.8666668], 1, 0.4)
+            brick_elems = np.unique(np.concatenate([e.get("brick",[]) for e in elems]))
+            np.testing.assert_equal( brick_elems, [25,26,27,28,31,32,33,34] )
+
+            elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3)
+            cseg_elems = np.unique(np.concatenate([e.get("cseg",[]) for e in elems]))
+            beam_elems = np.unique(np.concatenate([e.get("beam",[]) for e in elems]))
+            shell_elems = np.unique(np.concatenate([e.get("shell",[]) for e in elems]))
+            np.testing.assert_equal( shell_elems, [3,4,5,6,9,11] )
+            np.testing.assert_equal( beam_elems, [5,6,37,42] )
+            np.testing.assert_equal( cseg_elems, [2,3,5,6,8,9] )
+
         def test_nearest_node(self):
             """Test the nearest_node function."""
             node, dist = self.adjacency.nearest_node([0.0,0.0,0.0], 1)
@@ -273,7 +304,7 @@ class LoopWrapperGeometricMeshInfoTests(ParallelAdjacencyTests.TestParallelGeome
 
     def setUp(self):
         self.mili = reader.open_database( LoopWrapperGeometricMeshInfoTests.file_name, suppress_parallel=True )
-        
+
 class LoopWrapperAdjacencyMappingTests(ParallelAdjacencyTests.TestParallelAdjacencyMapping):
     file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
 
@@ -286,7 +317,7 @@ class PoolWrapperGeometricMeshInfoTests(ParallelAdjacencyTests.TestParallelGeome
 
     def setUp(self):
         self.mili = reader.open_database( PoolWrapperGeometricMeshInfoTests.file_name, suppress_parallel=False )
-        
+
 class PoolWrapperAdjacencyMappingTests(ParallelAdjacencyTests.TestParallelAdjacencyMapping):
     file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
 
@@ -299,7 +330,7 @@ class ServerWrapperGeometricMeshInfoTests(ParallelAdjacencyTests.TestParallelGeo
 
     def setUp(self):
         self.mili = reader.open_database( ServerWrapperGeometricMeshInfoTests.file_name, suppress_parallel=False, experimental=True )
-        
+
 class ServerWrapperAdjacencyMappingTests(ParallelAdjacencyTests.TestParallelAdjacencyMapping):
     file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
 

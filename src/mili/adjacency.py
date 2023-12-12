@@ -45,7 +45,7 @@ elems = adjacency.mesh_entities_within_radius("brick", 1, 100, radius=1.0)
 
 class AdjacencyMapping:
   """A wrapper around MiliDatabase or Parallel Wrappers that handles adjacency queries.
-  
+
   Args:
       obj (Union[MiliDatabase,ParallelWrapper]): The Mili database or ParallelWrapper object.
   """
@@ -75,8 +75,11 @@ class AdjacencyMapping:
       radius (float): The radius within which to search.
     """
     centroid = self.__compute_centroid_helper(class_name, label, state)
+    return self.mesh_entities_near_coordinate(centroid, state, radius)
 
-    nodes_in_radius = self.obj.geometry.nodes_within_radius( centroid, radius, state )
+  def mesh_entities_near_coordinate(self, coordinate: List[float], state: int, radius: float):
+    """Get all mesh entities within a specified radius from a specified coordinate at a given state."""
+    nodes_in_radius = self.obj.geometry.nodes_within_radius( coordinate, radius, state )
     if not self.serial:
       nodes_in_radius = np.unique(np.concatenate(nodes_in_radius))
 
@@ -201,9 +204,9 @@ class GeometricMeshInfo:
       centroid = np.sum(nodal_coordinates["nodpos"]["data"][0], axis=0)
       centroid = centroid / float(len(elem_conns))
       return centroid
-    
+
     return None
-  
+
   def nodes_within_radius(self, center, radius, state):
     """Get all nodes within a radius of a given point at the specified state."""
     if isinstance(center, list):
@@ -244,6 +247,6 @@ class GeometricMeshInfo:
       matches, _ = np.where(np.isin(elem_conns[class_name][:,:-1], nlabels))
       if len(matches) != 0:
         elems_of_nodes[class_name] = self.db.labels(class_name)[matches]
-        elems_of_nodes[class_name] = np.unique(elems_of_nodes[class_name])    
+        elems_of_nodes[class_name] = np.unique(elems_of_nodes[class_name])
 
     return elems_of_nodes

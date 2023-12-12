@@ -550,6 +550,7 @@ append_tool.write_states()
 
 The mili-python reader provides some support for querying element adjacencies through the `AdjacencyMapping` wrapper. The current list of supported adjacency queries includes:
 - Querying all elements within a specified radius of a given element using the function `mesh_entities_within_radius`.
+- Querying all elements within a specified radius of a given 3d coordinate using the function `mesh_entities_near_coordinate`.
 - Querying all elements associated with a set of specific nodes using the `elems_of_nodes` function.
 - Querying the nearest node to a 3d coordinate using the `nearest_node` function.
 - Querying the nearest element to a 3d coordinate using the `nearest_element` function.
@@ -562,6 +563,26 @@ adj = adjacency.AdjacencyMapping(db)
 
 # Gathers the elements within a radius of 0.30 length units from shell 6 at state 1
 adjacent_elements = adj.mesh_entities_within_radius("shell", 6, 1, 0.30)
+
+"""
+The format of the returned dictionary is shown below:
+
+adjacent_elements = {
+    "shell": [3,4,5,6,9,11],
+    "beam": [5,6,37,42],
+    "cseg": [2,3,5,6,8,9],
+}
+"""
+```
+
+The function `mesh_entities_near_coordinate` gathers all nodes within the specified radius of the given 3d coordinate and returns all elements that are associated with those nodes.
+
+```python
+from mili import adjacency
+adj = adjacency.AdjacencyMapping(db)
+
+# Gathers the elements within a radius of 0.30 length units from the given coordinate at state 1
+adjacent_elements = adj.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3)
 
 """
 The format of the returned dictionary is shown below:
