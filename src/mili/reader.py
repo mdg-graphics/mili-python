@@ -376,7 +376,7 @@ class MiliDatabase:
 
   def element_sets(self) -> dict:
     return {k:v for k,v in self.__int_points.items() if k.startswith("es_")}
-  
+
   def integration_points(self) ->dict:
     """Get the available integration points for each material."""
     elem_sets = self.element_sets()
@@ -675,10 +675,10 @@ class MiliDatabase:
     if ips is None:
       ips = []
 
-    if type(ips) is not list:
+    if not isinstance(ips, (list,np.ndarray)):
       raise TypeError( 'comp must be an integer or list of integers' )
     # Ensure not duplicate integration points
-    ips = list(set(ips))
+    ips = np.unique( np.array( ips, dtype=np.int32 ))
 
     if write_data is not None:
       for queried_name in svar_names:

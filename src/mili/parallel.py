@@ -1,17 +1,18 @@
 """
 SPDX-License-Identifier: (MIT)
 """
-
 import multiprocessing
 import dill
 import pathos.multiprocessing as mp
 from functools import partial
-from multiprocessing import Process, Manager
+from multiprocessing import Process, shared_memory
 import numpy as np
 import atexit
 import psutil
+import uuid
 from enum import Enum
 from typing import *
+from functools import reduce
 
 # TODO: probably just create a wrapper/dispatch superclass, and implement loop/pool/client-server versions instead of loop/pool in one and client/server in another
 
@@ -166,8 +167,61 @@ class PoolWrapper(Wrapper):
         res = pool.map(lambda f: f(), to_invoke) # can't partial the pargs or the first will bind to self
     return res
 
+class SharedMemKey(dict):
+  """This is just here so we can compare using ininstance. Not sure if there is a better way to do this."""
+  pass
 
-# check asyncio module
+class Shmallocate:
+  def __init__( self ):
+    self.__shmem = {}
+    self.__metadata = {}
+    self.__all_shmem = {}
+
+  def active_keys( self ):
+    return list( self.__shmem.keys() )
+
+  def metadata( self, ukey ):
+    return self.__metadata.get(ukey,{})
+
+  def alloc( self, name : str, create : bool, **kwargs ):
+    ukey = name
+    if create:
+      alloc_uuid = uuid.uuid4()
+      # if alloc_uuid.is_safe != uuid.SafeUUID.safe:
+        # raise SystemError("Cannot generate a multiprocessing-safe UUID for shared memory usage! Please revert to a different parallel operation mode.")
+      ukey =  f"{name}-{alloc_uuid.hex}"
+    shmem = shared_memory.SharedMemory( name = ukey, create = create, **kwargs )
+    self.__shmem[ ukey ] = shmem
+    self.__all_shmem[ ukey ] = shmem
+    self.__metadata[ ukey ] = { }
+    return shmem, ukey
+
+  def ndarray( self, name : str, create : bool, shape : Any, dtype : np.dtype, **kwargs ):
+    if 'buffer' in kwargs.keys():
+      raise ValueError("Do not attempt to specify a buffer for shared-memory ndarray creation.")
+    shmem, ukey = self.alloc( name = name, create = create, size = reduce( lambda x, y : x * y, shape ) * np.dtype(dtype).itemsize )
+    self.__metadata[ ukey ][ 'shape' ] = shape
+    self.__metadata[ ukey ][ 'dtype' ] = dtype
+    return np.ndarray( shape = shape, dtype = dtype, buffer = shmem.buf, **kwargs ), ukey
+
+  def close( self ):
+    for shmem in self.__shmem.values():
+      shmem.close()
+    self.__metadata = {}
+    self.__shmem = {}
+
+  # this removes responsiblity for managing the allocated shared memory
+  #  from this shmallocate object and places the responsibility on the user
+  def relinquish( self, ukey ):
+    shmem = self.__all_shmem.pop( ukey, None )
+    return shmem
+
+  def unlink( self ):
+    for shmem in self.__all_shmem.values():
+      shmem.close()
+      shmem.unlink()
+    self.__all_shmem = {}
+
 
 class ServerWrapper(Wrapper):
   """Multiprocessing client/server wrapper for reading Mili databases in parallel.
@@ -177,8 +231,7 @@ class ServerWrapper(Wrapper):
   """
   class ClientWrapper(Process):
     def __init__( self,
-                  conn, 
-                  shared_dict,
+                  conn,
                   cls_obj: Type,
                   proc_pargs: List[List[Any]] = [],
                   proc_kwargs: List[Mapping[Any,Any]] = [] ):
@@ -194,10 +247,21 @@ class ServerWrapper(Wrapper):
         raise ValueError(f'Must supply the same number of pargs ({num_pargs}) and kwargs ({num_kwargs}) to instantiate object list.')
 
       self.__conn = conn
-      self.__shared_dict = shared_dict
       self.__cls_obj = cls_obj
       self.__proc_pargs = proc_pargs
       self.__proc_kwargs = proc_kwargs
+      self.__shmalloc = Shmallocate()
+
+    def __from_shared_mem(self, item):
+      if isinstance(item, SharedMemKey):
+        shared_mem, _  = self.__shmalloc.ndarray( **item, create=False )
+        return shared_mem
+      elif isinstance(item, list):
+        return [self.__from_shared_mem(i) for i in item]
+      elif isinstance(item, dict):
+        return { k:self.__from_shared_mem(v) for k,v in item.items() }
+      else:
+        return item
 
     def run( self ):
       self.__wrapped = [ self.__cls_obj(*pargs, **kwargs) for pargs, kwargs in zip(self.__proc_pargs, self.__proc_kwargs) ]
@@ -209,13 +273,12 @@ class ServerWrapper(Wrapper):
 
       while True:
         if self.__conn.poll():
-          status = dill.loads( self.__conn.recv() )
-          if status == '__exit':
+          cmd, pargs, kwargs = dill.loads( self.__conn.recv() )
+          if cmd == '__exit':
             break
           else:
-            cmd = self.__shared_dict["cmd"]
-            pargs = self.__shared_dict["pargs"]
-            kwargs = self.__shared_dict["kwargs"]
+            pargs = self.__from_shared_mem( pargs )
+            kwargs = self.__from_shared_mem( kwargs )
             try:
               if callable(getattr(obj_type, cmd)):
                 result = [ getattr( self.__cls_obj, cmd )( wrapped, *pargs, **kwargs) for wrapped in self.__wrapped ]
@@ -224,8 +287,29 @@ class ServerWrapper(Wrapper):
             except:
               result = []
             self.__conn.send_bytes( dill.dumps(result) )
+            # Call close() since we don't need shared_mem pargs/kwargs anymore on this subprocess
+            self.__shmalloc.close()
+
       return
-  
+
+  def __to_shared_mem(self, item):
+    if isinstance(item, np.ndarray):
+      if item.size == 0:
+        return item
+      array, key = self.__shmalloc.ndarray( name = "shm", create=True, shape=item.shape, dtype=item.dtype )
+      array[:] = item[:]
+      return SharedMemKey({'name': key, 'shape': item.shape, 'dtype': item.dtype})
+    elif isinstance(item, list):
+      # Try to convert lists to numpy arrays so we can use shared memory
+      if len(item) > 0 and isinstance(item[0], (int,np.integer,float,np.floating)):
+        return self.__to_shared_mem( np.array(item) )
+      else:
+        return [ self.__to_shared_mem(i) for i in item]
+    elif isinstance(item, dict):
+      return { k:self.__to_shared_mem(v) for k,v in item.items() }
+    else:
+      return item
+
   def __divide_into_sequential_groups( self, values, n_groups ):
     if n_groups > len(values):
       n_groups = len(values)
@@ -233,7 +317,7 @@ class ServerWrapper(Wrapper):
     for i in range( n_groups ):
       si = (d+1)*(i if i < r else r) + d*(0 if i < r else i - r)
       yield values[si:si+(d+1 if i < r else d)]
-  
+
   def __init__( self,
                cls_obj : Type,
                proc_pargs : List[List[Any]] = [],
@@ -262,9 +346,17 @@ class ServerWrapper(Wrapper):
     # Get the number of processors that are available
     n_cores = int( psutil.cpu_count(logical=False) )
 
-    # Create shared dictionary for passing commands/arguments to subprocesses
-    self.__manager = Manager()
-    self.__shared_dict = self.__manager.dict()
+    self.__shmalloc = Shmallocate()
+
+    # WARNING: Do not remove this.
+    # The multiprocessing resource_tracker is instantiated the first time a SharedMemory object
+    # is created. We need to create some memory here and then delete it so that the resource_tracker
+    # is created now and gets inherited by all the subprocesses when we fork().
+    # This prevents erroneous warnings that shared memory is being leaked because now all processes are
+    # using the same resource tracker.
+    shmem = shared_memory.SharedMemory( create = True, size = 4 )
+    shmem.close()
+    shmem.unlink()
 
     # Break out into groups for each processor available
     proc_pargs = self.__divide_into_sequential_groups( proc_pargs, n_cores )
@@ -275,7 +367,7 @@ class ServerWrapper(Wrapper):
     self.__conns = []
     for pargs, kwargs in zip( proc_pargs, proc_kwargs ):
       c0, c1 = multiprocessing.Pipe()
-      self.__pool.append( ServerWrapper.ClientWrapper( c1, self.__shared_dict, cls_obj, pargs, kwargs ) )
+      self.__pool.append( ServerWrapper.ClientWrapper( c1, cls_obj, pargs, kwargs ) )
       self.__conns.append( c0 )
 
     atexit.register(self.__cleanup_processes)
@@ -290,19 +382,19 @@ class ServerWrapper(Wrapper):
         prop_objs = getattr(self, func)([],{})
         prop_objs_type = type(prop_objs[0])
         setattr( self, func, LoopWrapper(prop_objs_type, objects=prop_objs))
-  
+
   def close(self):
     """Close the database and end all subprocesses."""
     atexit.unregister(self.__cleanup_processes)
     self.__cleanup_processes()
-    
+
   # Need this so processes don't hang and close properly
   def __cleanup_processes(self):
-    if hasattr( self, '_ServerWrapper__conns' ):
+    if hasattr( self, f'_{__class__.__name__}__conns' ):
       for conn in self.__conns:
-        conn.send( dill.dumps( '__exit' ) )
+        conn.send( dill.dumps( ('__exit', [], {} ) ) )
     self.__conns = []
-    if hasattr( self, '_ServerWrapper__pool'):
+    if hasattr( self, f'_{__class__.__name__}__pool'):
       for proc in self.__pool:
         proc.join( )
     self.__pool = []
@@ -316,33 +408,32 @@ class ServerWrapper(Wrapper):
   def __worker_call(self,attr,*pargs,**kwargs):
     results = [None] * len(self.__conns)
 
-    # Set command and arguments in shared dictionary.
-    self.__shared_dict["cmd"] = attr
-    self.__shared_dict["pargs"] = pargs
-    self.__shared_dict["kwargs"] = kwargs
+    pargs = self.__to_shared_mem( pargs )
+    kwargs = self.__to_shared_mem( kwargs )
+    data = (attr, pargs, kwargs)
 
-    # Tell subprocesses there is a new command to be processed.
+    # Send command information to subprocesses
     for conn in self.__conns:
-      conn.send( dill.dumps( "__cmd" ) )
+      conn.send( dill.dumps( data ) )
 
     for idx, conn in enumerate(self.__conns):
       results[idx] = dill.loads( conn.recv_bytes() )
 
-    if self.supports_returncode:
-      return_codes = []
-      self.__shared_dict["cmd"] = "returncode"
-      self.__shared_dict["pargs"] = []
-      self.__shared_dict["kwargs"] = {}
-      for conn in self.__conns:
-        conn.send( dill.dumps( "__cmd" ) )
+    self.__shmalloc.unlink()
 
+    if self.supports_returncode:
+      data = ("returncode", [], {})
+      for conn in self.__conns:
+        conn.send( dill.dumps( data ) )
+
+      return_codes = []
       for idx, conn in enumerate(self.__conns):
         return_codes.append( dill.loads( conn.recv_bytes() ) )
       return_codes = np.array(self.__flatten(return_codes))
       parse_return_codes(return_codes)
 
     return self.__flatten(results)
-  
+
 def get_wrapper( suppress_parallel = False, experimental = False ):
   Wrapper = None
   if suppress_parallel:

@@ -40,7 +40,7 @@ class DerivedExpressions:
 
   Args:
       db (MiliDatabase): The mili database object
-  
+
   """
   def __init__(self, db: MiliDatabase):
     self.db = db
@@ -219,7 +219,7 @@ class DerivedExpressions:
         "primals": ['sx', 'sy', 'sz'],
         "primals_class": [None, None, None],
         "supports_batching": False,
-        "compute_function": self.__compute_pressure 
+        "compute_function": self.__compute_pressure
       },
       "prin_dev_stress1": {
         "primals": ["sx","sy","sz","sxy","syz","szx"],
@@ -273,7 +273,7 @@ class DerivedExpressions:
           Only that mili-python can caclulate them if all required inputs exist.
     """
     return list(self.__derived_expressions.keys())
-  
+
   def derived_variables_of_class(self, class_name: str) -> List[str]:
     """Return list of derived variables that can be calculated for a given class."""
     derived_list = []
@@ -292,7 +292,7 @@ class DerivedExpressions:
         if len(primals_found) == len(specs['primals']) and all(primals_found):
           derived_list.append(var_name)
     return derived_list
-  
+
   def classes_of_derived_variable(self, var_name: str) -> List[str]:
     """Return list of element classes for which the specified derived variable can be calculated."""
     if var_name not in self.__derived_expressions:
@@ -312,7 +312,7 @@ class DerivedExpressions:
       raise NotImplementedError("Currently not supported.")
 
     return classes_of_derived
-  
+
   def find_batchable_queries(self, result_names: List[str]):
     """Determine if any derived queries can be batched based on the result names."""
     groups = []
@@ -329,7 +329,7 @@ class DerivedExpressions:
         for g in group:
           final_groups.append([g[0]])
     return final_groups
-    
+
   def __init_derived_query_parameters(self,
                               result_names : List[str],
                               class_name : str,
@@ -384,15 +384,17 @@ class DerivedExpressions:
 
     if labels is None:
       labels = self.db.labels().get( class_name, np.empty([0],np.int32) )
-    
+
     if type(ips) is int:
       ips = [ips]
     if ips is None:
       ips = []
 
-    if type(ips) is not list:
+    if not isinstance(ips, (list,np.ndarray)):
       raise TypeError( 'comp must be an integer or list of integers' )
-    
+    # Ensure not duplicate integration points
+    ips = np.unique( np.array( ips, dtype=np.int32 ))
+
     return result_names, class_name, material, labels, states, ips
 
   def __parse_derived_result_spec( self, result_names: List[str], class_name: str, kwargs: dict ):
@@ -418,7 +420,7 @@ class DerivedExpressions:
       raise ValueError((f"The required primals do not all exist for the required_classes\n"
                         f"required_primals = {required_primals}\n"
                         f"required_classes = {primal_classes}"))
-    
+
     # Handle keyword arguments
     # Use function reflection to get list of arguments for the derived compute function
     function_signature = inspect.signature(compute_function)
@@ -439,9 +441,9 @@ class DerivedExpressions:
           if function_signature.parameters[keyword].default == inspect.Parameter.empty:
             raise ValueError((f"For the derived result '{result_name}' you must "
                               f"provide the key word argument '{keyword}'"))
-    
+
     return required_primals, primal_classes, kwargs, supports_batching, compute_function
-  
+
   def __generate_elem_node_map(self, elem_node_association):
     """Generate masks for each element that maps to nodal data.
 
@@ -507,7 +509,7 @@ class DerivedExpressions:
       primal_data.update( self.db.query(primal_names, primal_class_name, None, labels_to_query, states, ips) )
 
     return primal_data, query_args
-    
+
   def query(self,
             result_names: List[str],
             class_name: str,
@@ -517,7 +519,7 @@ class DerivedExpressions:
             ips : Optional[Union[List[int],int]] = None,
             **kwargs):
     """General derived result function.
-    
+
     : param result_names : The list of derived results to compute
     : param class_sname : mesh class name being queried
     : param material : optional sname or material number to select labels from
@@ -544,9 +546,9 @@ class DerivedExpressions:
         derived_result = compute_function( group, primal_data, query_args, **kwargs )
       else:
         derived_result = compute_function( group[0], primal_data, query_args, **kwargs )
-    
+
     return derived_result
-  
+
   def __initialize_result_dictionary( self, result_names: List[str], primal_data: dict ) -> dict:
     """Initialize the empty dictionary structure to store the derived results in."""
     primal = list(primal_data.keys())[0]
@@ -558,7 +560,7 @@ class DerivedExpressions:
       derived_result[result_name]['data'] = np.empty_like( primal_data[primal]['data'])
       derived_result[result_name]['layout'] = primal_data[primal]['layout']
     return derived_result
-  
+
   def __get_nodal_reference_positions( self, components: Union[List[str],str], reference_state: int, labels ):
     """Load the nodal reference positions for the specified state and nodes."""
     if isinstance(components, str):
@@ -610,7 +612,7 @@ class DerivedExpressions:
     derived_result[result_name]['data'] = disp
 
     return derived_result
-  
+
   def __compute_node_displacement_magnitude(self,
                                   result_name: str,
                                   primal_data: dict,
@@ -628,7 +630,7 @@ class DerivedExpressions:
     dx = primal_data['ux']['data'] - reference_data[:,:1]
     dy = primal_data['uy']['data'] - reference_data[:,1:2]
     dz = primal_data['uz']['data'] - reference_data[:,2:]
-    
+
     derived_result[result_name]['data'] = np.sqrt(dx**2 + dy**2 + dz**2)
 
     return derived_result
@@ -688,7 +690,7 @@ class DerivedExpressions:
     derived_result[result_name]['data'][~mask] = 0  # velocity at 1st state set to zero
 
     return derived_result
-  
+
   def __compute_node_acceleration(self,
                                   result_name: str,
                                   primal_data: dict,
@@ -710,10 +712,10 @@ class DerivedExpressions:
     mask_cent = (states != 1) & (states != max_st)  # mask for central diff. calculations
     mask_fwd = (states == 1)  # mask for forward diff. calculations
     mask_back = (states == max_st)  # mask for backward diff. calculations
-    
+
     states_prev = states[mask_cent] - 1  # list of previous states
     states_next = states[mask_cent] + 1  # list of next states
-    
+
     # Query data for the previous states (center diff. only)
     u_p_cent = self.db.query( required_primal, 'node', None, labels, states_prev)
     u_p_cent = u_p_cent[required_primal]['data']
@@ -731,7 +733,7 @@ class DerivedExpressions:
     if any(mask_cent==True):
       delta_t = 0.5 * (times[states_next-1] - times[states_prev-1])  # Calculate average dt
       one_over_tsqr = 1 / (delta_t**2)
-      
+
       accel = (u_n_cent - 2*u_c_cent + u_p_cent) * one_over_tsqr
       derived_result[result_name]['data'][mask_cent] = accel
 
@@ -747,7 +749,7 @@ class DerivedExpressions:
       delta_t = 0.5 * (times[-1] - times[-3])  # average time step
       one_over_tsqr = 1 / (delta_t**2)
       accel = (u_c - 2*u_p + u_pp) * one_over_tsqr
-      
+
       derived_result[result_name]['data'][mask_back] = accel
 
     # Use forward differnce if the first state is requested
@@ -762,11 +764,11 @@ class DerivedExpressions:
       delta_t = 0.5 * (times[2] - times[0])  # average time step
       one_over_tsqr = 1 / (delta_t**2)
       accel = (u_nn - 2*u_n + u_c) * one_over_tsqr
-      
+
       derived_result[result_name]['data'][mask_fwd] = accel
 
     return derived_result
-  
+
   def __compute_vol_strain(self,
                          result_name: str,
                          primal_data: dict,
@@ -780,7 +782,7 @@ class DerivedExpressions:
     ey: np.ndarray = primal_data['ey']['data']
     ez: np.ndarray = primal_data['ez']['data']
     derived_result[result_name]['data'] = ex + ey + ez
-            
+
     return derived_result
 
   def __compute_principal_strain(self,
@@ -804,7 +806,7 @@ class DerivedExpressions:
     y_col = np.stack( [exy, ey, eyz])  # 3 x num_states x num_labels x 1 array
     z_col = np.stack( [ezx, eyz, ez])  # 3 x num_states x num_labels x 1 array
     strain = np.stack( [x_col, y_col, z_col])  # full 5-d Strain array
-    
+
     # Strain is 3 x 3 x states x elems x ipts,
     # Shift to be states x elems x ipts x 3 x 3 so that first three indices match result_matrix.
     strain = np.moveaxis(strain, [0,1,2,3,4], [3,4,0,1,2])
@@ -824,7 +826,7 @@ class DerivedExpressions:
       else:
         raise ValueError
       derived_result[result_name]['data'] = result_matrix
-            
+
     return derived_result
 
   def __compute_principal_strain_alt(self,
@@ -847,7 +849,7 @@ class DerivedExpressions:
     ezx: np.ndarray = primal_data['ezx']['data']
 
     e_hyd = (1/3) * (ex + ey + ez)  # hydrostatic strain
-    
+
     # Create 6 x num_states x num_labels x 1 array
     dev_strain = np.stack( [ex-e_hyd, ey-e_hyd, ez-e_hyd, exy, eyz, ezx] )
     # Calc J2
@@ -857,7 +859,7 @@ class DerivedExpressions:
             + dev_strain[3,:,:,:]**2 \
             + dev_strain[4,:,:,:]**2 \
             + dev_strain[5,:,:,:]**2
-    
+
     # Calc J3
     J3 = -dev_strain[0,:,:,:] * dev_strain[1,:,:,:] * dev_strain[2,:,:,:] \
         - 2.0 * dev_strain[3,:,:,:] * dev_strain[4,:,:,:] * dev_strain[5,:,:,:] \
@@ -869,24 +871,24 @@ class DerivedExpressions:
     nz_mask = J2 > 0.0  # mask for non-zero J2 values (J2 is never negative)
     limit_check = np.zeros_like(J2)  # default value is zero (for J2<=0)
     limit_check[nz_mask] = J2[nz_mask]
-    
+
     # Break out elements that pass the limit check (non-zero J2)
     limit_mask = limit_check >= 1e-12  # elements that pass the limit check
     J2_slice = J2[limit_mask]
     J3_slice = J3[limit_mask]
 
     alpha: np.ndarray = -0.5 * np.sqrt(27/J2_slice) * J3_slice/J2_slice
-    
+
     # Limit alpha to the range -1 to 1
     alpha[alpha<0] = np.maximum(alpha[alpha<0], -1.0)
     alpha[alpha>0] = np.minimum(alpha[alpha>0], 1.0)
-        
+
     # Calculate the load angle (in rad)
     angle: np.ndarray = np.arccos(alpha) * (1/3)
-    
+
     # Calculate an intermediate value
     value: np.ndarray = 2 * np.sqrt(J2_slice * (1/3))
-    
+
     # Modify the load angle for 2nd and 3rd principal stresses
     if result_name=='prin_strain2_alt':
         angle = angle - 2*np.pi * (1/3)
@@ -896,9 +898,9 @@ class DerivedExpressions:
     # Calculate the requested principal stress (zero if limit_check failed)
     princ_strain: np.ndarray = np.zeros_like(J2)
     princ_strain[limit_mask] = value * np.cos(angle)
-    
+
     princ_strain[limit_mask] = princ_strain[limit_mask] + e_hyd[limit_mask]  # convert to principal strain
-    
+
     derived_result[result_name]['data'] = princ_strain
 
     return derived_result
@@ -925,7 +927,7 @@ class DerivedExpressions:
     y_col = np.stack( [exy, ey-e_hyd, eyz])  # 3 x num_states x num_labels x num_ipt array
     z_col = np.stack( [ezx, eyz, ez-e_hyd])  # 3 x num_states x num_labels x num_ipt array
     dev_strain = np.stack( [x_col, y_col, z_col])  # full 5-d strain array
-    
+
     # Strain is 3 x 3 x states x elems x ipts,
     # Shift to be states x elems x ipts x 3 x 3 so that first three indices match result_matrix.
     dev_strain = np.moveaxis(dev_strain, [0,1,2,3,4], [3,4,0,1,2])
@@ -945,7 +947,7 @@ class DerivedExpressions:
       else:
         raise ValueError
       derived_result[result_name]['data'] = result_matrix
-            
+
     return derived_result
 
   def __compute_dev_principal_strain_alt(self,
@@ -969,10 +971,10 @@ class DerivedExpressions:
     ezx: np.ndarray = primal_data['ezx']['data']
 
     e_hyd = (1/3) * (ex + ey + ez)  # hydrostatic strain
-    
+
     # Create 6 x num_states x num_labels x 1 array
     dev_strain = np.stack( [ex-e_hyd, ey-e_hyd, ez-e_hyd, exy, eyz, ezx] )
-    
+
     # Calc J2
     J2 = -(dev_strain[0,:,:,:]*dev_strain[1,:,:,:] \
           + dev_strain[1,:,:,:]*dev_strain[2,:,:,:] \
@@ -980,7 +982,7 @@ class DerivedExpressions:
             + dev_strain[3,:,:,:]**2 \
             + dev_strain[4,:,:,:]**2 \
             + dev_strain[5,:,:,:]**2
-    
+
     # Calc J3
     J3 = -dev_strain[0,:,:,:] * dev_strain[1,:,:,:] * dev_strain[2,:,:,:] \
         - 2.0 * dev_strain[3,:,:,:] * dev_strain[4,:,:,:] * dev_strain[5,:,:,:] \
@@ -992,39 +994,39 @@ class DerivedExpressions:
     nz_mask = J2 > 0.0  # mask for non-zero J2 values (J2 is never negative)
     limit_check = np.zeros_like(J2)  # default value is zero (for J2<=0)
     limit_check[nz_mask] = J2[nz_mask]
-    
+
     # Break out elements that pass the limit check (non-zero J2)
     limit_mask = limit_check >= 1e-12  # elements that pass the limit check
     J2_slice = J2[limit_mask]
     J3_slice = J3[limit_mask]
 
     alpha: np.ndarray = -0.5 * np.sqrt(27/J2_slice) * J3_slice/J2_slice
-    
+
     # Limit alpha to the range -1 to 1
     alpha[alpha<0] = np.maximum(alpha[alpha<0], -1.0)
     alpha[alpha>0] = np.minimum(alpha[alpha>0], 1.0)
-        
+
     # Calculate the load angle (in rad)
     angle: np.ndarray = np.arccos(alpha) * (1/3)
-    
+
     # Calculate an intermediate value
     value: np.ndarray = 2 * np.sqrt(J2_slice * (1/3))
-    
+
     # Modify the load angle for 2nd and 3rd principal stresses
     if result_name=='prin_strain2_alt' or result_name=='prin_dev_strain2_alt':
         angle = angle - 2*np.pi * (1/3)
     elif result_name=='prin_strain3_alt' or result_name=='prin_dev_strain3_alt':
         angle = angle + 2*np.pi * (1/3)
-        
+
     # Calculate the requested principal stress (zero if limit_check failed)
     princ_strain: np.ndarray = np.zeros_like(J2)
     princ_strain[limit_mask] = value * np.cos(angle)
-    
+
     if 'dev' not in result_name:
       princ_strain[limit_mask] = princ_strain[limit_mask] + e_hyd  # convert to principal strain
-    
+
     derived_result[result_name]['data'] = princ_strain
-            
+
     return derived_result
 
   def __compute_principal_stress(self,
@@ -1054,7 +1056,7 @@ class DerivedExpressions:
 
     # Compute eigenvalues
     eigen_values = np.linalg.eigvalsh(stress)
-    
+
     # Extract component based on result(s)
     for result_name in result_names:
       result_matrix = np.empty_like(sx)
@@ -1066,9 +1068,9 @@ class DerivedExpressions:
         result_matrix = eigen_values[:,:,:,1]  # get the 2nd value
       else:
         raise ValueError
-        
+
       derived_result[result_name]['data'] = result_matrix
-            
+
     return derived_result
 
   def __compute_effective_stress(self,
@@ -1090,13 +1092,13 @@ class DerivedExpressions:
     dev_stress_x = sx+pressure
     dev_stress_y = sy+pressure
     dev_stress_z = sz+pressure
-    
+
     # Calculate the 2nd deviatoric stress invariant, J2
     J2 = 0.5 * (dev_stress_x**2 + dev_stress_y**2 + dev_stress_z**2) \
               + sxy*sxy + syz*syz + szx*szx
 
     derived_result[result_name]['data'] = np.sqrt(3*J2)
-            
+
     return derived_result
 
   def __compute_pressure(self,
@@ -1131,7 +1133,7 @@ class DerivedExpressions:
     szx = primal_data['szx']['data']
 
     pressure = -(1/3) * (sx + sy + sz)
-    
+
     # Create 3 x 3 x num_states x num_labels x 1 array
     x_col = np.stack( [sx+pressure, sxy, szx])  # 3 x num_states x num_labels x 1 array
     y_col = np.stack( [sxy, sy+pressure, syz])  # 3 x num_states x num_labels x 1 array
@@ -1157,7 +1159,7 @@ class DerivedExpressions:
       else:
         raise ValueError
       derived_result[result_name]['data'] = result_matrix
-            
+
     return derived_result
 
   def __compute_max_shear_stress(self,
@@ -1176,7 +1178,7 @@ class DerivedExpressions:
     szx = primal_data['szx']['data']
 
     pressure = -(1/3) * (sx + sy + sz)
-    
+
     # Create 3 x 3 x num_states x num_labels x 1 array
     x_col = np.stack( [sx+pressure, sxy, szx])  # 3 x num_states x num_labels x 1 array
     y_col = np.stack( [sxy, sy+pressure, syz])  # 3 x num_states x num_labels x 1 array
@@ -1190,7 +1192,7 @@ class DerivedExpressions:
 
     eigen_values = np.linalg.eigvalsh(stress)
     result_matrix = 0.5 * (np.max(eigen_values, axis=3) - np.min(eigen_values, axis=3))
-    
+
     derived_result[result_name]['data'] = result_matrix
 
     return derived_result
@@ -1214,11 +1216,11 @@ class DerivedExpressions:
     dev_stress_x = sx+pressure
     dev_stress_y = sy+pressure
     dev_stress_z = sz+pressure
-    
+
     # Calculate the 2nd deviatoric stress invariant, J2
     J2 = 0.5 * (dev_stress_x**2 + dev_stress_y**2 + dev_stress_z**2) \
               + sxy*sxy + syz*syz + szx*szx
-              
+
     # Calculate the effective stress
     seff = np.sqrt(3*J2)
 
@@ -1239,13 +1241,13 @@ class DerivedExpressions:
     labels = query_args['labels']
     ips = query_args['ips']
     primal_classes = query_args['class_sname'][0]
-    
+
     # Create mask that excludes first and last states (only states compatable with center difference)
     max_st = len(self.db.state_maps())  # last state in the database
     mask_cent = (states != 1) & (states != max_st)
     mask_first = states == 1  # mask that includes only first state (if requested)
     mask_last = states == max_st  # mask that includes only last state (if requested)
-    
+
     # Create lists of states n-1 and n+1
     states_prev = states[mask_cent] - 1
     states_next = states[mask_cent] + 1
@@ -1253,7 +1255,7 @@ class DerivedExpressions:
     # Query data from states before and after desired states
     eps_prev_q = self.db.query('eps', primal_classes, None, labels, states_prev, ips)
     eps_next_q = self.db.query('eps', primal_classes, None, labels, states_next, ips)
-    
+
     state_times = self.db.times()
 
     eps_curr = primal_data['eps']['data'][mask_cent]  # requested state eps
@@ -1262,20 +1264,20 @@ class DerivedExpressions:
     time_prev = state_times[states_prev-1]  # offset because state 1 = index 0 for these arrays
     time_curr = state_times[states[mask_cent]-1]
     time_next = state_times[states_next-1]
-    
+
     dt1_inv = 1.0 / (time_curr - time_prev)
     dt2_inv = 1.0 / (time_next - time_curr)
-    
+
     # Add dummy dimensions so these 1D arrays can be multiplied by the 3D arrays.
     dt1_inv = np.expand_dims(dt1_inv, (1,2))
     dt2_inv = np.expand_dims(dt2_inv, (1,2))
-    
+
     e0 = (eps_curr - eps_prev) * dt1_inv  # backward difference calculation
     e1 = (e0 + (eps_next - eps_curr) * dt2_inv) * 0.5  # average with forward diff. calc.
 
     derived_result[result_name]['data'][mask_cent] = e1
     derived_result[result_name]['data'][mask_first] = 0  # set first state to zero
-    
+
     # Calculate last state separately using backward difference.  This probably isn't very common.
     if any(mask_last==True):
       states_last_prev = states[mask_last]-1  # 2nd to last state (includes duplicates)
@@ -1284,7 +1286,7 @@ class DerivedExpressions:
       eps_prev = eps_last_prev_q['eps']['data']
       time_prev = self.db.times()[states_last_prev-1]  # time arrays are all 1D
       time_curr = self.db.times()[states[mask_last]-1]
-      
+
       dt1_inv = 1.0 / (time_curr - time_prev)
       dt1_inv = np.expand_dims(dt1_inv, (1,2))  # add dummy dimensions to convert to 3D
       e0 = (eps_curr - eps_prev) * dt1_inv  # backward difference calculation
