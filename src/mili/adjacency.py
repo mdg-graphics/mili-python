@@ -30,7 +30,6 @@ Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
 from __future__ import annotations
 from typing import *
 from numpy.lib.function_base import iterable
-from mili import reader
 from mili.parallel import LoopWrapper,PoolWrapper,ServerWrapper
 import numpy as np
 

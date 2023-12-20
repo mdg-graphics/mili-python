@@ -22,7 +22,7 @@ from mili.datatypes import *
 from mili.afileIO import *
 from mili.parallel import *
 from mili.derived import *
-from mili.adjacency import *
+from mili.adjacency import GeometricMeshInfo
 
 if sys.version_info < (3, 7):
   raise ImportError(f"This module requires python version >= 3.7!")
