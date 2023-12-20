@@ -8,6 +8,7 @@ from __future__ import annotations
 import itertools
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 import os
 import re
 import sys
@@ -23,6 +24,7 @@ from mili.afileIO import *
 from mili.parallel import *
 from mili.derived import *
 from mili.adjacency import GeometricMeshInfo
+from mili.utils import *
 
 if sys.version_info < (3, 7):
   raise ImportError(f"This module requires python version >= 3.7!")
@@ -31,17 +33,6 @@ if tuple( int(vnum) for vnum in np.__version__.split('.') ) < (1,20,0):
 
 def np_empty(dtype):
   return np.empty([0],dtype=dtype)
-
-def dictionary_merge_concat(dictionaries):
-  """Merge dictionaries. When same key appears in multiple dictionaries, concatenate results."""
-  combined_dictionary = {}
-  for dictionary in dictionaries:
-    for key, value in dictionary.items():
-      if key not in combined_dictionary:
-        combined_dictionary[key] = value
-      else:
-        combined_dictionary[key] = np.append(combined_dictionary[key], value)
-  return combined_dictionary
 
 # Set up Logging
 mili_python_logger = logging.getLogger(__name__)
@@ -697,6 +688,7 @@ class MiliDatabase:
              states : Optional[Union[List[int],int]] = None,
              ips : Optional[Union[List[int],int]] = None,
              write_data : Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]] = None,
+             as_dataframe: bool = False,
              **kwargs ):
     '''
     Query the database for svars, returning data for the specified parameters, optionally writing data to the database.
@@ -711,6 +703,7 @@ class MiliDatabase:
     : param ips : optional for svars with array or vec_array aggregation query just these components, default is all available
     : param write_data : optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
                    then modify the values desired, then query again with the modified result in this param
+    : param as_dataframe : optional. If True the result is returned as a Pandas DataFrame
     '''
     # normalize arguments to expected types / default values
     svar_names, class_sname, material, labels, states, ips, write_data = self.__init_query_parameters( svar_names, class_sname, material, labels, states, ips, write_data )
@@ -741,7 +734,10 @@ class MiliDatabase:
     # If no labels, then skip. We do this here to ensure non existant state variables are reported.
     if ordinals.size == 0:
       self.__logger.warning(f"No labels found for the class {class_sname}", extra=self.__log_msg_extra)
-      return res
+      if as_dataframe:
+        return result_dictionary_to_dataframe( res )
+      else:
+        return res
 
     # Handle derived queries
     derived_query_names = [spec[0] for spec in derived_specs]
@@ -751,6 +747,9 @@ class MiliDatabase:
     # Handle primal queries
     for query_spec in primal_specs:
       queried_name, queried_svar_name, comp_svar_names, actual_result_source = query_spec
+
+      if as_dataframe and self.__svars[queried_svar_name].agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:
+        self.__logger.warning("Querying Vector state variables with as_dataframe=True can be very slow.", extra=self.__log_msg_extra)
 
       res[queried_name]['layout']['states'] = states
       res[queried_name]['source'] = actual_result_source
@@ -901,7 +900,10 @@ class MiliDatabase:
 
             res[ queried_name ][ "data" ][ sidx, :, : ] = var_data
 
-    return res
+    if as_dataframe:
+      return result_dictionary_to_dataframe( res )
+    else:
+      return res
 
   def __get_state_byte_data(self, state: int, zero_out: bool, byte_data: BinaryIO):
     state_size = np.sum([srec.byte_size for srec in self.__srecs])
@@ -1045,66 +1047,6 @@ class MiliDatabase:
     trailing_digits = "" if trailing_digits_regex is None else trailing_digits_regex.group(1)
     new_base_name = new_base_name + trailing_digits
     afile_writer.write(new_afile, new_base_name)
-
-def combine( results_dict: List[Dict] ) -> dict:
-  """Given a parallel result dictionary, Merge data into a single dictionary.
-
-  NOTE: This does not take an insignificant amount of time
-  """
-  # If result_dict is already a dictionary, just return it.
-  if isinstance( results_dict, dict ):
-    return results_dict
-
-  # Otherwise combine
-  merged_results = {}
-
-  svars = list(set(np.concatenate([list(res.keys()) for res in results_dict])))
-  for svar in svars:
-    merged_results[svar] = {}
-    # Get list of processors that contain data
-    processors_with_data = [ results_dict[i] for i in np.where( [d[svar]['data'].size > 0 for d in results_dict] )[0] ]
-    if processors_with_data:
-      merged_results[svar]['layout'] = {}
-      merged_results[svar]['source'] = processors_with_data[0][svar]['source']
-      merged_results[svar]['layout']['states'] = processors_with_data[0][svar]['layout']['states']
-      merged_results[svar]['data'] = np.concatenate( [d[svar]['data'][:,:,:] for d in processors_with_data], axis=1 )
-      merged_results[svar]['layout']['labels'] = np.concatenate( [d[svar]['layout']['labels'] for d in processors_with_data] )
-
-      _, indexes, counts = np.unique(merged_results[svar]['layout']['labels'], return_counts=True, return_index=True)
-      if np.any(counts > 1):
-        merged_results[svar]['data'] = merged_results[svar]['data'][:,indexes,:]
-        merged_results[svar]['layout']['labels'] = merged_results[svar]['layout']['labels'][indexes]
-
-  return merged_results
-
-def results_by_element( result_dict: Union[Dict,List[Dict]] ) -> dict:
-  """Reorganize result data in a new dictionary with the form { svar: { element: <list_of_results> } }"""
-  if isinstance( result_dict, dict ):
-    result_dict = [result_dict]
-
-  reorganized_data = {}
-  for processor_result in result_dict:
-    for svar in processor_result:
-      if svar not in reorganized_data:
-        reorganized_data[svar] = {}
-
-      for elem_idx, element in enumerate(processor_result[svar]['layout']['labels']):
-        if element not in reorganized_data:
-          reorganized_data[svar][element] = processor_result[svar]['data'][:,elem_idx,:]
-
-  return reorganized_data
-
-def writeable_from_results_by_element( results_dict: dict, results_by_element: dict ) -> dict:
-  """Given the query result dictionary and the results_by_element dictionary generate writeable dictionary."""
-  results_dict = combine(results_dict)
-  for result in results_by_element:
-    if result in results_dict:
-      for idx, element in enumerate(list(results_by_element[result].keys())):
-          # NOTE: We are able to just use idx (0-N) because we assume results_dict and results_by_element
-          # are from the same query which means that the element order in results_dict and results_by_element
-          # will be the same.
-          results_dict[result]['data'][:,idx] = results_by_element[result][element]
-  return results_dict
 
 def open_database( base : os.PathLike, procs = [], suppress_parallel = False, experimental = False, **kwargs ):
   """

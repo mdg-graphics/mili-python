@@ -2466,127 +2466,11 @@ class ExperimentalParallelSingleStateFile(unittest.TestCase):
         answer = self.mili.query("te", "glob", states=[22])
         self.assertAlmostEqual( answer[0]["te"]["data"][0,0,0], 1629.718, delta=1e-4)
 
-
-class TestCombineFunction(unittest.TestCase):
-    file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
-
-    def setUp(self):
-        self.mili = reader.open_database( TestCombineFunction.file_name, suppress_parallel=True )
-
-    def __compare_parallel_and_combined_result( self, parallel_result, combined_result ) -> bool:
-        """Helper function to validate combine function."""
-        for processor_result in parallel_result:
-            for svar in processor_result:
-                # Check svar exists
-                self.assertTrue(svar in combined_result)
-                # Check that states are the same
-                if processor_result[svar]['layout']['states'].size != 0:
-                    np.testing.assert_equal(processor_result[svar]['layout']['states'], combined_result[svar]['layout']['states'])
-                for elem_index, element in enumerate(processor_result[svar]['layout']['labels']):
-                    # Check that element exists
-                    self.assertTrue( element in combined_result[svar]['layout']['labels'] )
-                    combined_index = np.where( element == combined_result[svar]['layout']['labels'] )[0][0]
-                    # Check that element result is the same for all states
-                    for state_index, state in enumerate(processor_result[svar]['layout']['states']):
-                        np.testing.assert_equal( processor_result[svar]['data'][state_index,elem_index,:], combined_result[svar]['data'][state_index,combined_index,:] )
-
-    def test_combine_scalar( self ):
-        """ Test combine function with scalar result"""
-        res = self.mili.query("sx", "brick", states=[44, 78])
-        combined = reader.combine( res )
-        self.__compare_parallel_and_combined_result(res, combined)
-
-    def test_compile_multiple_scalars( self ):
-        """ Test combine function with multiple scalar results"""
-        res = self.mili.query(["sx","sy"], "brick", states=[44, 78])
-        combined = reader.combine( res )
-        self.__compare_parallel_and_combined_result(res, combined)
-
-    def test_combine_vector( self ):
-        """ Test combine function with vector result"""
-        res = self.mili.query("stress", "brick", states=[44, 78])
-        combined = reader.combine( res )
-        self.__compare_parallel_and_combined_result(res, combined)
-
-    def test_combine_vector_array( self ):
-        """ Test combine function with vector array result"""
-        res = self.mili.query("stress", "shell", states=[44, 78])
-        combined = reader.combine( res )
-        self.__compare_parallel_and_combined_result(res, combined)
-
-    def test_combine_nodal_scalar( self ):
-        """ Test combine function with nodal scalar result"""
-        res = self.mili.query("ux", "node", states=[44, 78])
-        combined = reader.combine( res )
-        self.__compare_parallel_and_combined_result(res, combined)
-
-    def test_combine_nodal_vector( self ):
-        """ Test combine function with nodal vector result"""
-        res = self.mili.query("nodpos", "node", states=[44, 78])
-        combined = reader.combine( res )
-        self.__compare_parallel_and_combined_result(res, combined)
-
-class TestResultsByElementFunction(unittest.TestCase):
-    file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
-
-    def setUp(self):
-        self.mili = reader.open_database( TestCombineFunction.file_name, suppress_parallel=True )
-
-    def __compare_parallel_and_reorganized_result( self, parallel_result, reorganized_result ) -> bool:
-        """Helper function to validate results_by_element function."""
-        for processor_result in parallel_result:
-            for svar in processor_result:
-                # Check svar exists
-                self.assertTrue(svar in reorganized_result)
-
-                for elem_index, element in enumerate(processor_result[svar]['layout']['labels']):
-                    # Check that element exists
-                    self.assertTrue( element in reorganized_result[svar] )
-                    # Check that element result is the same for all states
-                    for state_index, state in enumerate(processor_result[svar]['layout']['states']):
-                        np.testing.assert_equal( processor_result[svar]['data'][state_index,elem_index,:], reorganized_result[svar][element][state_index] )
-
-    def test_result_by_element_scalar( self ):
-        """ Test result_by_element function with scalar result"""
-        res = self.mili.query("sx", "brick", states=[44, 78])
-        reorganized = reader.results_by_element(res)
-        self.__compare_parallel_and_reorganized_result(res, reorganized)
-
-    def test_result_by_element_multiple_scalars( self ):
-        """ Test result_by_element function with multiple scalar results"""
-        res = self.mili.query(["sx","sy"], "brick", states=[44, 78])
-        reorganized = reader.results_by_element(res)
-        self.__compare_parallel_and_reorganized_result(res, reorganized)
-
-    def test_result_by_element_vector( self ):
-        """ Test result_by_element function with vector result"""
-        res = self.mili.query("stress", "brick", states=[44, 78])
-        reorganized = reader.results_by_element(res)
-        self.__compare_parallel_and_reorganized_result(res, reorganized)
-
-    def test_result_by_element_vector_array( self ):
-        """ Test result_by_element function with vector array result"""
-        res = self.mili.query("stress", "shell", states=[44, 78])
-        reorganized = reader.results_by_element(res)
-        self.__compare_parallel_and_reorganized_result(res, reorganized)
-
-    def test_result_by_element_nodal_scalar( self ):
-        """ Test result_by_element function with nodal scalar result"""
-        res = self.mili.query("ux", "node", states=[44, 78])
-        reorganized = reader.results_by_element(res)
-        self.__compare_parallel_and_reorganized_result(res, reorganized)
-
-    def test_result_by_element_nodal_vector( self ):
-        """ Test result_by_element function with nodal vector result"""
-        res = self.mili.query("nodpos", "node", states=[44, 78])
-        reorganized = reader.results_by_element(res)
-        self.__compare_parallel_and_reorganized_result(res, reorganized)
-
 class TestModifyUncombinedDatabase(unittest.TestCase):
     file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
 
     def setUp(self):
-        self.mili = reader.open_database( TestCombineFunction.file_name, suppress_parallel=True )
+        self.mili = reader.open_database( TestModifyUncombinedDatabase.file_name, suppress_parallel=True )
 
     def test_modify_scalar(self):
         res = self.mili.query("sx", "brick", states=[35])
@@ -2662,7 +2546,7 @@ class TestModifyUncombinedDatabaseResultsByElement(unittest.TestCase):
     file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
 
     def setUp(self):
-        self.mili = reader.open_database( TestCombineFunction.file_name, suppress_parallel=True )
+        self.mili = reader.open_database( TestModifyUncombinedDatabaseResultsByElement.file_name, suppress_parallel=True )
 
     def test_modify_scalar(self):
         res = self.mili.query("sx", "brick", states=[44])
@@ -2748,7 +2632,7 @@ class TestReturnCodes(unittest.TestCase):
     file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
 
     def test_loopwrapper(self):
-        mili = reader.open_database( TestCombineFunction.file_name, suppress_parallel=True )
+        mili = reader.open_database( TestReturnCodes.file_name, suppress_parallel=True )
         # All procs return ReturnCode.ERROR so Exception is raised
         with self.assertRaises(ValueError):
             res = mili.query("does-not-exist", "brick")
@@ -2765,7 +2649,7 @@ class TestReturnCodes(unittest.TestCase):
         self.assertEqual(ret_codes[7][0], ReturnCode.ERROR)
 
     def test_poolwrapper(self):
-        mili = reader.open_database( TestCombineFunction.file_name, suppress_parallel=False )
+        mili = reader.open_database( TestReturnCodes.file_name, suppress_parallel=False )
         # All procs return ReturnCode.ERROR so Exception is raised
         with self.assertRaises(ValueError):
             res = mili.query("does-not-exist", "brick")
@@ -2776,7 +2660,7 @@ class TestReturnCodes(unittest.TestCase):
         # This is fine because we don't expect users to access the returncode methd.
 
     def test_serverwrapper(self):
-        mili = reader.open_database( TestCombineFunction.file_name, suppress_parallel=False, experimental=True )
+        mili = reader.open_database( TestReturnCodes.file_name, suppress_parallel=False, experimental=True )
         # All procs return ReturnCode.ERROR so Exception is raised
         with self.assertRaises(ValueError):
             res = mili.query("does-not-exist", "brick")

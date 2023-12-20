@@ -183,15 +183,16 @@ lbls = db.labels('node')
 # Querying Results
 Querying results from mili database can be done using the `query` function:
 ```python
-def query( self,
-           svar_names : Union[List[str],str],
-           class_sname : str,
-           material : Optional[Union[str,int]] = None,
-           labels : Optional[Union[List[int],int]] = None,
-           states : Optional[Union[List[int],int]] = None,
-           ips : Optional[Union[List[int],int]] = None,
-           write_data : Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]] = None,
-           **kwargs ):
+  def query( self,
+             svar_names : Union[List[str],str],
+             class_sname : str,
+             material : Optional[Union[str,int]] = None,
+             labels : Optional[Union[List[int],int]] = None,
+             states : Optional[Union[List[int],int]] = None,
+             ips : Optional[Union[List[int],int]] = None,
+             write_data : Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]] = None,
+             as_dataframe: bool = False,
+             **kwargs ):
     '''
     Query the database for svars, returning data for the specified parameters, optionally writing data to the database.
     The parameters passed to query can be identical across a parallel invocation of query, since each individual
@@ -203,8 +204,9 @@ def query( self,
     : param labels : optional labels to query data about, filtered by material if material if material is supplied, default is all
     : param states: optional state numbers from which to query data, default is all
     : param ips : optional for svars with array or vec_array aggregation query just these components, default is all available
-    : param write_data : optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format, then modify the values desired, then query again with the modified result in this param
-    '''
+    : param write_data : optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
+                   then modify the values desired, then query again with the modified result in this param
+    : param as_dataframe : optional. If True the result is returned as a Pandas DataFrame
 ```
 
 Here are a few example queries:
@@ -329,6 +331,33 @@ sy_shell_1 = element_data['sy'][1]
 #  [ STATE 3: sy_int_point1, sy_int_point2 ]
 #  ... ]
 ```
+
+### Pandas DataFrames
+
+Optionally the results of the query method can be returned as a Pandas DataFrame. If the keyword argument `as_dataframe` is set to `True` then the result dictionary will store the data for each state variable as a DataFrame.
+
+```python
+result = reader.combine( db.query( 'sx', 'brick', as_dataframe=True ) )
+
+"""
+results will have the format:
+{
+  <svar-name> : <dataframe>,
+  <svar-name> : <dataframe>,
+  ...
+}
+"""
+
+sx_df = result['sx']
+# sx_df.columns are the labels
+# sx_df.index are the state numbers
+
+sx_brick_12_state_44 = sx_df[12][44]
+```
+
+> **WARNING**: Querying vector state variables, such as `stress` or `strain` with `as_dataframe=True` can take a very long time, especially in parallel. It is not recommended that you query vector state variables as dataframes. Vector state variable data is stored in 3 dimensional array (num_states by num_labels by num_components) and Pandas DataFrames are not very efficient with 3 dimensional data. There are significant overheads associated with converting the data to a DataFrame as well as performing the data serialization that is required when using mili-python in parallel.
+
+> **NOTE**: The DataFrames can be converted back to the dictionary format if necessary (such as when overwriting data) using the `dataframe_to_result_dictionary` function. Existing result dictionaries can be converted to dataframes using the `result_dictionary_to_dataframe` function.
 
 ---
 
