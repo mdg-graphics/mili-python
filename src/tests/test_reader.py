@@ -353,6 +353,24 @@ class SerialSingleStateFile(unittest.TestCase):
         mat_nums = self.mili.material_numbers()
         self.assertEqual(set(mat_nums), set([1,2,3,4,5]))
 
+    def test_element_sets(self):
+        """
+        Test getter for element_sets
+        """
+        elem_sets = self.mili.element_sets()
+        self.assertEqual( set(elem_sets.keys()), set(["es_1", "es_3"]))
+        self.assertEqual( elem_sets['es_1'], [1,2,3,4,4] )
+        self.assertEqual( elem_sets['es_3'], [1,2,2] )
+
+    def test_integration_points(self):
+        """
+        Test integration_points method.
+        """
+        int_points = self.mili.integration_points()
+        self.assertEqual( set(int_points.keys()), set(["1", "3"]))
+        self.assertEqual( int_points['1'], [1,2,3,4] )
+        self.assertEqual( int_points['3'], [1,2] )
+
     def test_classes_of_state_variable(self):
         """
         Test the classes_of_state_variable method of Mili Class.
@@ -974,6 +992,37 @@ class ParallelSingleStateFile(unittest.TestCase):
             self.assertEqual(FIRST_STATE, times[0])
             self.assertEqual(LAST_STATE, times[-1])
 
+    def test_element_sets(self):
+        """
+        Testing the element_sets() method of the MiliDatabase class.
+        """
+        elem_sets = self.mili.element_sets()
+        self.assertEqual( len(elem_sets), 8 )
+
+        self.assertEqual( elem_sets[0], {} )
+        self.assertEqual( elem_sets[1], {} )
+        self.assertEqual( elem_sets[2], {"es_1": [1,2,3,4,4], "es_3": [1,2,2]} )
+        self.assertEqual( elem_sets[3], {"es_3": [1,2,2]} )
+        self.assertEqual( elem_sets[4], {"es_1": [1,2,3,4,4]} )
+        self.assertEqual( elem_sets[5], {"es_1": [1,2,3,4,4], "es_3": [1,2,2]} )
+        self.assertEqual( elem_sets[6], {"es_1": [1,2,3,4,4]} )
+        self.assertEqual( elem_sets[7], {"es_1": [1,2,3,4,4]} )
+
+    def test_integration_points(self):
+        """
+        Testing the integration_points() method of the MiliDatabase class.
+        """
+        int_points = self.mili.integration_points()
+        self.assertEqual( len(int_points), 8 )
+
+        self.assertEqual( int_points[0], {} )
+        self.assertEqual( int_points[1], {} )
+        self.assertEqual( int_points[2], {"1": [1,2,3,4], "3": [1,2]} )
+        self.assertEqual( int_points[3], {"3": [1,2]} )
+        self.assertEqual( int_points[4], {"1": [1,2,3,4]} )
+        self.assertEqual( int_points[5], {"1": [1,2,3,4], "3": [1,2]} )
+        self.assertEqual( int_points[6], {"1": [1,2,3,4]} )
+        self.assertEqual( int_points[7], {"1": [1,2,3,4]} )
 
     """
     Testing the getLabels() method of the Mili class
@@ -1794,6 +1843,37 @@ class ExperimentalParallelSingleStateFile(unittest.TestCase):
             self.assertEqual(FIRST_STATE, times[0])
             self.assertEqual(LAST_STATE, times[-1])
 
+    def test_element_sets(self):
+        """
+        Testing the element_sets() method of the MiliDatabase class.
+        """
+        elem_sets = self.mili.element_sets()
+        self.assertEqual( len(elem_sets), 8 )
+
+        self.assertEqual( elem_sets[0], {} )
+        self.assertEqual( elem_sets[1], {} )
+        self.assertEqual( elem_sets[2], {"es_1": [1,2,3,4,4], "es_3": [1,2,2]} )
+        self.assertEqual( elem_sets[3], {"es_3": [1,2,2]} )
+        self.assertEqual( elem_sets[4], {"es_1": [1,2,3,4,4]} )
+        self.assertEqual( elem_sets[5], {"es_1": [1,2,3,4,4], "es_3": [1,2,2]} )
+        self.assertEqual( elem_sets[6], {"es_1": [1,2,3,4,4]} )
+        self.assertEqual( elem_sets[7], {"es_1": [1,2,3,4,4]} )
+
+    def test_integration_points(self):
+        """
+        Testing the integration_points() method of the MiliDatabase class.
+        """
+        int_points = self.mili.integration_points()
+        self.assertEqual( len(int_points), 8 )
+
+        self.assertEqual( int_points[0], {} )
+        self.assertEqual( int_points[1], {} )
+        self.assertEqual( int_points[2], {"1": [1,2,3,4], "3": [1,2]} )
+        self.assertEqual( int_points[3], {"3": [1,2]} )
+        self.assertEqual( int_points[4], {"1": [1,2,3,4]} )
+        self.assertEqual( int_points[5], {"1": [1,2,3,4], "3": [1,2]} )
+        self.assertEqual( int_points[6], {"1": [1,2,3,4]} )
+        self.assertEqual( int_points[7], {"1": [1,2,3,4]} )
 
     """
     Testing the getLabels() method of the Mili class

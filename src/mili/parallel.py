@@ -233,6 +233,7 @@ class ServerWrapper(Wrapper):
     def __init__( self,
                   conn,
                   cls_obj: Type,
+                  use_shared_memory: bool,
                   proc_pargs: List[List[Any]] = [],
                   proc_kwargs: List[Mapping[Any,Any]] = [] ):
       super(Process,self).__init__()
@@ -250,10 +251,13 @@ class ServerWrapper(Wrapper):
       self.__cls_obj = cls_obj
       self.__proc_pargs = proc_pargs
       self.__proc_kwargs = proc_kwargs
+      self.__use_shared_memory = use_shared_memory
       self.__shmalloc = Shmallocate()
 
     def __from_shared_mem(self, item):
-      if isinstance(item, SharedMemKey):
+      if not self.__use_shared_memory:
+        return item
+      elif isinstance(item, SharedMemKey):
         shared_mem, _  = self.__shmalloc.ndarray( **item, create=False )
         return shared_mem
       elif isinstance(item, list):
@@ -293,7 +297,9 @@ class ServerWrapper(Wrapper):
       return
 
   def __to_shared_mem(self, item):
-    if isinstance(item, np.ndarray):
+    if not self.__use_shared_memory:
+      return item
+    elif isinstance(item, np.ndarray):
       if item.size == 0:
         return item
       array, key = self.__shmalloc.ndarray( name = "shm", create=True, shape=item.shape, dtype=item.dtype )
@@ -321,7 +327,8 @@ class ServerWrapper(Wrapper):
   def __init__( self,
                cls_obj : Type,
                proc_pargs : List[List[Any]] = [],
-               proc_kwargs : List[Mapping[Any,Any]] = [] ):
+               proc_kwargs : List[Mapping[Any,Any]] = [],
+               use_shared_memory: Optional[bool] = True ):
     # validate parameters
     num_pargs = len(proc_pargs)
     num_kwargs = len(proc_kwargs)
@@ -346,6 +353,7 @@ class ServerWrapper(Wrapper):
     # Get the number of processors that are available
     n_cores = int( psutil.cpu_count(logical=False) )
 
+    self.__use_shared_memory = use_shared_memory
     self.__shmalloc = Shmallocate()
 
     # WARNING: Do not remove this.
@@ -354,9 +362,10 @@ class ServerWrapper(Wrapper):
     # is created now and gets inherited by all the subprocesses when we fork().
     # This prevents erroneous warnings that shared memory is being leaked because now all processes are
     # using the same resource tracker.
-    shmem = shared_memory.SharedMemory( create = True, size = 4 )
-    shmem.close()
-    shmem.unlink()
+    if self.__use_shared_memory:
+      shmem = shared_memory.SharedMemory( create = True, size = 4 )
+      shmem.close()
+      shmem.unlink()
 
     # Break out into groups for each processor available
     proc_pargs = self.__divide_into_sequential_groups( proc_pargs, n_cores )
@@ -367,7 +376,7 @@ class ServerWrapper(Wrapper):
     self.__conns = []
     for pargs, kwargs in zip( proc_pargs, proc_kwargs ):
       c0, c1 = multiprocessing.Pipe()
-      self.__pool.append( ServerWrapper.ClientWrapper( c1, cls_obj, pargs, kwargs ) )
+      self.__pool.append( ServerWrapper.ClientWrapper( c1, cls_obj, self.__use_shared_memory, pargs, kwargs ) )
       self.__conns.append( c0 )
 
     atexit.register(self.__cleanup_processes)

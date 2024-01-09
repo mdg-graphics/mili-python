@@ -18,12 +18,12 @@ class TestGrizInterfaceRuns(unittest.TestCase):
 
     def test_d3samp6(self):
         file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
-        griz = grizinterface.open_griz_interface( file_name, experimental=True )
+        griz = grizinterface.open_griz_interface( file_name )
         self.assertIsInstance( griz, grizinterface.GrizInterface)
 
     def test_basic1(self):
         file_name = os.path.join(dir_path,'data','parallel','basic1','basic1.plt')
-        griz = grizinterface.open_griz_interface( file_name, experimental=True )
+        griz = grizinterface.open_griz_interface( file_name )
         self.assertIsInstance( griz, grizinterface.GrizInterface)
 
 
@@ -33,7 +33,7 @@ class TestGrizInterfaceErrors(unittest.TestCase):
         file_name = os.path.join(dir_path,'data','parallel','bad_dir','d3samp6.plt')
         f = io.StringIO()
         with contextlib.redirect_stdout(f):
-            griz = grizinterface.open_griz_interface( file_name, experimental=True )
+            griz = grizinterface.open_griz_interface( file_name )
         self.assertTrue("Mili File Error: Cannot locate mili file director" in f.getvalue())
         self.assertEqual( griz, None )
 
@@ -41,6 +41,6 @@ class TestGrizInterfaceErrors(unittest.TestCase):
         file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp4.plt')
         f = io.StringIO()
         with contextlib.redirect_stdout(f):
-            griz = grizinterface.open_griz_interface( file_name, experimental=True )
+            griz = grizinterface.open_griz_interface( file_name )
         self.assertTrue("Mili File Error: No A-files for procs '' with base name" in f.getvalue())
         self.assertEqual( griz, None )

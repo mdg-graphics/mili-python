@@ -14,20 +14,20 @@ import numpy.typing as npt
 import traceback
 
 
-def open_griz_interface( base_filename : os.PathLike, procs = [], suppress_parallel = False, experimental = False ):
+def open_griz_interface( base_filename : os.PathLike, procs = [] ):
   """Open a Mili database and create GrizInterface object.
 
   Args:
    base_file (os.PathLike): the base filename of the mili database (e.g. for 'pltA', just 'plt', for parallel
                             databases like 'dblplt00A', also exclude the rank-digits, giving 'dblplt')
    procs (Optional[List[int]]) : optionally a list of process-files to open in parallel, default is all
-   suppress_parallel (Optional[Bool]) : optionally return a serial database reader object if possible (for serial databases).
-                                        Note: if the database is parallel, suppress_parallel==True will return a reader that will
-                                        query each processes database files in series.
-   experimental (Optional[Bool]) : optional developer-only argument to try experimental parallel features
   """
   try:
-    db = open_database(base_filename, procs, suppress_parallel, experimental, log_validator=False)
+    db = open_database(base_filename, procs,
+                       suppress_parallel=False,
+                       experimental=True,
+                       log_validator=False,
+                       shared_memory=False)
     gdb = GrizInterface(db)
   except MiliAParseError as e:
     print(f"\nMili AFile Parsing Error: {str(e)}")
@@ -111,6 +111,12 @@ class GrizInterface:
     """Check if the error flag is set."""
     return self.__error_flag
 
+  def close(self) -> None:
+    """Close the existing Milidatabase ServerWrapper."""
+    self.db.close()
+    del self.db
+    self.db = None
+
   def reload(self) -> None:
     """Reload the state maps for the plot file."""
     self.db.reload_state_maps()
@@ -186,8 +192,8 @@ class GrizInterface:
         self.mesh_object_classes,
         self.materials,
         self.parts
-      ) 
-  
+      )
+
   @dataclass
   class GrizStDescriptorsCallData:
     """Dataclass containing all data needed by Griz get_st_descriptors call."""

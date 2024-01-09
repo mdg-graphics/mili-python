@@ -366,7 +366,7 @@ class MiliDatabase:
     return int_points
 
   def element_sets(self) -> dict:
-    return {k:v for k,v in self.__int_points.items() if k.startswith("es_")}
+    return {k:v for k,v in self.__int_points.items() if k.startswith("es_") and k[-1].isdigit() }
 
   def integration_points(self) ->dict:
     """Get the available integration points for each material."""
@@ -1089,7 +1089,8 @@ def open_database( base : os.PathLike, procs = [], suppress_parallel = False, ex
       mili_database = LoopWrapper( MiliDatabase, proc_pargs, proc_kwargs )
   else:
     if experimental:
-      mili_database = ServerWrapper( MiliDatabase, proc_pargs, proc_kwargs )
+      shared_memory = kwargs.get("shared_memory", True)
+      mili_database = ServerWrapper( MiliDatabase, proc_pargs, proc_kwargs, shared_memory )
     else:
       mili_database = PoolWrapper( MiliDatabase, proc_pargs, proc_kwargs )
   return mili_database
