@@ -229,7 +229,7 @@ class MiliDatabase:
 
     offset = 0
     self.__srec_fmt_qty = 1
-    for sname, srec in self.__afile.dirs[DirectoryDecl.Type.SREC_DATA]['subrecords'].items():
+    for sname, srec in self.__afile.dirs[DirectoryDecl.Type.SREC_DATA].get('subrecords',{}).items():
       srec : Subrecord
       # add all svars to srec
       srec.svars = [ self.__afile.dirs[DirectoryDecl.Type.STATE_VAR_DICT][svar_name] for svar_name in srec.svar_names ]
@@ -742,7 +742,12 @@ class MiliDatabase:
     # Handle derived queries
     derived_query_names = [spec[0] for spec in derived_specs]
     if derived_query_names:
-      res.update( self.__derived.query(derived_query_names, class_sname, material, labels, states, ips, **kwargs) )
+      try:
+        derived_data = self.__derived.query(derived_query_names, class_sname, material, labels, states, ips, **kwargs)
+      except Exception as e:
+        self.__return_code = (ReturnCode.ERROR, str(e))
+        derived_data = {}
+      res.update( derived_data )
 
     # Handle primal queries
     for query_spec in primal_specs:

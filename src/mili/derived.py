@@ -262,7 +262,25 @@ class DerivedExpressions:
         "primals_class": [None, None, None],
         "supports_batching": False,
         "compute_function": self.__compute_nodal_tangential_traction_magnitude
-      }
+      },
+      "mat_cog_disp_x": {
+        "primals": ["matcgx"],
+        "primals_class": [None],
+        "supports_batching": False,
+        "compute_function": self.__compute_material_cog_displacement
+      },
+      "mat_cog_disp_y": {
+        "primals": ["matcgy"],
+        "primals_class": [None],
+        "supports_batching": False,
+        "compute_function": self.__compute_material_cog_displacement
+      },
+      "mat_cog_disp_z": {
+        "primals": ["matcgz"],
+        "primals_class": [None],
+        "supports_batching": False,
+        "compute_function": self.__compute_material_cog_displacement
+      },
       # TODO: Add more primals here
     }
 
@@ -1309,5 +1327,28 @@ class DerivedExpressions:
     nodtang_y = primal_data['nodtang_y']['data']
     nodtang_z = primal_data['nodtang_z']['data']
     derived_result[result_name]['data'] = np.sqrt(nodtang_x**2 + nodtang_y**2 + nodtang_z**2)
+
+    return derived_result
+
+
+  def __compute_material_cog_displacement(self,
+                                          result_name: str,
+                                          primal_data: dict,
+                                          query_args: dict,
+                                          reference_state: int = 1):
+    """Compute the derived results mat_cog_disp_[x|y|z]. Material Center of Gravity Displacement."""
+    labels = query_args['labels']
+    class_sname = query_args['class_sname'][0]
+    # Create dictionary structure for the final result
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data )
+
+    # Determine which displacement we are calculating and what primal is needed.
+    result_idx = ['mat_cog_disp_x', 'mat_cog_disp_y', 'mat_cog_disp_z'].index( result_name )
+    required_primal = ['matcgx', 'matcgy', 'matcgz'][result_idx]
+
+    reference_data = self.db.query(required_primal, class_sname, labels=labels, states=[reference_state])
+
+    disp = primal_data[required_primal]['data'] - reference_data[required_primal]['data']
+    derived_result[result_name]['data'] = disp
 
     return derived_result

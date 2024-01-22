@@ -46,21 +46,22 @@ class SerialDerivedExpressions(unittest.TestCase):
 
     def setUp(self):
         self.mili = reader.open_database( SerialDerivedExpressions.file_name, suppress_parallel = True )
-    
+
     def test_supported_variables(self):
         EXPECTED = ['disp_x', 'disp_y', 'disp_z', 'disp_mag', 'disp_rad_mag_xy',
                     'vel_x', 'vel_y', 'vel_z', 'acc_x', 'acc_y', 'acc_z', 'vol_strain',
-                    'prin_strain1', 'prin_strain2', 'prin_strain3', 
+                    'prin_strain1', 'prin_strain2', 'prin_strain3',
                     'prin_dev_strain1', 'prin_dev_strain2', 'prin_dev_strain3',
-                    'prin_strain1_alt', 'prin_strain2_alt', 'prin_strain3_alt', 
+                    'prin_strain1_alt', 'prin_strain2_alt', 'prin_strain3_alt',
                     'prin_dev_strain1_alt', 'prin_dev_strain2_alt', 'prin_dev_strain3_alt',
                     'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure',
                     'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress',
-                    'triaxiality', 'eps_rate', 'nodtangmag'
+                    'triaxiality', 'eps_rate', 'nodtangmag', 'mat_cog_disp_x', 'mat_cog_disp_y',
+                    'mat_cog_disp_z'
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
-    
+
     def test_derived_variables_of_class(self):
         BRICK_DERIVED = [
             "vol_strain", "prin_strain1", "prin_strain2", "prin_strain3", "prin_dev_strain1",
@@ -122,7 +123,7 @@ class SerialDerivedExpressions(unittest.TestCase):
         result = self.mili.query("pressure", "beam", labels=[20], states=[44], ips=[1,2,3,4])
         PRESSURE = np.array([ [7.60622900e+03, 1.23563398e+04, 1.21421602e+04, 7.38469482e+03] ])
         np.testing.assert_allclose( result['pressure']['data'][0,:,:], PRESSURE)
-    
+
     def test_disp_x(self):
         """X Displacement"""
         result = self.mili.query("disp_x", "node", states=[1,50,101], labels=[24,52])
@@ -136,7 +137,7 @@ class SerialDerivedExpressions(unittest.TestCase):
         # State 101, nodes 24, 52
         self.assertAlmostEqual( result['disp_x']['data'][2][0][0], 1.05899870e-01)
         self.assertAlmostEqual( result['disp_x']['data'][2][1][0], 0.000000e+00)
-    
+
     def test_disp_y(self):
         """Y Displacement"""
         result = self.mili.query("disp_y", "node", states=[1,50,101], labels=[24,52])
@@ -275,8 +276,8 @@ class SerialDerivedExpressions(unittest.TestCase):
         # self.assertAlmostEqual( result['acc_x']['data'][0][1][0], 0.000000e+00)
         # # State 3, nodes 7, 1217
         # self.assertAlmostEqual( result['acc_x']['data'][1][0][0], -3.7135E-02, delta=5.0E-16)
-        # self.assertAlmostEqual( result['acc_x']['data'][1][1][0], 3.7134E-02, delta=5.0E-16)        
-        
+        # self.assertAlmostEqual( result['acc_x']['data'][1][1][0], 3.7134E-02, delta=5.0E-16)
+
     def test_acc_y(self):
         """Y Acceleration"""
         # Answers are based on hand calculations, not griz results.
@@ -290,7 +291,7 @@ class SerialDerivedExpressions(unittest.TestCase):
         # State 101, nodes 24, 52
         self.assertAlmostEqual( result['acc_y']['data'][2][0][0], 3.360507e+06, delta=10.0)
         self.assertAlmostEqual( result['acc_y']['data'][2][1][0], 1.394145e+06, delta=3.0)
-    
+
     def test_acc_z(self):
         """Z Acceleration"""
         # Answers are based on hand calculations, not griz results.
@@ -304,7 +305,7 @@ class SerialDerivedExpressions(unittest.TestCase):
         # State 101, nodes 24, 78
         self.assertAlmostEqual( result['acc_z']['data'][2][0][0], -1.106856e+06, delta=2.0)
         self.assertAlmostEqual( result['acc_z']['data'][2][1][0], 1.025e+05, delta=20.0)
-    
+
     def test_vol_strain(self):
         """Strain Trace"""
         result = self.mili.query("vol_strain", "brick", states=[2,44,86], labels=[10, 20])
@@ -733,7 +734,7 @@ class SerialDerivedExpressions(unittest.TestCase):
         # This database does not have (i.e. test) variable time steps.
         file_name = os.path.join(dir_path,'data','serial','d3samp4','d3samp4.plt')
         db = reader.open_database( file_name, suppress_parallel=True )
-        
+
         # Hand calcs for eps_rate
         EPS_RATE1_46_1 = 0.0
         EPS_RATE2_46_1 = 0.5 * ( (1.95459e-2 - 0.0)/1000 + (5.01047e-2 - 1.95459e-2)/1000 )
@@ -760,7 +761,7 @@ class SerialDerivedExpressions(unittest.TestCase):
         EPS_RATE2_47_1 = 0.5 * ( (1.32413e-2 - 0.0)/1000 + (3.40781e-2 - 1.32413e-2)/1000 )
         EPS_RATE_STATES = np.array( [EPS_RATE2_46_1, EPS_RATE2_47_1] )
         np.testing.assert_allclose( result['eps_rate']['data'][0,:,0], EPS_RATE_STATES, rtol=1.0E-06)
-    
+
     def test_nodetangmag(self):
         """Nodal Tangential Traction Magnitude"""
         # Uses a different database that contains the primals "nodtang"
@@ -795,6 +796,29 @@ class SerialDerivedExpressions(unittest.TestCase):
         self.assertAlmostEqual(result['nodtangmag']['data'][1,2,0], 62.646706196877986, delta=1.0e-20 )
         self.assertAlmostEqual(result['nodtangmag']['data'][2,2,0], 75.71470466999355, delta=1.0e-20 )
 
+    def test_mat_cog_disp(self):
+        """Test Material Center of Gravity Displacement."""
+        # Uses a different database that contains the primals "matcg[x|y|z]"
+        file_name = os.path.join(dir_path,'data','serial','rigid_body_1','rigid_body1.plt')
+        db = reader.open_database( file_name, suppress_parallel=True )
+
+        result = db.query("mat_cog_disp_x", "mat", labels=[1], states=[1,3,5,7])
+        self.assertAlmostEqual(result['mat_cog_disp_x']['data'][0,0,0], 0.0)
+        self.assertAlmostEqual(result['mat_cog_disp_x']['data'][1,0,0], 0.0)
+        self.assertAlmostEqual(result['mat_cog_disp_x']['data'][2,0,0], 0.0)
+        self.assertAlmostEqual(result['mat_cog_disp_x']['data'][3,0,0], 0.0)
+
+        result = db.query("mat_cog_disp_y", "mat", labels=[1], states=[1,3,5,7])
+        self.assertAlmostEqual(result['mat_cog_disp_y']['data'][0,0,0], 0.0)
+        self.assertAlmostEqual(result['mat_cog_disp_y']['data'][1,0,0], 0.1004999, delta=1.0e-7)
+        self.assertAlmostEqual(result['mat_cog_disp_y']['data'][2,0,0], 0.1999999, delta=1.0e-7)
+        self.assertAlmostEqual(result['mat_cog_disp_y']['data'][3,0,0], 0.3, delta=1.0e-7)
+
+        result = db.query("mat_cog_disp_z", "mat", labels=[1], states=[1,3,5,7])
+        self.assertAlmostEqual(result['mat_cog_disp_z']['data'][0,0,0], 0.0)
+        self.assertAlmostEqual(result['mat_cog_disp_z']['data'][1,0,0], 0.1004999, delta=1.0e-7)
+        self.assertAlmostEqual(result['mat_cog_disp_z']['data'][2,0,0], 0.1999999, delta=1.0e-7)
+        self.assertAlmostEqual(result['mat_cog_disp_z']['data'][3,0,0], 0.3, delta=1.0e-7)
 
 
 class ParallelDerivedExpressions(unittest.TestCase):
@@ -803,7 +827,7 @@ class ParallelDerivedExpressions(unittest.TestCase):
 
     def setUp(self):
         self.mili = reader.open_database( ParallelDerivedExpressions.file_name, suppress_parallel=False )
-    
+
     def test_pressure(self):
         """Pressure"""
         tolerance = 1e-5
@@ -839,7 +863,7 @@ class ParallelDerivedExpressions(unittest.TestCase):
         # State 101, nodes 24, 52
         self.assertAlmostEqual( result[7]['disp_x']['data'][2][0][0], 1.05899870e-01)
         self.assertAlmostEqual( result[3]['disp_x']['data'][2][0][0], 0.000000e+00)
-    
+
     def test_disp_y(self):
         """Y Displacement"""
         result = self.mili.query("disp_y", "node", states=[1,50,101], labels=[24,52])

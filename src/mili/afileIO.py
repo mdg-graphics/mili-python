@@ -385,7 +385,7 @@ class AFileParser:
       }
     else:
       afile.dirs[dir_decl.dir_type][sname]['nodes'] = np.append( afile.dirs[dir_decl.dir_type][sname]['nodes'], self.verify( f'{dir_decl.dir_type.name}/{sname}', append ), axis=0 )
-      afile.dirs[dir_decl.dir_type][sname]['blocks'] = np.concatenate( afile.dirs[dir_decl.dir_type][sname]['blocks'], blocks )
+      afile.dirs[dir_decl.dir_type][sname]['blocks'] = np.append( afile.dirs[dir_decl.dir_type][sname]['blocks'], blocks, axis=0 )
 
   def __parse_elem_conn( self, afile : AFile, conn_data : bytes, dir_decl : DirectoryDecl ):
     f = io.BytesIO( conn_data )
