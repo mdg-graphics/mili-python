@@ -1106,7 +1106,21 @@ class DerivedExpressions:
     syz = primal_data['syz']['data']
     szx = primal_data['szx']['data']
 
-    pressure = -(1/3) * (sx + sy + sz)
+    """
+    NOTE:
+    If sx == sy == sz then the pressure should be equal to -sx == -sy == -sz
+    However -(1/3) * (sx + sy + sz) can produce values that are slightly off from
+    sx, sy, and sz. So when we calculate dev_stress_x|y|z we would expect the values
+    to be 0.0, but get results along the lines of 0.000X which leads to incorrect
+    results for effective stress.
+    """
+    rtol = 0.0
+    atol = 1e-15
+    if np.allclose(sx, sy, rtol=rtol, atol=atol) and np.allclose(sy, sz, rtol=rtol, atol=atol):
+      pressure = -sx
+    else:
+      pressure = -(1/3) * (sx + sy + sz)
+
     dev_stress_x = sx+pressure
     dev_stress_y = sy+pressure
     dev_stress_z = sz+pressure
