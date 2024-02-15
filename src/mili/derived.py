@@ -281,6 +281,13 @@ class DerivedExpressions:
         "supports_batching": False,
         "compute_function": self.__compute_material_cog_displacement
       },
+      "element_volume": {
+        "primals": ["nodpos"],
+        "primals_class": ["node"],
+        "supports_batching": False,
+        "compute_function": self.__compute_element_volume,
+        "only_sclasses": [Superclass.M_HEX, Superclass.M_TET]
+      },
       # TODO: Add more primals here
     }
 
@@ -296,8 +303,12 @@ class DerivedExpressions:
     """Return list of derived variables that can be calculated for a given class."""
     derived_list = []
     if class_name in self.db.class_names():
+      class_def = self.db.mesh_object_classes().get(class_name)
       queriable_state_variables = self.db.queriable_svars()
       for var_name, specs in self.__derived_expressions.items():
+        if 'only_sclasses' in specs:
+          if class_def.sclass not in specs['only_sclasses']:
+            continue
         primals_found = []
         for req_primal, req_primal_class in zip(specs['primals'], specs['primals_class']):
           # Check that primal exists
@@ -317,17 +328,26 @@ class DerivedExpressions:
       raise KeyError(f"The derived result '{var_name}' does not exist")
     derived_spec = self.__derived_expressions[var_name]
     classes_of_derived = []
-    element_classes = self.db.class_names()
+    element_class_data = self.db.mesh_object_classes()
 
     if all( [primal_class is None for primal_class in derived_spec['primals_class']] ):
       # CASE 1: All primals must exist for same element class as derived result
-      for class_name in element_classes:
+      for class_name, class_def in element_class_data.items():
+        if "only_sclasses" in derived_spec:
+          if class_def.sclass not in derived_spec["only_sclasses"]:
+            continue
         primals_found = [ class_name in self.db.classes_of_state_variable(primal) for primal in derived_spec['primals'] ]
         if all(primals_found):
           classes_of_derived.append(class_name)
     else:
       # CASE 2: primals must exists for class different from derived result
-      raise NotImplementedError("Currently not supported.")
+      for class_name, class_def in element_class_data.items():
+        if "only_sclasses" in derived_spec:
+          if class_def.sclass not in derived_spec["only_sclasses"]:
+            continue
+        primals_found = [ primal_class in self.db.classes_of_state_variable(primal) for primal, primal_class in zip(derived_spec['primals'],derived_spec["primals_class"]) ]
+        if all(primals_found):
+          classes_of_derived.append(class_name)
 
     return classes_of_derived
 
@@ -439,6 +459,16 @@ class DerivedExpressions:
                         f"required_primals = {required_primals}\n"
                         f"required_classes = {primal_classes}"))
 
+    # Check that computation is supported for this element superclass
+    only_sclasses = self.__derived_expressions[result_name].get("only_sclasses", None)
+    if only_sclasses is not None:
+      # This derived result can only be calculated for a subset of element superclasses
+      class_def = self.db.mesh_object_classes().get(class_name)
+      if class_def is not None:
+        if class_def.sclass not in only_sclasses:
+          raise ValueError((f"The derived result '{result_name}' is not supported for the '{class_def.sclass.name}' element superclass\n"
+                            f"This result is supported for: {only_sclasses}"))
+
     # Handle keyword arguments
     # Use function reflection to get list of arguments for the derived compute function
     function_signature = inspect.signature(compute_function)
@@ -468,16 +498,18 @@ class DerivedExpressions:
     Args:
       elem_node_association: The output of the nodes_to_elem MiliDatabase function.
     """
-    elem_node_map = {}
+    elem_node_map = []
     nodes_by_elem, elem_order = elem_node_association
 
     # Get list of unique nodes that need to be queried
     labels_to_query = np.unique( nodes_by_elem.flatten() )
 
     # Generate mask for each elements nodal results
+    sorter = np.argsort(labels_to_query)
     for elem_label, associated_nodes in zip( elem_order, nodes_by_elem ):
-      elem_node_map[elem_label[0]] = np.where(np.isin(labels_to_query, associated_nodes))[0]
-
+      # We use searchsorted to maintain node order
+      elem_node_map.append( sorter[np.searchsorted(labels_to_query, associated_nodes, sorter=sorter)] )
+    elem_node_map = np.array( elem_node_map )
     return labels_to_query, elem_node_map
 
   def __query_required_primals(self,
@@ -512,6 +544,7 @@ class DerivedExpressions:
 
       # Special case:
       if primal_class_name != class_name:
+        query_args['result_classname'] = class_name
         # Element class of derived result does not match element class of one or more required primal
         # so we need to map the labels from one super class to another. Most commonly this
         # will be getting all the nodes that make up each of the requested elements.
@@ -1365,4 +1398,127 @@ class DerivedExpressions:
     disp = primal_data[required_primal]['data'] - reference_data[required_primal]['data']
     derived_result[result_name]['data'] = disp
 
+    return derived_result
+
+  def __compute_element_volume(self,
+                               result_name: str,
+                               primal_data: dict,
+                               query_args: dict):
+    """Compute the element volume of the M_HEX or M_TET superclass."""
+    labels = query_args['labels']
+    states = query_args['states']
+    class_name = query_args['result_classname']
+
+    # Manually construct derived result dictionary since result element class
+    # does not match primal data element class.
+    derived_result = {
+      result_name: {
+        "data": np.empty( (len(states), len(labels), 1), dtype=np.float32 ),
+        "layout": { "state": states, "labels": labels }
+      }
+    }
+
+    elem_node_map = query_args["elem_node_map"]
+    nodpos = primal_data["nodpos"]["data"]
+
+    # Differentiate between M_HEX and M_TET Superclass.
+    class_def = self.db.mesh_object_classes().get(class_name)
+
+    if class_def.sclass == Superclass.M_HEX:
+      a45 = nodpos[:, elem_node_map[:,3], 2] - nodpos[:, elem_node_map[:,4], 2]
+      a24 = nodpos[:, elem_node_map[:,1], 2] - nodpos[:, elem_node_map[:,3], 2]
+      a52 = nodpos[:, elem_node_map[:,4], 2] - nodpos[:, elem_node_map[:,1], 2]
+      a16 = nodpos[:, elem_node_map[:,0], 2] - nodpos[:, elem_node_map[:,5], 2]
+      a31 = nodpos[:, elem_node_map[:,2], 2] - nodpos[:, elem_node_map[:,0], 2]
+      a63 = nodpos[:, elem_node_map[:,5], 2] - nodpos[:, elem_node_map[:,2], 2]
+      a27 = nodpos[:, elem_node_map[:,1], 2] - nodpos[:, elem_node_map[:,6], 2]
+      a74 = nodpos[:, elem_node_map[:,6], 2] - nodpos[:, elem_node_map[:,3], 2]
+      a38 = nodpos[:, elem_node_map[:,2], 2] - nodpos[:, elem_node_map[:,7], 2]
+      a81 = nodpos[:, elem_node_map[:,7], 2] - nodpos[:, elem_node_map[:,0], 2]
+      a86 = nodpos[:, elem_node_map[:,7], 2] - nodpos[:, elem_node_map[:,5], 2]
+      a57 = nodpos[:, elem_node_map[:,4], 2] - nodpos[:, elem_node_map[:,6], 2]
+      a6345 = a63 - a45
+      a5238 = a52 - a38
+      a8624 = a86 - a24
+      a7416 = a74 - a16
+      a5731 = a57 - a31
+      a8127 = a81 - a27
+
+      px1 = (nodpos[:, elem_node_map[:,1], 1] * a6345 +
+             nodpos[:, elem_node_map[:,2], 1] * a24   -
+             nodpos[:, elem_node_map[:,3], 1] * a5238 +
+             nodpos[:, elem_node_map[:,4], 1] * a8624 +
+             nodpos[:, elem_node_map[:,5], 1] * a52   +
+             nodpos[:, elem_node_map[:,7], 1] * a45)
+
+      px2 = (nodpos[:, elem_node_map[:,2], 1] * a7416 +
+             nodpos[:, elem_node_map[:,3], 1] * a31   -
+             nodpos[:, elem_node_map[:,0], 1] * a6345 +
+             nodpos[:, elem_node_map[:,5], 1] * a5731 +
+             nodpos[:, elem_node_map[:,6], 1] * a63   +
+             nodpos[:, elem_node_map[:,4], 1] * a16)
+
+      px3 = (nodpos[:, elem_node_map[:,3], 1] * a8127 -
+             nodpos[:, elem_node_map[:,0], 1] * a24   -
+             nodpos[:, elem_node_map[:,1], 1] * a7416 -
+             nodpos[:, elem_node_map[:,6], 1] * a8624 +
+             nodpos[:, elem_node_map[:,7], 1] * a74   +
+             nodpos[:, elem_node_map[:,5], 1] * a27)
+
+      px4 = (nodpos[:, elem_node_map[:,0], 1] * a5238 -
+             nodpos[:, elem_node_map[:,1], 1] * a31   -
+             nodpos[:, elem_node_map[:,2], 1] * a8127 -
+             nodpos[:, elem_node_map[:,7], 1] * a5731 +
+             nodpos[:, elem_node_map[:,4], 1] * a81   +
+             nodpos[:, elem_node_map[:,6], 1] * a38)
+
+      px5 = (-nodpos[:, elem_node_map[:,7], 1] * a7416 +
+              nodpos[:, elem_node_map[:,6], 1] * a86   +
+              nodpos[:, elem_node_map[:,5], 1] * a8127 -
+              nodpos[:, elem_node_map[:,0], 1] * a8624 -
+              nodpos[:, elem_node_map[:,3], 1] * a81   -
+              nodpos[:, elem_node_map[:,1], 1] * a16)
+
+      px6 = (-nodpos[:, elem_node_map[:,4], 1] * a8127 +
+              nodpos[:, elem_node_map[:,7], 1] * a57   +
+              nodpos[:, elem_node_map[:,6], 1] * a5238 -
+              nodpos[:, elem_node_map[:,1], 1] * a5731 -
+              nodpos[:, elem_node_map[:,0], 1] * a52   -
+              nodpos[:, elem_node_map[:,2], 1] * a27)
+
+      px7 = (-nodpos[:, elem_node_map[:,5], 1] * a5238 -
+              nodpos[:, elem_node_map[:,4], 1] * a86   +
+              nodpos[:, elem_node_map[:,7], 1] * a6345 +
+              nodpos[:, elem_node_map[:,2], 1] * a8624 -
+              nodpos[:, elem_node_map[:,1], 1] * a63   -
+              nodpos[:, elem_node_map[:,3], 1] * a38)
+
+      px8 = (-nodpos[:, elem_node_map[:,6], 1] * a6345 -
+              nodpos[:, elem_node_map[:,5], 1] * a57   +
+              nodpos[:, elem_node_map[:,4], 1] * a7416 +
+              nodpos[:, elem_node_map[:,3], 1] * a5731 -
+              nodpos[:, elem_node_map[:,2], 1] * a74   -
+              nodpos[:, elem_node_map[:,0], 1] * a45)
+
+      vol = (px1 * nodpos[:, elem_node_map[:,0], 0] +
+             px2 * nodpos[:, elem_node_map[:,1], 0] +
+             px3 * nodpos[:, elem_node_map[:,2], 0] +
+             px4 * nodpos[:, elem_node_map[:,3], 0] +
+             px5 * nodpos[:, elem_node_map[:,4], 0] +
+             px6 * nodpos[:, elem_node_map[:,5], 0] +
+             px7 * nodpos[:, elem_node_map[:,6], 0] +
+             px8 * nodpos[:, elem_node_map[:,7], 0])
+      vol = vol / 12.0
+
+    elif class_def.sclass == Superclass.M_TET:
+      u = nodpos[:,elem_node_map[:,1],:] - nodpos[:,elem_node_map[:,0],:]
+      v = nodpos[:,elem_node_map[:,2],:] - nodpos[:,elem_node_map[:,0],:]
+      w = nodpos[:,elem_node_map[:,3],:] - nodpos[:,elem_node_map[:,0],:]
+
+      # vol = w dot (u cross v)
+      vol = np.sum( w[:,:,:] * np.cross(u, v, axis=2), axis=2 )
+      vol = vol / 6.0
+
+    vol = np.reshape( vol, vol.shape + (1,) )
+    derived_result["element_volume"]["data"] = vol
     return derived_result

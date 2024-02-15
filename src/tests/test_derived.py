@@ -57,7 +57,7 @@ class SerialDerivedExpressions(unittest.TestCase):
                     'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure',
                     'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress',
                     'triaxiality', 'eps_rate', 'nodtangmag', 'mat_cog_disp_x', 'mat_cog_disp_y',
-                    'mat_cog_disp_z'
+                    'mat_cog_disp_z', 'element_volume',
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
@@ -68,7 +68,7 @@ class SerialDerivedExpressions(unittest.TestCase):
             "prin_dev_strain2", "prin_dev_strain3", "prin_strain1_alt", "prin_strain2_alt",
             "prin_strain3_alt", "prin_dev_strain1_alt", "prin_dev_strain2_alt", "prin_dev_strain3_alt",
             "prin_stress1", "prin_stress2", "prin_stress3", "eff_stress", "pressure", "prin_dev_stress1",
-            "prin_dev_stress2", "prin_dev_stress3", "max_shear_stress", "triaxiality"
+            "prin_dev_stress2", "prin_dev_stress3", "max_shear_stress", "triaxiality", 'element_volume'
         ]
         BEAM_DERIVED = [
             "prin_stress1", "prin_stress2", "prin_stress3", "eff_stress", "pressure", "prin_dev_stress1",
@@ -96,9 +96,11 @@ class SerialDerivedExpressions(unittest.TestCase):
         DISPX_CLASSES = ["node"]
         EFF_STRESS_CLASSES = ["beam", "brick", "shell"]
         VOL_STRAIN_CLASSES = ["brick", "shell"]
+        VOLUME_CLASSES = ["brick"]
         self.assertEqual( self.mili.classes_of_derived_variable("disp_x"), DISPX_CLASSES)
         self.assertEqual( self.mili.classes_of_derived_variable("eff_stress"), EFF_STRESS_CLASSES)
         self.assertEqual( self.mili.classes_of_derived_variable("vol_strain"), VOL_STRAIN_CLASSES)
+        self.assertEqual( self.mili.classes_of_derived_variable("element_volume"), VOLUME_CLASSES)
 
     def test_pressure(self):
         """Pressure"""
@@ -820,6 +822,35 @@ class SerialDerivedExpressions(unittest.TestCase):
         self.assertAlmostEqual(result['mat_cog_disp_z']['data'][2,0,0], 0.1999999, delta=1.0e-7)
         self.assertAlmostEqual(result['mat_cog_disp_z']['data'][3,0,0], 0.3, delta=1.0e-7)
 
+    def test_hex_element_volume(self):
+        """Test Element Volume calculation for Hexes."""
+        result = self.mili.query("element_volume", "brick", labels=[1,4], states=[1,3,4])
+
+        self.assertAlmostEqual(result["element_volume"]["data"][0,0,0], 0.02083334)
+        self.assertAlmostEqual(result["element_volume"]["data"][0,1,0], 0.0291667)
+        self.assertAlmostEqual(result["element_volume"]["data"][1,0,0], 0.02083334)
+        self.assertAlmostEqual(result["element_volume"]["data"][1,1,0], 0.0291667)
+        self.assertAlmostEqual(result["element_volume"]["data"][2,0,0], 0.02083334)
+        self.assertAlmostEqual(result["element_volume"]["data"][2,1,0], 0.0291667)
+
+    def test_tet_element_volume(self):
+        """Test Element Volume calculation for Tets."""
+        # Uses a different database that contains the tet elements"
+        file_name = os.path.join(dir_path,'data','serial','tet','tet1_t4.plt')
+        db = reader.open_database( file_name, suppress_parallel=True )
+
+        result = db.query("element_volume", "tet", labels=[53,59,65], states=[1,49,81])
+        self.assertAlmostEqual(result["element_volume"]["data"][0,0,0], 6.291125304843772E-05)
+        self.assertAlmostEqual(result["element_volume"]["data"][0,1,0], 4.703088313429738E-05)
+        self.assertAlmostEqual(result["element_volume"]["data"][0,2,0], 4.166676663023120E-05)
+        self.assertAlmostEqual(result["element_volume"]["data"][1,0,0], 6.208914054162492E-05)
+        self.assertAlmostEqual(result["element_volume"]["data"][1,1,0], 4.682676728095200E-05)
+        self.assertAlmostEqual(result["element_volume"]["data"][1,2,0], 4.158493911287766E-05)
+        self.assertAlmostEqual(result["element_volume"]["data"][2,0,0], 6.239515600934483E-05)
+        self.assertAlmostEqual(result["element_volume"]["data"][2,1,0], 4.717303015668719E-05)
+        self.assertAlmostEqual(result["element_volume"]["data"][2,2,0], 4.147314159979739E-05)
+        pass
+
 
 class ParallelDerivedExpressions(unittest.TestCase):
     """Test Parallel implementation of Derived Expressions Wrapper class."""
@@ -1298,3 +1329,14 @@ class ParallelDerivedExpressions(unittest.TestCase):
         SEFF = np.array([ [2.46960137e+04, 3.95834883e+04, 3.90579766e+04, 2.41670957e+04] ])
         TRIAXIALITY = -PRESSURE/SEFF
         np.testing.assert_allclose( result[6]['triaxiality']['data'][0,:,:], TRIAXIALITY, rtol=1.0E-07)
+
+    def test_hex_element_volume(self):
+        """Test Element Volume calculation for Hexes."""
+        result = self.mili.query("element_volume", "brick", labels=[1,4], states=[1,3,4])
+
+        self.assertAlmostEqual(result[3]["element_volume"]["data"][0,0,0], 0.02083334)
+        self.assertAlmostEqual(result[3]["element_volume"]["data"][0,1,0], 0.0291667)
+        self.assertAlmostEqual(result[3]["element_volume"]["data"][1,0,0], 0.02083334)
+        self.assertAlmostEqual(result[3]["element_volume"]["data"][1,1,0], 0.0291667)
+        self.assertAlmostEqual(result[3]["element_volume"]["data"][2,0,0], 0.02083334)
+        self.assertAlmostEqual(result[3]["element_volume"]["data"][2,1,0], 0.0291667)

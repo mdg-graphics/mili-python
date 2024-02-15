@@ -119,6 +119,19 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
         np.testing.assert_equal( elems["beam"], [5,6,37,42] )
         np.testing.assert_equal( elems["cseg"], [2,3,5,6,8,9] )
 
+        # Test limiting by material
+        elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3, material=1)
+        self.assertEqual( list(elems.keys()), ["beam"] )
+        np.testing.assert_equal( elems["beam"], [5,6,37,42] )
+
+        elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3, material=3)
+        self.assertEqual( list(elems.keys()), ["shell"] )
+        np.testing.assert_equal( elems["shell"], [3,4,5,6,9,11] )
+
+        elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3, material=4)
+        self.assertEqual( list(elems.keys()), ["cseg"] )
+        np.testing.assert_equal( elems["cseg"], [2,3,5,6,8,9] )
+
     def test_mesh_entities_near_coordinate(self):
         """Test the mesh_entities_near_coordinate function."""
         elems = self.adjacency.mesh_entities_near_coordinate([1.0825318, 0.62499994, 3.], 1, 0.1)
@@ -130,6 +143,19 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
         elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3)
         np.testing.assert_equal( elems["shell"], [3,4,5,6,9,11] )
         np.testing.assert_equal( elems["beam"], [5,6,37,42] )
+        np.testing.assert_equal( elems["cseg"], [2,3,5,6,8,9] )
+
+        # Test limiting by material
+        elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3, material=1)
+        self.assertEqual( list(elems.keys()), ["beam"] )
+        np.testing.assert_equal( elems["beam"], [5,6,37,42] )
+
+        elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3, material=3)
+        self.assertEqual( list(elems.keys()), ["shell"] )
+        np.testing.assert_equal( elems["shell"], [3,4,5,6,9,11] )
+
+        elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3, material=4)
+        self.assertEqual( list(elems.keys()), ["cseg"] )
         np.testing.assert_equal( elems["cseg"], [2,3,5,6,8,9] )
 
     def test_nearest_node(self):
@@ -246,6 +272,25 @@ class ParallelAdjacencyTests:
             np.testing.assert_equal( beam_elems, [5,6,37,42] )
             np.testing.assert_equal( cseg_elems, [2,3,5,6,8,9] )
 
+            # Test limiting by material
+            elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3, material=1)
+            classes = np.unique(np.concatenate([list(e.keys()) for e in elems]))
+            self.assertEqual( classes, ["beam"] )
+            beam_elems = np.unique(np.concatenate([e.get("beam",[]) for e in elems]))
+            np.testing.assert_equal( beam_elems, [5,6,37,42] )
+
+            elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3, material=3)
+            classes = np.unique(np.concatenate([list(e.keys()) for e in elems]))
+            self.assertEqual( classes, ["shell"] )
+            shell_elems = np.unique(np.concatenate([e.get("shell",[]) for e in elems]))
+            np.testing.assert_equal( shell_elems, [3,4,5,6,9,11] )
+
+            elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3, material=4)
+            classes = np.unique(np.concatenate([list(e.keys()) for e in elems]))
+            self.assertEqual( classes, ["cseg"] )
+            cseg_elems = np.unique(np.concatenate([e.get("cseg",[]) for e in elems]))
+            np.testing.assert_equal( cseg_elems, [2,3,5,6,8,9] )
+
         def test_mesh_entities_near_coordinate(self):
             """Test the mesh_entities_near_coordinate function."""
             elems = self.adjacency.mesh_entities_near_coordinate([1.0825318, 0.62499994, 3.], 1, 0.1)
@@ -262,6 +307,26 @@ class ParallelAdjacencyTests:
             shell_elems = np.unique(np.concatenate([e.get("shell",[]) for e in elems]))
             np.testing.assert_equal( shell_elems, [3,4,5,6,9,11] )
             np.testing.assert_equal( beam_elems, [5,6,37,42] )
+            np.testing.assert_equal( cseg_elems, [2,3,5,6,8,9] )
+
+            # Test limiting by material
+            elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3, material=1)
+            cseg_elems = np.unique(np.concatenate([e.get("cseg",[]) for e in elems]))
+            classes = np.unique(np.concatenate([list(e.keys()) for e in elems]))
+            self.assertEqual( classes, ["beam"] )
+            beam_elems = np.unique(np.concatenate([e.get("beam",[]) for e in elems]))
+            np.testing.assert_equal( beam_elems, [5,6,37,42] )
+
+            elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3, material=3)
+            classes = np.unique(np.concatenate([list(e.keys()) for e in elems]))
+            self.assertEqual( classes, ["shell"] )
+            shell_elems = np.unique(np.concatenate([e.get("shell",[]) for e in elems]))
+            np.testing.assert_equal( shell_elems, [3,4,5,6,9,11] )
+
+            elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3, material=4)
+            classes = np.unique(np.concatenate([list(e.keys()) for e in elems]))
+            self.assertEqual( classes, ["cseg"] )
+            cseg_elems = np.unique(np.concatenate([e.get("cseg",[]) for e in elems]))
             np.testing.assert_equal( cseg_elems, [2,3,5,6,8,9] )
 
         def test_nearest_node(self):

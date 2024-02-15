@@ -584,14 +584,14 @@ The mili-python reader provides some support for querying element adjacencies th
 - Querying the nearest node to a 3d coordinate using the `nearest_node` function.
 - Querying the nearest element to a 3d coordinate using the `nearest_element` function.
 
-The function `mesh_entities_within_radius` computes the centroid of the element you have specified using the nodal coordinates for that element at the specified state. The reader then gathers all nodes within the specified radius of that centroid and returns all elements that are associated with those nodes.
+The function `mesh_entities_within_radius` computes the centroid of the element you have specified using the nodal coordinates for that element at the specified state. The reader then gathers all nodes within the specified radius of that centroid and returns all elements that are associated with those nodes. This function also takes the optional arguement `material` that limits the search to a specific material name or number.
 
 ```python
 from mili import adjacency
 adj = adjacency.AdjacencyMapping(db)
 
 # Gathers the elements within a radius of 0.30 length units from shell 6 at state 1
-adjacent_elements = adj.mesh_entities_within_radius("shell", 6, 1, 0.30)
+adjacent_elements = adj.mesh_entities_within_radius("shell", 6, 1, 0.30, material=None)
 
 """
 The format of the returned dictionary is shown below:
@@ -604,14 +604,14 @@ adjacent_elements = {
 """
 ```
 
-The function `mesh_entities_near_coordinate` gathers all nodes within the specified radius of the given 3d coordinate and returns all elements that are associated with those nodes.
+The function `mesh_entities_near_coordinate` gathers all nodes within the specified radius of the given 3d coordinate and returns all elements that are associated with those nodes. This function also takes the optional arguement `material` that limits the search to a specific material name or number.
 
 ```python
 from mili import adjacency
 adj = adjacency.AdjacencyMapping(db)
 
 # Gathers the elements within a radius of 0.30 length units from the given coordinate at state 1
-adjacent_elements = adj.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3)
+adjacent_elements = adj.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3, material=None)
 
 """
 The format of the returned dictionary is shown below:

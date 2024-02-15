@@ -64,7 +64,12 @@ class AdjacencyMapping:
                         f"Make sure that the specified class name, label and state all exist."))
     return centroid
 
-  def mesh_entities_within_radius(self, class_name: str, label: int, state: int, radius: float):
+  def mesh_entities_within_radius(self,
+                                  class_name: str,
+                                  label: int,
+                                  state: int,
+                                  radius: float,
+                                  material: Optional[Union[str,int]] = None):
     """Get all mesh entities within a specified radius from a specified mesh entity at a specified state.
 
     Args:
@@ -72,17 +77,22 @@ class AdjacencyMapping:
       label (str): The element label.
       state (int): The state number.
       radius (float): The radius within which to search.
+      material (Optional[Union[str,int]], default=None): Limit search to a specific material.
     """
     centroid = self.__compute_centroid_helper(class_name, label, state)
-    return self.mesh_entities_near_coordinate(centroid, state, radius)
+    return self.mesh_entities_near_coordinate(centroid, state, radius, material)
 
-  def mesh_entities_near_coordinate(self, coordinate: List[float], state: int, radius: float):
+  def mesh_entities_near_coordinate(self,
+                                    coordinate: List[float],
+                                    state: int,
+                                    radius: float,
+                                    material: Optional[Union[str,int]] = None):
     """Get all mesh entities within a specified radius from a specified coordinate at a given state."""
     nodes_in_radius = self.obj.geometry.nodes_within_radius( coordinate, radius, state )
     if not self.serial:
       nodes_in_radius = np.unique(np.concatenate(nodes_in_radius))
 
-    return self.obj.geometry.elems_of_nodes(nodes_in_radius)
+    return self.obj.geometry.elems_of_nodes(nodes_in_radius, material)
 
   def elems_of_nodes(self, node_labels):
     """Find elements associated with the specified nodes."""
@@ -226,7 +236,7 @@ class GeometricMeshInfo:
 
     return nodes_in_radius
 
-  def elems_of_nodes(self, node_labels):
+  def elems_of_nodes(self, node_labels, material: Optional[Union[int,str]] = None):
     """Find elements associated with the specified nodes."""
     if type(node_labels) is not list:
       if iterable(node_labels):
@@ -243,9 +253,19 @@ class GeometricMeshInfo:
     elems_of_nodes = {}
     elem_conns = self.db.connectivity()
     for class_name in elem_conns:
-      matches, _ = np.where(np.isin(elem_conns[class_name][:,:-1], nlabels))
+      class_conns = elem_conns[class_name]
+      if material is not None:
+        # Filter out element classes that do not have any elements of this material
+        mats_of_class = np.unique(self.db.materials_of_class_name(class_name))
+        if material not in mats_of_class:
+          continue
+        # Filter out elements not of the specified material
+        elems_of_mat = np.where(class_conns[:,-1] == material)[0]
+        class_conns = elem_conns[class_name][elems_of_mat,:]
+
+      matches, _ = np.where(np.isin(class_conns[:,:-1], nlabels))
       if len(matches) != 0:
-        elems_of_nodes[class_name] = self.db.labels(class_name)[matches]
-        elems_of_nodes[class_name] = np.unique(elems_of_nodes[class_name])
+        matches = np.unique( matches )
+        elems_of_nodes[class_name] = np.unique( self.db.labels(class_name)[matches] )
 
     return elems_of_nodes
