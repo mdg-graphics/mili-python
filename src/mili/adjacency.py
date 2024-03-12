@@ -31,6 +31,7 @@ from __future__ import annotations
 from typing import *
 from numpy.lib.function_base import iterable
 from mili.parallel import LoopWrapper,PoolWrapper,ServerWrapper
+from mili.utils import dictionary_merge_concat_unique
 import numpy as np
 
 """
@@ -92,11 +93,14 @@ class AdjacencyMapping:
     if not self.serial:
       nodes_in_radius = np.unique(np.concatenate(nodes_in_radius))
 
-    return self.obj.geometry.elems_of_nodes(nodes_in_radius, material)
+    return self.elems_of_nodes(nodes_in_radius, material)
 
-  def elems_of_nodes(self, node_labels):
+  def elems_of_nodes(self, node_labels, material=None):
     """Find elements associated with the specified nodes."""
-    return self.obj.geometry.elems_of_nodes(node_labels)
+    elems = self.obj.geometry.elems_of_nodes(node_labels, material)
+    if not self.serial:
+      elems = dictionary_merge_concat_unique(elems)
+    return elems
 
   def nearest_node(self, point: List[float], state: int) -> Tuple[int,float]:
     """Get the nearest node to a specified point.
@@ -134,6 +138,80 @@ class AdjacencyMapping:
     if not self.serial:
       nearest_per_proc = min(nearest_per_proc, key=lambda x: x[2])
     return nearest_per_proc
+
+  def neighbor_elements(self, class_name: str, label: int, material: Optional[Union[int,str]] = None, neighbor_radius: int = 1):
+    """Gather all neighbor elements to a specified element.
+
+    Args:
+      class_name (str): The element class name.
+      labels (int): The element label.
+      material (Optional[Union[int,str]], default=None): Limit gathered elements to a specific material number.
+      neighbor_radius (int, default=1): The number of neighbors to go out from the specified element.
+    """
+    labels = self.obj.labels(class_name)
+    if labels is None:
+      raise ValueError(f"No labels found for class name '{class_name}'")
+    if not self.serial:
+      labels = np.unique(np.concatenate(list(filter(lambda x : x is not None, labels))))
+    if label not in labels:
+      raise ValueError(f"The label '{label}' was not found for the class '{class_name}'")
+
+    def nodes_of_elems(element_class, element_labels):
+      """Wrap call to MiliDatabase.nodes_of_elems to handle serial vs parallel"""
+      nodes = self.obj.nodes_of_elems(element_class, element_labels)
+      if not self.serial:
+        nodes = np.concatenate([n[0] for n in nodes if isinstance(n, tuple)]).ravel()
+      else:
+        nodes = nodes[0].ravel()
+      return nodes
+
+    def material_classes(material):
+      """Wrap call to MiliDatabase.material_classes to handle serial vs parallel"""
+      classes_of_material = self.obj.material_classes(material)
+      if not self.serial:
+        classes_of_material = np.unique(np.concatenate(classes_of_material))
+      return classes_of_material
+
+    def class_labels_of_material(material, elem_class):
+      """Wrap call to MiliDatabase.class_labels_of_material to handle serial vs parallel"""
+      elems_of_material = self.obj.class_labels_of_material(material, elem_class)
+      if not self.serial:
+        elems_of_material = np.unique(np.concatenate(elems_of_material))
+      return elems_of_material
+
+    elements = {}
+    nodes = nodes_of_elems(class_name, label)
+    nodes_processed = set()
+    nodes_to_process = set(nodes)
+    steps_from_elem = 0
+    while len(nodes_to_process) > 0 and steps_from_elem < neighbor_radius:
+      # Get all elements associated with the nodes we are currently processing
+      nodes_processed.update(nodes_to_process)
+      elems = self.elems_of_nodes(nodes_to_process)
+      elements = dictionary_merge_concat_unique([elements, elems])
+
+      nodes_to_process.clear()
+      steps_from_elem += 1
+
+      # Get the nodes of the elements we just found and mark them as needing to be processed
+      # filter out nodes that have already been processed
+      if steps_from_elem < neighbor_radius:
+        for elem_class, elem_labels in elems.items():
+          nodes = nodes_of_elems(elem_class, elem_labels)
+          nodes_to_process.update(nodes)
+        nodes_to_process = nodes_to_process.difference(nodes_processed)
+
+    if material:
+      # Filter out elements not of the specified material
+      classes_of_material = material_classes(material)
+      elements = { k:v for k,v in elements.items() if k in classes_of_material }
+
+      for elem_class in elements:
+        elems_of_material = class_labels_of_material(material, elem_class)
+        where = np.where(np.isin(elements[elem_class], elems_of_material))
+        elements[elem_class] = elements[elem_class][where]
+
+    return elements
 
 class GeometricMeshInfo:
   """A wrapper around MiliDatabase objects that handles Geometric mesh info and queries.
@@ -253,19 +331,19 @@ class GeometricMeshInfo:
     elems_of_nodes = {}
     elem_conns = self.db.connectivity()
     for class_name in elem_conns:
-      class_conns = elem_conns[class_name]
-      if material is not None:
-        # Filter out element classes that do not have any elements of this material
-        mats_of_class = np.unique(self.db.materials_of_class_name(class_name))
-        if material not in mats_of_class:
-          continue
-        # Filter out elements not of the specified material
-        elems_of_mat = np.where(class_conns[:,-1] == material)[0]
-        class_conns = elem_conns[class_name][elems_of_mat,:]
-
-      matches, _ = np.where(np.isin(class_conns[:,:-1], nlabels))
+      matches, _ = np.where(np.isin(elem_conns[class_name][:,:-1], nlabels))
       if len(matches) != 0:
         matches = np.unique( matches )
         elems_of_nodes[class_name] = np.unique( self.db.labels(class_name)[matches] )
+
+    if material:
+      # Filter out elements not of the specified material
+      classes_of_material = self.db.material_classes(material)
+      elems_of_nodes = { k:v for k,v in elems_of_nodes.items() if k in classes_of_material }
+
+      for elem_class in elems_of_nodes:
+        elems_of_material = self.db.class_labels_of_material(material, elem_class)
+        where = np.where(np.isin(elems_of_nodes[elem_class], elems_of_material))
+        elems_of_nodes[elem_class] = elems_of_nodes[elem_class][where]
 
     return elems_of_nodes

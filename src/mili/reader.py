@@ -541,10 +541,13 @@ class MiliDatabase:
         elem_labels = [ elem_labels ]
     if class_sname not in self.__class_to_sclass:
       return np.empty([1,0],dtype=np.int32)
-    if any( label not in self.__labels[class_sname] for label in elem_labels ):
+    if all( label not in self.__labels[class_sname] for label in elem_labels ):
       return np.empty([1,0],dtype=np.int32)
     if class_sname not in self.__conns:
       return np.empty([1,0],dtype=np.int32)
+
+    # Only search for labels that actually exist for this processor/database
+    elem_labels = [label for label in elem_labels if label in self.__labels[class_sname]]
 
     # get the indices of the labels we're querying in the list of local labels of the element class, so we can retrieve their connectivity
     indices = (self.__labels[class_sname][:,None] == elem_labels).argmax(axis=0)

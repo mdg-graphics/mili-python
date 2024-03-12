@@ -583,6 +583,7 @@ The mili-python reader provides some support for querying element adjacencies th
 - Querying all elements associated with a set of specific nodes using the `elems_of_nodes` function.
 - Querying the nearest node to a 3d coordinate using the `nearest_node` function.
 - Querying the nearest element to a 3d coordinate using the `nearest_element` function.
+- Querying the neighboring elements for a given element using the `neighbor_elements` function.
 
 The function `mesh_entities_within_radius` computes the centroid of the element you have specified using the nodal coordinates for that element at the specified state. The reader then gathers all nodes within the specified radius of that centroid and returns all elements that are associated with those nodes. This function also takes the optional arguement `material` that limits the search to a specific material name or number.
 
@@ -624,7 +625,7 @@ adjacent_elements = {
 """
 ```
 
-The function `elems_of_nodes` gathers all elements associated with a set of nodes.
+The function `elems_of_nodes` gathers all elements associated with a set of nodes. This function also takes the optional arguement `material` that limits the search to a specific material name or number.
 
 ```python
 from mili import adjacency
@@ -655,6 +656,23 @@ adj = adjacency.AdjacencyMapping(db)
 
 # Get the closest element (class name and label) and its distance from the point (0.0, 0.0, 0.0) at state 1.
 class_name, label, distance = adj.nearest_element( [0.0, 0.0, 0.0], 1)
+```
+
+The function `neighbor_elements` finds all elements that neighbor the specified element. A neighbor element is defined as any element that shares a node with the specified element. The `neighbor_radius` argument can be used to specify the number of steps out from the element to perform while gathering the neighbor elements. The `material` argument can be used to limit the elements that are returned to a specified material name or number.
+```python
+from mili import adjacency
+adj = adjacency.AdjacencyMapping(db)
+
+neighbors = adj.neighbor_elements("brick", 1, neighbor_radius=2, material=2)
+"""
+The format of the returned dictionary is shown below:
+
+neighbors = {
+    "brick": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+              11, 12, 13, 14, 15, 16, 17, 18,
+              19, 21, 23, 25, 27, 29, 31, 33, 35]
+}
+"""
 ```
 
 # MiliDatabase Class member functions

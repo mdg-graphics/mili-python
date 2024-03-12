@@ -2,6 +2,10 @@
 [![pipeline status](https://rzlc.llnl.gov/gitlab/mili/mili-python/badges/master/pipeline.svg)](https://rzlc.llnl.gov/gitlab/mili/mili-python/-/commits/master)
 [![coverage report](https://rzlc.llnl.gov/gitlab/mili/mili-python/badges/master/coverage.svg)](https://rzlc.llnl.gov/gitlab/mili/mili-python/-/commits/master)
 
+# Changelog
+
+A history of the changes made to mili-python can be found ![here](doc/changelog.md)
+
 # Manual
 
 The Mili Python manual can be found ![here](doc/source/manual.md)

@@ -18,6 +18,17 @@ def dictionary_merge_concat(dictionaries):
         combined_dictionary[key] = np.append(combined_dictionary[key], value)
   return combined_dictionary
 
+def dictionary_merge_concat_unique(dictionaries):
+  """Merge dictionaries. When same key appears in multiple dictionaries, concatenate unique results."""
+  combined_dictionary = {}
+  for dictionary in dictionaries:
+    for key, value in dictionary.items():
+      if key not in combined_dictionary:
+        combined_dictionary[key] = value
+      else:
+        combined_dictionary[key] = np.unique(np.append(combined_dictionary[key], value))
+  return combined_dictionary
+
 def merge_result_dictionaries( result_dicts: List[dict] ) -> Dict:
   """Combine parallel results dictionaries into a single dictionary."""
   merged_results = {}
