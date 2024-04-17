@@ -594,9 +594,9 @@ class DerivedExpressions:
 
       # Call function to derive result
       if supports_batching:
-        derived_result = compute_function( group, primal_data, query_args, **kwargs )
+        derived_result.update( compute_function( group, primal_data, query_args, **kwargs ) )
       else:
-        derived_result = compute_function( group[0], primal_data, query_args, **kwargs )
+        derived_result.update( compute_function( group[0], primal_data, query_args, **kwargs ) )
 
     return derived_result
 

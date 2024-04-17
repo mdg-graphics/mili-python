@@ -12,6 +12,12 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Removed
 
+## [v0.6.6] - 2024-4-17
+
+### Fixed
+
+- Fixed bug where querying multiple derived variables in a single query only returned the results for one of the variables.
+
 ## [v0.6.5] - 2024-3-12
 
 ### Added

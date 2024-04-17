@@ -102,6 +102,32 @@ class SerialDerivedExpressions(unittest.TestCase):
         self.assertEqual( self.mili.classes_of_derived_variable("vol_strain"), VOL_STRAIN_CLASSES)
         self.assertEqual( self.mili.classes_of_derived_variable("element_volume"), VOLUME_CLASSES)
 
+    def test_query_multiple_variables(self):
+        tolerance = 1e-5
+        result = self.mili.query(["pressure", "eff_stress"], "brick", states=[2,44,86], labels=[10,20])
+
+        self.assertEqual(result['pressure']['source'], 'derived')
+        # State 2, labels 10, 20
+        self.assertAlmostEqual( result['pressure']['data'][0][0][0], 3.839578e-10, delta=tolerance)
+        self.assertAlmostEqual( result['pressure']['data'][0][1][0], -7.582866e-10, delta=tolerance)
+        # State 44, labels 10, 20
+        self.assertAlmostEqual( result['pressure']['data'][1][0][0], 9.1467084e+02, delta=tolerance)
+        self.assertAlmostEqual( result['pressure']['data'][1][1][0], 1.3345321e+03, delta=tolerance)
+        # State 86, labels 10, 20
+        self.assertAlmostEqual( result['pressure']['data'][2][0][0], 1.01330115e+03, delta=tolerance)
+        self.assertAlmostEqual( result['pressure']['data'][2][1][0], 1.9704016e+02, delta=tolerance)
+
+        self.assertEqual(result['eff_stress']['source'], 'derived')
+        # State 2, labels 10, 20
+        self.assertAlmostEqual( result['eff_stress']['data'][0][0][0], 3.88536481e-10, delta=1e-18)
+        self.assertAlmostEqual( result['eff_stress']['data'][0][1][0], 7.60721042e-10, delta=1e-18)
+        # State 44, labels 10, 20
+        self.assertAlmostEqual( result['eff_stress']['data'][1][0][0], 1.88665918e+03, delta=3.5E-7)
+        self.assertAlmostEqual( result['eff_stress']['data'][1][1][0], 9.77912305e+03, delta=3.5E-6)
+        # State 86, labels 10, 20
+        self.assertAlmostEqual( result['eff_stress']['data'][2][0][0], 1.09058093e+03, delta=3.0E-6)
+        self.assertAlmostEqual( result['eff_stress']['data'][2][1][0], 1.22841052e+03, delta=2.5E-6)
+
     def test_pressure(self):
         """Pressure"""
         tolerance = 1e-5
