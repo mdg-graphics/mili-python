@@ -12,6 +12,12 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Removed
 
+## [v0.6.7] - 2024-4-22
+
+### Fixed
+
+- Fixed bug where combining the derived result `element_volume` caused an exception.
+
 ## [v0.6.6] - 2024-4-17
 
 ### Fixed

@@ -1414,7 +1414,8 @@ class DerivedExpressions:
     derived_result = {
       result_name: {
         "data": np.empty( (len(states), len(labels), 1), dtype=np.float32 ),
-        "layout": { "state": states, "labels": labels }
+        "layout": { "states": states, "labels": labels },
+        "source": "derived"
       }
     }
 

@@ -883,7 +883,7 @@ class ParallelDerivedExpressions(unittest.TestCase):
     file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
 
     def setUp(self):
-        self.mili = reader.open_database( ParallelDerivedExpressions.file_name, suppress_parallel=False )
+        self.mili = reader.open_database( ParallelDerivedExpressions.file_name, suppress_parallel=False, experimental=True )
 
     def test_pressure(self):
         """Pressure"""
@@ -1366,3 +1366,12 @@ class ParallelDerivedExpressions(unittest.TestCase):
         self.assertAlmostEqual(result[3]["element_volume"]["data"][1,1,0], 0.0291667)
         self.assertAlmostEqual(result[3]["element_volume"]["data"][2,0,0], 0.02083334)
         self.assertAlmostEqual(result[3]["element_volume"]["data"][2,1,0], 0.0291667)
+
+        result = reader.combine( self.mili.query("element_volume", "brick", labels=[1,4], states=[1,3,4]) )
+
+        self.assertAlmostEqual(result["element_volume"]["data"][0,0,0], 0.02083334)
+        self.assertAlmostEqual(result["element_volume"]["data"][0,1,0], 0.0291667)
+        self.assertAlmostEqual(result["element_volume"]["data"][1,0,0], 0.02083334)
+        self.assertAlmostEqual(result["element_volume"]["data"][1,1,0], 0.0291667)
+        self.assertAlmostEqual(result["element_volume"]["data"][2,0,0], 0.02083334)
+        self.assertAlmostEqual(result["element_volume"]["data"][2,1,0], 0.0291667)
