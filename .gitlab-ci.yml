@@ -10,6 +10,10 @@ workflow:
       when: always
     - when: never
 
+include:
+  - project: 'lc-templates/id_tokens'
+    file: 'id_tokens.yml'
+
 variables:
     MINIMUM_COVERAGE: "86"
     INSTALL_ROOT: "/collab/usr/gapps/mdg/python/"
