@@ -16,35 +16,7 @@ from functools import reduce
 
 # TODO: probably just create a wrapper/dispatch superclass, and implement loop/pool/client-server versions instead of loop/pool in one and client/server in another
 
-class ReturnCode(Enum):
-  OK = 0
-  ERROR = 1
-  CRITICAL = 2
-
-  def str_repr(self):
-    return ["Success", "Error", "Critical"][self.value]
-
-def parse_return_codes(return_codes):
-  if not np.all([rcode_tup[0] == ReturnCode.OK for rcode_tup in return_codes]):
-    # An error has occurred. Need to determine severity.
-    num_ret_codes = len(return_codes)
-    error_types = np.array(return_codes)[:,0]
-    errors = np.where(np.isin(error_types, ReturnCode.ERROR))[0]
-    critical = np.where(np.isin(error_types, ReturnCode.CRITICAL))[0]
-    if len(critical) > 0 or len(errors) == num_ret_codes:
-      all_errors = np.concatenate((return_codes[errors], return_codes[critical]))
-      error_msgs = list(set([f"{retcode[0].str_repr()}: {retcode[1]}" for retcode in all_errors]))
-      raise ValueError(", ".join(error_msgs))
-
-class Wrapper:
-  """Wrapper superclass."""
-  def __init__(self, cls_obj):
-    self.cls_obj = cls_obj
-    self.supports_returncode = False
-    if hasattr(cls_obj, "returncode"):
-      self.supports_returncode = True
-
-class LoopWrapper(Wrapper):
+class LoopWrapper:
   def __init__( self,
                 cls_obj : Type,
                 proc_pargs : List[List[Any]] = [],
@@ -59,9 +31,6 @@ class LoopWrapper(Wrapper):
     elif num_kwargs != num_pargs:
       raise ValueError(f'Must supply the same number of pargs ({num_pargs}) and kwargs ({num_kwargs}) to instantiate object list.')
 
-    # Call super class constructor to set up return code if available
-    super(LoopWrapper, self).__init__(cls_obj)
-
     if objects:
       objs = objects
     else:
@@ -75,8 +44,8 @@ class LoopWrapper(Wrapper):
     self._objs = objs
 
     # Add member functions to this object based on the member functions of the wrapped objects
-    call_lambda = lambda _attr, _cls_obj, _objs : lambda *pargs, **kwargs: self.loop_caller(_attr,_cls_obj,_objs,*pargs,**kwargs)
-    for func in ( func for func in dir(cls_obj) if not func.startswith('__') and not func.startswith(f'_{cls_obj.__name__}') ):
+    call_lambda = lambda _attr, _cls_obj, _objs : lambda *pargs, **kwargs: self.__loop_caller(_attr,_cls_obj,_objs,*pargs,**kwargs)
+    for func in ( func for func in dir(cls_obj) if not func.startswith('_') ):
       # Class Methods
       if callable(getattr(cls_obj,func)):
         setattr( self, func, call_lambda(func,cls_obj,objs) )
@@ -86,86 +55,18 @@ class LoopWrapper(Wrapper):
         prop_objs_type = type(prop_objs[0])
         setattr( self, func, LoopWrapper(prop_objs_type, objects=prop_objs))
 
-  def loop_caller(self,attr,cls_obj,objs,*pargs,**kwargs):
+  def __loop_caller(self,attr,cls_obj,objs,*pargs,**kwargs):
     if callable(getattr(cls_obj, attr)):
-      result = [ getattr(cls_obj,attr)( obj, *pargs, **kwargs ) for obj in objs ]
+      try:
+        result = [ getattr(cls_obj,attr)( obj, *pargs, **kwargs ) for obj in objs ]
+      except:
+        result = []
     else:
-      result = [ getattr(obj,attr) for obj in objs ]
-
-    if self.supports_returncode:
-      return_codes = np.array([ obj.returncode() for obj in objs ])
-      parse_return_codes( return_codes )
+      try:
+        result = [ getattr(obj,attr) for obj in objs ]
+      except:
+        result = []
     return result
-
-class PoolWrapper(Wrapper):
-  def __init__( self,
-                cls_obj : Type,
-                proc_pargs : List[List[Any]] = [],
-                proc_kwargs : List[Mapping[Any,Any]] = [],
-                objects: List[Any] = None ):
-    # validate parameters
-    num_pargs = len(proc_pargs)
-    num_kwargs = len(proc_kwargs)
-    if num_pargs > 0 and num_kwargs == 0:
-      proc_kwargs = [ {} ] * num_pargs
-    elif num_kwargs > 0 and num_pargs == 0:
-      proc_pargs = [] * num_kwargs
-    elif num_kwargs != num_pargs:
-      raise ValueError(f'Must supply the same number of pargs ({num_pargs}) and kwargs ({num_kwargs}) to instantiate worker processes')
-
-    # Call super class constructor to set up return code if available
-    super(PoolWrapper, self).__init__(cls_obj)
-
-    if objects:
-      objs = objects
-    else:
-      with mp.ProcessingPool(len(proc_pargs)) as pool:
-        objs = pool.map( lambda args: cls_obj( *args[0], **args[1] ), list( zip(proc_pargs, proc_kwargs) ) )
-
-    # ensure all contained objects are the same exact type (no instances, subclasses are not valid)
-    obj_type = type(objs[0])
-    assert( all( type(obj) == obj_type for obj in objs ) )
-
-    # right now this is just to retain the objs for debuging, but they are all captured in lambdas so this isn't explicitly required
-    self._objs = objs
-
-    # Add member functions to this object based on the member functions of the wrapped objects
-    call_lambda = lambda _attr, _cls_obj, _objs : lambda *pargs, **kwargs: self.pool_caller(_attr,_cls_obj,_objs,*pargs,**kwargs)
-    for func in ( func for func in dir(cls_obj) if not func.startswith('__') and not func.startswith(f'_{cls_obj.__name__}') ):
-      # Class Methods
-      if callable(getattr(cls_obj,func)):
-        setattr( self, func, call_lambda(func,cls_obj,objs) )
-      # Support for properties
-      elif isinstance(getattr(cls_obj, func), property):
-        prop_objs = [ getattr(obj, func) for obj in objs ]
-        prop_objs_type = type(prop_objs[0])
-        setattr( self, func, LoopWrapper(prop_objs_type, objects=prop_objs))
-
-  def returncode_wrapper(func):
-    """Wrapper to run function and get returncode in single call.
-
-    NOTE: This is needed because the state of each object is not maintained across calls
-          to pool.map, so all data needs to be retrieved in one call.
-    """
-    def wrapper(self, *pargs, **kwargs):
-      res = func(self, *pargs, **kwargs)
-      return_codes = self.returncode()
-      return res, return_codes
-    return wrapper
-
-  def pool_caller(self,attr,cls_obj,objs,*pargs,**kwargs):
-    # we make the list ahead of time to bind the pargs and kwargs identically across the pool, instead of having to pass in or make arrays for them
-    if self.supports_returncode:
-      to_invoke = [ partial( PoolWrapper.returncode_wrapper(getattr(cls_obj,attr)), obj, *pargs, **kwargs ) for obj in objs ]
-      with mp.ProcessingPool(len(objs)) as pool:
-        result = pool.map(lambda f: f(), to_invoke) # can't partial the pargs or the first will bind to self
-        res, return_codes = zip(*result)
-        parse_return_codes( np.array(return_codes) )
-    else:
-      to_invoke = [ partial( getattr(cls_obj,attr), obj, *pargs, **kwargs ) for obj in objs ]
-      with mp.ProcessingPool(len(objs)) as pool:
-        res = pool.map(lambda f: f(), to_invoke) # can't partial the pargs or the first will bind to self
-    return res
 
 class SharedMemKey(dict):
   """This is just here so we can compare using ininstance. Not sure if there is a better way to do this."""
@@ -223,13 +124,13 @@ class Shmallocate:
     self.__all_shmem = {}
 
 
-class ServerWrapper(Wrapper):
+class ServerWrapper:
   """Multiprocessing client/server wrapper for reading Mili databases in parallel.
 
   When more plot files exist than processors, each processor handles multiple file
   using the same concept as the loop wrapper.
   """
-  class ClientWrapper(Process):
+  class _ClientWrapper(Process):
     def __init__( self,
                   conn,
                   cls_obj: Type,
@@ -339,13 +240,10 @@ class ServerWrapper(Wrapper):
     elif num_kwargs != num_pargs:
       raise ValueError(f'Must supply the same number of pargs ({num_pargs}) and kwargs ({num_kwargs}) to instantiate worker processes')
 
-    # Call super class constructor to set up return code if available
-    super(ServerWrapper, self).__init__(cls_obj)
-
     # need to have a lambda that returns new lambdas for each func to avoid only have a single lambda bound for all funcs
     mem_maker = lambda attr : lambda *pargs, **kwargs : self.__worker_call( attr, *pargs, **kwargs )
     # generate member functions mimicking those in the wrapped class, excluding private and class functions
-    for func in ( func for func in dir(cls_obj) if not func.startswith('__') and not func.startswith(f'_{cls_obj.__name__}') ):
+    for func in ( func for func in dir(cls_obj) if not func.startswith('_') ):
       # Class Methods and Properties
       if callable(getattr(cls_obj,func)) or isinstance(getattr(cls_obj, func), property):
         setattr( self, func, mem_maker(func) )
@@ -376,7 +274,7 @@ class ServerWrapper(Wrapper):
     self.__conns = []
     for pargs, kwargs in zip( proc_pargs, proc_kwargs ):
       c0, c1 = multiprocessing.Pipe()
-      self.__pool.append( ServerWrapper.ClientWrapper( c1, cls_obj, self.__use_shared_memory, pargs, kwargs ) )
+      self.__pool.append( ServerWrapper._ClientWrapper( c1, cls_obj, self.__use_shared_memory, pargs, kwargs ) )
       self.__conns.append( c0 )
 
     atexit.register(self.__cleanup_processes)
@@ -430,17 +328,6 @@ class ServerWrapper(Wrapper):
 
     self.__shmalloc.unlink()
 
-    if self.supports_returncode:
-      data = ("returncode", [], {})
-      for conn in self.__conns:
-        conn.send( dill.dumps( data ) )
-
-      return_codes = []
-      for idx, conn in enumerate(self.__conns):
-        return_codes.append( dill.loads( conn.recv_bytes() ) )
-      return_codes = np.array(self.__flatten(return_codes))
-      parse_return_codes(return_codes)
-
     return self.__flatten(results)
 
 def get_wrapper( suppress_parallel = False, experimental = False ):
@@ -448,8 +335,5 @@ def get_wrapper( suppress_parallel = False, experimental = False ):
   if suppress_parallel:
     Wrapper = LoopWrapper
   else:
-    if experimental:
-      Wrapper = ServerWrapper
-    else:
-      Wrapper = PoolWrapper
+    Wrapper = ServerWrapper
   return Wrapper

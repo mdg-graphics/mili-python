@@ -18,13 +18,6 @@ class AppendStatesTool:
     self.append_states_spec = input_dictionary
     self.database = self.check_append_states_spec()
 
-  def __flatten_if_parallel( self, alist ):
-    if self.serial_database:
-      return alist
-    else:
-      alist = [item for item in alist if item is not None]
-      return [item for sublist in alist for item in sublist]
-
   def __get_spec_var(self, key, type_ok, required=False, err_msg="" ):
     # Check key exists
     variable = self.append_states_spec.get( key, None )
@@ -102,6 +95,16 @@ class AppendStatesTool:
     out_database_name = self.__get_spec_var("output_basename", str, required=req,
                                             err_msg=" Required if output_mode == 'write'.")
 
+    # Check for state file state count / size limits
+    limit_states = self.__get_spec_var("limit_states_per_file", int, required=False)
+    if limit_states is not None:
+      if limit_states < 1:
+        raise ValueError(f"The value of 'limit_states_per_file' must be >= 1. Current value is {limit_states}")
+    limit_bytes = self.__get_spec_var("limit_bytes_per_file", int, required=False)
+    if limit_bytes is not None:
+      if limit_bytes < 1:
+        raise ValueError(f"The value of 'limit_bytes_per_file' must be >= 1. Current value is {limit_bytes}")
+
     # Check states is valid int
     states = self.__get_spec_var("states", int, required=True)
     if not isinstance(states,(int,np.int32)) or states < 0:
@@ -114,14 +117,10 @@ class AppendStatesTool:
       raise KeyError( f"Could not find state_times or time_inc in append_states_spec. At least one is required." )
 
     # Try to open original mili database from database_basename from user input
-    orig_database = reader.open_database( in_database_name, suppress_parallel=False, experimental=True )
-    # Check if database is serial or parallel
-    if isinstance(orig_database, reader.MiliDatabase):
-      self.serial_database = True
-    else:
-      self.serial_database = False
+    orig_database = reader.open_database( in_database_name, suppress_parallel=False, merge_results=True )
+    self.serial_database = orig_database.serial
 
-    orig_state_times = orig_database.times() if self.serial_database else orig_database.times()[0]
+    orig_state_times = orig_database.times()
     orig_last_time = orig_state_times[-1]
     # Get state_times from time_inc and last state time from original db
     if state_times == None and time_inc != None:
@@ -166,7 +165,7 @@ class AppendStatesTool:
 
         svar, svar_vector_name = self.__parse_svar_name( svar )
         # Look up svar component quantity to allow overwriting arrays
-        all_svars = orig_database.state_variables()
+        all_svars = orig_database._mili.state_variables()
         if self.serial_database:
           svar_def = all_svars.get(svar, None)
           if svar_def is None:
@@ -193,10 +192,7 @@ class AppendStatesTool:
               raise ValueError(f"Unable to find {svar_vector_name} state variable in original database.")
         else:
           # Check for special cases of stress_in|mid|out or strain_in|out
-          if self.serial_database:
-            containing_svars = np.unique(orig_database.containing_state_variables_of_class(svar, svar_class))
-          else:
-            containing_svars = np.unique(np.concatenate(orig_database.containing_state_variables_of_class(svar, svar_class)))
+          containing_svars = np.unique(orig_database.containing_state_variables_of_class(svar, svar_class))
           if len(containing_svars) > 1:
             raise ValueError(f"The state variable '{svar}' exists in multiple vectors ({containing_svars}) for " \
                              f"the class '{svar_class}'. You will need to specify the svar as vector-name[comp-name] in append_states_spec.")
@@ -207,23 +203,20 @@ class AppendStatesTool:
           svar_atom_qty = int(svar_atom_qty / prod(svar_def.dims) )
 
         # Check svar and svar_class exist in original database
-        orig_svar_classes = np.unique(self.__flatten_if_parallel(orig_database.classes_of_state_variable(svar)))
+        orig_svar_classes = orig_database.classes_of_state_variable(svar)
         if svar_class not in orig_svar_classes:
           raise ValueError( f"Unable to find {svar_class} {svar} data in original database." )
 
         # Check labels match
-        orig_labels = np.unique(self.__flatten_if_parallel(orig_database.labels(svar_class)))
+        orig_labels = orig_database.labels(svar_class)
         if not np.all(np.isin(svar_labels, orig_labels)):
             raise ValueError( f"Value(s) specified for {svar_class} {svar} labels [{svar_labels}] do not match values in original database." )
 
         # Check if integration points exist for this state variable + class_name
         available_int_points = orig_database.int_points_of_state_variable(svar, svar_class)
-        if not self.serial_database:
-          available_int_points = [int_points for int_points in available_int_points if int_points != []]
-          available_int_points = [] if len(available_int_points) == 0 else available_int_points[0]
 
         # If there are multiple integration points
-        if available_int_points != []:
+        if len(available_int_points) > 0:
           if svar_int_point is None:
             svar_int_point = available_int_points
           elif isinstance(svar_int_point, int) and svar_int_point in available_int_points:
@@ -231,7 +224,7 @@ class AppendStatesTool:
           else:
             raise ValueError(f"Invalid value for {svar_class} {svar}['int_point']: {svar_int_point}. " \
                              f"Availabe integration points: {available_int_points}")
-        if available_int_points == [] and svar_int_point is not None:
+        if len(available_int_points) == 0 and svar_int_point is not None:
           raise ValueError(f"Invalid value for {svar_class} {svar}['int_point']: {svar_int_point}. " \
                            f"No integration points exists for this state variable/class.")
         n_int_points = 1 if svar_int_point is None else len(svar_int_point)
@@ -325,7 +318,7 @@ class AppendStatesTool:
     """Generate new state times and numbers to add to the database"""
     new_state_times = []
     new_state_numbers = []
-    state_times = database.times() if self.serial_database else database.times()[0]
+    state_times = database.times()
     if "state_times" in self.append_states_spec:
       new_state_times = self.append_states_spec['state_times']
     elif "time_inc" in self.append_states_spec:
@@ -347,20 +340,23 @@ class AppendStatesTool:
       output_database = self.database
     elif self.append_states_spec['output_mode'] == "write":
       self.database.copy_non_state_data( self.append_states_spec['output_basename'] )
-      output_database = reader.open_database( self.append_states_spec['output_basename'], experimental=True )
+      output_database = reader.open_database( self.append_states_spec['output_basename'], experimental=True, merge_results=True )
 
     new_state_times, new_state_numbers = self.__get_new_state_times(output_database)
 
+    state_limit = self.append_states_spec.get("limit_states_per_file", None)
+    byte_limit = self.append_states_spec.get("limit_bytes_per_file", None)
+
     for new_time in new_state_times:
-      output_database.append_state( new_time )
+      output_database.append_state( new_time, limit_states_per_file=state_limit, limit_bytes_per_file=byte_limit)
 
     for class_name, modified_svars in self.append_states_spec['state_variables'].items():
       for svar_name, spec in modified_svars.items():
         labels = spec['labels']
         int_point = spec.get('int_point', None)
         new_data = spec['data']
-        svar_result = reader.combine(output_database.query(svar_name, class_name, labels=labels, states=new_state_numbers, ips=int_point))
+        svar_result = output_database.query(svar_name, class_name, labels=labels, states=new_state_numbers, ips=int_point)
         current_shape = svar_result[svar_name]['data'].shape
         new_data = np.reshape(new_data, current_shape)
         svar_result[svar_name]['data'] = new_data
-        reader.combine(output_database.query(svar_name, class_name, labels=labels, states=new_state_numbers, ips=int_point, write_data=svar_result))
+        output_database.query(svar_name, class_name, labels=labels, states=new_state_numbers, ips=int_point, write_data=svar_result)

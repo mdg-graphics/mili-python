@@ -12,6 +12,29 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Removed
 
+## [v0.7.0]
+
+### Added
+
+- `components_of_vector_svar` method to get the component state variable names for a vector state variable.
+- Added the keywords `limit_states_per_file` and `limit_bytes_per_file` to the append states tool to support contraining the size/count of state files when appending states to a database.
+
+### Fixed
+
+- Fixed bug where exception was not thrown when trying to query an invalid state variable, element class combination.
+
+### Changed
+
+- The `material_numbers` method now returns a `numpy.ndarray` rather than `List[int]`.
+- The `int_points_of_state_variable` method now returns a `numpy.ndarray` rather than `List[int]`.
+- The `connectivity` method now returns element LABELS instead of element IDS.
+- There is no longer a difference in the format of the results returned by the `MiliDatabase` functions for a serial database vs. an uncombined database. The uncombined results are merged into a serial format now.
+- The following `MiliDatabase` methods are now hidden: `subrecords`, `state_variables`, `mesh_object_classes`, `int_points`, `parameters`, `parameter`. These are functions that users should never need to use as they access the internal structures in Mili.
+
+### Removed
+
+- The `PoolWrapper` parallel implementation has been removed and the `ServerWrapper` parallel implementation has replaced it as the default parallel mode.
+
 ## [v0.6.7] - 2024-4-22
 
 ### Fixed

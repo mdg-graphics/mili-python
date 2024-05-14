@@ -34,7 +34,7 @@ Copyright (c) 2016-present, Lawrence Livermore National Security, LLC.
 import re
 import os
 import unittest
-from mili import reader
+from mili.reader import open_database, combine
 import numpy as np
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -45,7 +45,7 @@ class SerialDerivedExpressions(unittest.TestCase):
     file_name = os.path.join(dir_path,'data','serial','sstate','d3samp6.plt')
 
     def setUp(self):
-        self.mili = reader.open_database( SerialDerivedExpressions.file_name, suppress_parallel = True )
+        self.mili = open_database( SerialDerivedExpressions.file_name, suppress_parallel = True )
 
     def test_supported_variables(self):
         EXPECTED = ['disp_x', 'disp_y', 'disp_z', 'disp_mag', 'disp_rad_mag_xy',
@@ -246,7 +246,7 @@ class SerialDerivedExpressions(unittest.TestCase):
     def test_vel_x(self):
         """X Velocity"""
         file_name = os.path.join(dir_path,'data','serial','solids014','solids014_dblplt')
-        db = reader.open_database( file_name, suppress_parallel=True )
+        db = open_database( file_name, suppress_parallel=True )
         result = db.query("vel_x", "node", states=[1,3], labels=[7,1217])
         # State 1, nodes 7, 1217
         self.assertAlmostEqual( result['vel_x']['data'][0][0][0], 0.000000e+00)
@@ -258,7 +258,7 @@ class SerialDerivedExpressions(unittest.TestCase):
     def test_vel_y(self):
         """Y Velocity"""
         file_name = os.path.join(dir_path,'data','serial','solids014','solids014_dblplt')
-        db = reader.open_database( file_name, suppress_parallel=True )
+        db = open_database( file_name, suppress_parallel=True )
         result = db.query("vel_y", "node", states=[1,3], labels=[7,1217])
         # State 1, nodes 7, 1217
         self.assertAlmostEqual( result['vel_y']['data'][0][0][0], 0.000000e+00)
@@ -270,7 +270,7 @@ class SerialDerivedExpressions(unittest.TestCase):
     def test_vel_z(self):
         """Z Velocity"""
         file_name = os.path.join(dir_path,'data','serial','solids014','solids014_dblplt')
-        db = reader.open_database( file_name, suppress_parallel=True )
+        db = open_database( file_name, suppress_parallel=True )
         result = db.query("vel_z", "node", states=[1,3], labels=[7,1217])
         # State 1, nodes 7, 1217
         self.assertAlmostEqual( result['vel_z']['data'][0][0][0], 0.000000e+00)
@@ -297,7 +297,7 @@ class SerialDerivedExpressions(unittest.TestCase):
         # These tests only use the forward and backward difference algorithms.
         # Those acceleration calculations in griz may be incorrect causing these tests to fail.
         # file_name = os.path.join(dir_path,'data','serial','solids014','solids014_dblplt')
-        # db = reader.open_database( file_name, suppress_parallel=True )
+        # db = open_database( file_name, suppress_parallel=True )
         # result = db.query("acc_x", "node", states=[1,2], labels=[7,1217])
         # # State 1, nodes 7, 1217
         # self.assertAlmostEqual( result['acc_x']['data'][0][0][0], 0.000000e+00)
@@ -761,7 +761,7 @@ class SerialDerivedExpressions(unittest.TestCase):
         # Use a different database that has plastic strain (eps)
         # This database does not have (i.e. test) variable time steps.
         file_name = os.path.join(dir_path,'data','serial','d3samp4','d3samp4.plt')
-        db = reader.open_database( file_name, suppress_parallel=True )
+        db = open_database( file_name, suppress_parallel=True )
 
         # Hand calcs for eps_rate
         EPS_RATE1_46_1 = 0.0
@@ -794,7 +794,7 @@ class SerialDerivedExpressions(unittest.TestCase):
         """Nodal Tangential Traction Magnitude"""
         # Uses a different database that contains the primals "nodtang"
         file_name = os.path.join(dir_path,'data','serial','dbl_nodtang','dblplt')
-        db = reader.open_database( file_name, suppress_parallel=True )
+        db = open_database( file_name, suppress_parallel=True )
 
         result = db.query("nodtangmag", "cbs1_particle", labels=[5, 95, 115], states=[1, 60, 122])
         # cbs1_particle 5
@@ -828,7 +828,7 @@ class SerialDerivedExpressions(unittest.TestCase):
         """Test Material Center of Gravity Displacement."""
         # Uses a different database that contains the primals "matcg[x|y|z]"
         file_name = os.path.join(dir_path,'data','serial','rigid_body_1','rigid_body1.plt')
-        db = reader.open_database( file_name, suppress_parallel=True )
+        db = open_database( file_name, suppress_parallel=True )
 
         result = db.query("mat_cog_disp_x", "mat", labels=[1], states=[1,3,5,7])
         self.assertAlmostEqual(result['mat_cog_disp_x']['data'][0,0,0], 0.0)
@@ -863,7 +863,7 @@ class SerialDerivedExpressions(unittest.TestCase):
         """Test Element Volume calculation for Tets."""
         # Uses a different database that contains the tet elements"
         file_name = os.path.join(dir_path,'data','serial','tet','tet1_t4.plt')
-        db = reader.open_database( file_name, suppress_parallel=True )
+        db = open_database( file_name, suppress_parallel=True )
 
         result = db.query("element_volume", "tet", labels=[53,59,65], states=[1,49,81])
         self.assertAlmostEqual(result["element_volume"]["data"][0,0,0], 6.291125304843772E-05)
@@ -883,7 +883,10 @@ class ParallelDerivedExpressions(unittest.TestCase):
     file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
 
     def setUp(self):
-        self.mili = reader.open_database( ParallelDerivedExpressions.file_name, suppress_parallel=False, experimental=True )
+        self.mili = open_database( ParallelDerivedExpressions.file_name, suppress_parallel=False, merge_results=False )
+
+    def tearDown(self):
+        self.mili.close()
 
     def test_pressure(self):
         """Pressure"""
@@ -1367,7 +1370,7 @@ class ParallelDerivedExpressions(unittest.TestCase):
         self.assertAlmostEqual(result[3]["element_volume"]["data"][2,0,0], 0.02083334)
         self.assertAlmostEqual(result[3]["element_volume"]["data"][2,1,0], 0.0291667)
 
-        result = reader.combine( self.mili.query("element_volume", "brick", labels=[1,4], states=[1,3,4]) )
+        result = combine( self.mili.query("element_volume", "brick", labels=[1,4], states=[1,3,4]) )
 
         self.assertAlmostEqual(result["element_volume"]["data"][0,0,0], 0.02083334)
         self.assertAlmostEqual(result["element_volume"]["data"][0,1,0], 0.0291667)

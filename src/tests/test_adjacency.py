@@ -109,81 +109,81 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
     def test_mesh_entities_in_radius(self):
         """Test the mesh_entities_in_radius function."""
         elems = self.adjacency.mesh_entities_within_radius("node", 120, 1, 0.1)
-        np.testing.assert_equal( elems["brick"], [31,32,33,34] )
+        np.testing.assert_equal( sorted(elems["brick"]), [31,32,33,34] )
 
         elems = self.adjacency.mesh_entities_within_radius("brick", 32, 1, 0.4)
-        np.testing.assert_equal( elems["brick"], [25,26,27,28,31,32,33,34] )
+        np.testing.assert_equal( sorted(elems["brick"]), [25,26,27,28,31,32,33,34] )
 
         elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3)
-        np.testing.assert_equal( elems["shell"], [3,4,5,6,9,11] )
-        np.testing.assert_equal( elems["beam"], [5,6,37,42] )
-        np.testing.assert_equal( elems["cseg"], [2,3,5,6,8,9] )
+        np.testing.assert_equal( sorted(elems["shell"]), [3,4,5,6,9,11] )
+        np.testing.assert_equal( sorted(elems["beam"]), [5,6,37,42] )
+        np.testing.assert_equal( sorted(elems["cseg"]), [2,3,5,6,8,9] )
 
         # Test limiting by material
         elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3, material=1)
         self.assertEqual( list(elems.keys()), ["beam"] )
-        np.testing.assert_equal( elems["beam"], [5,6,37,42] )
+        np.testing.assert_equal( sorted(elems["beam"]), [5,6,37,42] )
 
         elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3, material=3)
         self.assertEqual( list(elems.keys()), ["shell"] )
-        np.testing.assert_equal( elems["shell"], [3,4,5,6,9,11] )
+        np.testing.assert_equal( sorted(elems["shell"]), [3,4,5,6,9,11] )
 
         elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3, material=4)
         self.assertEqual( list(elems.keys()), ["cseg"] )
-        np.testing.assert_equal( elems["cseg"], [2,3,5,6,8,9] )
+        np.testing.assert_equal( sorted(elems["cseg"]), [2,3,5,6,8,9] )
 
     def test_mesh_entities_near_coordinate(self):
         """Test the mesh_entities_near_coordinate function."""
         elems = self.adjacency.mesh_entities_near_coordinate([1.0825318, 0.62499994, 3.], 1, 0.1)
-        np.testing.assert_equal( elems["brick"], [31,32,33,34] )
+        np.testing.assert_equal( sorted(elems["brick"]), [31,32,33,34] )
 
         elems = self.adjacency.mesh_entities_near_coordinate([1.2828925, 0.34374997, 2.8666668], 1, 0.4)
-        np.testing.assert_equal( elems["brick"], [25,26,27,28,31,32,33,34] )
+        np.testing.assert_equal( sorted(elems["brick"]), [25,26,27,28,31,32,33,34] )
 
         elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3)
-        np.testing.assert_equal( elems["shell"], [3,4,5,6,9,11] )
-        np.testing.assert_equal( elems["beam"], [5,6,37,42] )
-        np.testing.assert_equal( elems["cseg"], [2,3,5,6,8,9] )
+        np.testing.assert_equal( sorted(elems["shell"]), [3,4,5,6,9,11] )
+        np.testing.assert_equal( sorted(elems["beam"]), [5,6,37,42] )
+        np.testing.assert_equal( sorted(elems["cseg"]), [2,3,5,6,8,9] )
 
         # Test limiting by material
         elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3, material=1)
         self.assertEqual( list(elems.keys()), ["beam"] )
-        np.testing.assert_equal( elems["beam"], [5,6,37,42] )
+        np.testing.assert_equal( sorted(elems["beam"]), [5,6,37,42] )
 
         elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3, material=3)
         self.assertEqual( list(elems.keys()), ["shell"] )
-        np.testing.assert_equal( elems["shell"], [3,4,5,6,9,11] )
+        np.testing.assert_equal( sorted(elems["shell"]), [3,4,5,6,9,11] )
 
         elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3, material=4)
         self.assertEqual( list(elems.keys()), ["cseg"] )
-        np.testing.assert_equal( elems["cseg"], [2,3,5,6,8,9] )
+        np.testing.assert_equal( sorted(elems["cseg"]), [2,3,5,6,8,9] )
 
     def test_elems_of_nodes(self):
         """Test the elems_of_nodes function."""
         elems = self.adjacency.elems_of_nodes(120)
         self.assertEqual(list(elems.keys()), ["brick"])
-        np.testing.assert_equal( elems["brick"], [31,32,33,34] )
+        np.testing.assert_equal( sorted(elems["brick"]), [31,32,33,34] )
 
         elems = self.adjacency.elems_of_nodes(15)
         self.assertEqual(list(elems.keys()), ["beam", "shell", "cseg"])
-        np.testing.assert_equal( elems["cseg"], [6,9] )
-        np.testing.assert_equal( elems["beam"], [6, 42] )
-        np.testing.assert_equal( elems["shell"], [6, 11] )
+        np.testing.assert_equal( sorted(elems["cseg"]), [6,9] )
+        np.testing.assert_equal( sorted(elems["beam"]), [6, 42] )
+        np.testing.assert_equal( sorted(elems["shell"]), [6, 11] )
 
         elems = self.adjacency.elems_of_nodes([3,120])
         self.assertEqual(list(elems.keys()), ["beam","brick"])
-        np.testing.assert_equal( elems["beam"], [1,2,12] )
-        np.testing.assert_equal( elems["brick"], [31,32,33,34] )
+        np.testing.assert_equal( sorted(elems["beam"]), [1,2,12] )
+        np.testing.assert_equal( sorted(elems["brick"]), [31,32,33,34] )
 
         node_labels = [ 12,  13,  33,  37,  49,  50,  51,  53,  54,  65,  66,  69,  70,
                         73,  81,  82,  85,  86,  97, 101]
         elems = self.adjacency.elems_of_nodes(node_labels, material=4)
         self.assertEqual(list(elems.keys()), ["cseg"])
-        np.testing.assert_equal( elems["cseg"], [1,2,3,4,5,7,8] )
+        np.testing.assert_equal( sorted(elems["cseg"]), [1,2,3,4,5,7,8] )
 
         elems = self.adjacency.elems_of_nodes(node_labels, material=5)
         self.assertEqual(list(elems.keys()), ["cseg"])
-        np.testing.assert_equal( elems["cseg"], [13,14,15,16,17,19,20] )
+        np.testing.assert_equal( sorted(elems["cseg"]), [13,14,15,16,17,19,20] )
 
     def test_nearest_node(self):
         """Test the nearest_node function."""
@@ -220,27 +220,27 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
         """Test the neighbor_elements funcion."""
         elems = self.adjacency.neighbor_elements("brick", 1)
         self.assertEqual(list(elems.keys()), ["brick", "cseg"])
-        np.testing.assert_equal(elems["brick"], [1, 2, 3, 4, 7, 8, 9, 10])
-        np.testing.assert_equal(elems["cseg"], [13, 14, 16, 17])
+        np.testing.assert_equal(sorted(elems["brick"]), [1, 2, 3, 4, 7, 8, 9, 10])
+        np.testing.assert_equal(sorted(elems["cseg"]), [13, 14, 16, 17])
 
         elems = self.adjacency.neighbor_elements("brick", 1, material = 2)
         self.assertEqual(list(elems.keys()), ["brick"])
-        np.testing.assert_equal(elems["brick"], [1, 2, 3, 4, 7, 8, 9, 10])
+        np.testing.assert_equal(sorted(elems["brick"]), [1, 2, 3, 4, 7, 8, 9, 10])
 
         elems = self.adjacency.neighbor_elements("brick", 1, material = 5)
         self.assertEqual(list(elems.keys()), ["cseg"])
-        np.testing.assert_equal(elems["cseg"], [13, 14, 16, 17])
+        np.testing.assert_equal(sorted(elems["cseg"]), [13, 14, 16, 17])
 
         elems = self.adjacency.neighbor_elements("brick", 1, neighbor_radius = 2)
         self.assertEqual(list(elems.keys()), ["brick", "cseg"])
-        np.testing.assert_equal(elems["brick"], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+        np.testing.assert_equal(sorted(elems["brick"]), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
                                                  11, 12, 13, 14, 15, 16, 17, 18,
                                                  19, 21, 23, 25, 27, 29, 31, 33, 35])
-        np.testing.assert_equal(elems["cseg"], [13, 14, 15, 16, 17, 18, 19, 20, 21])
+        np.testing.assert_equal(sorted(elems["cseg"]), [13, 14, 15, 16, 17, 18, 19, 20, 21])
 
         elems = self.adjacency.neighbor_elements("brick", 1, material=2, neighbor_radius = 3)
         self.assertEqual(list(elems.keys()), ["brick"])
-        np.testing.assert_equal(elems["brick"], np.arange(1, 37)) # All brick elements are within 3 neighbors of brick 1
+        np.testing.assert_equal(sorted(elems["brick"]), np.arange(1, 37)) # All brick elements are within 3 neighbors of brick 1
 
 
 class ParallelAdjacencyTests:
@@ -312,80 +312,80 @@ class ParallelAdjacencyTests:
             """Test the elems_of_nodes function."""
             elems = self.adjacency.elems_of_nodes(120)
             self.assertEqual(list(elems.keys()), ["brick"])
-            np.testing.assert_equal( elems["brick"], [31,32,33,34] )
+            np.testing.assert_equal( sorted(elems["brick"]), [31,32,33,34] )
 
             elems = self.adjacency.elems_of_nodes(15)
             self.assertEqual(list(elems.keys()), ["beam", "shell", "cseg"])
-            np.testing.assert_equal( elems["cseg"], [6,9] )
-            np.testing.assert_equal( elems["beam"], [6, 42] )
-            np.testing.assert_equal( elems["shell"], [6, 11] )
+            np.testing.assert_equal( sorted(elems["cseg"]), [6,9] )
+            np.testing.assert_equal( sorted(elems["beam"]), [6, 42] )
+            np.testing.assert_equal( sorted(elems["shell"]), [6, 11] )
 
             elems = self.adjacency.elems_of_nodes([3,120])
             self.assertEqual(list(elems.keys()), ["brick","beam"])
-            np.testing.assert_equal( elems["beam"], [1,2,12] )
-            np.testing.assert_equal( elems["brick"], [31,32,33,34] )
+            np.testing.assert_equal( sorted(elems["beam"]), [1,2,12] )
+            np.testing.assert_equal( sorted(elems["brick"]), [31,32,33,34] )
 
             node_labels = [ 12,  13,  33,  37,  49,  50,  51,  53,  54,  65,  66,  69,  70,
                             73,  81,  82,  85,  86,  97, 101]
             elems = self.adjacency.elems_of_nodes(node_labels, material=4)
             self.assertEqual(list(elems.keys()), ["cseg"])
-            np.testing.assert_equal( elems["cseg"], [1,2,3,4,5,7,8] )
+            np.testing.assert_equal( sorted(elems["cseg"]), [1,2,3,4,5,7,8] )
 
             elems = self.adjacency.elems_of_nodes(node_labels, material=5)
             self.assertEqual(list(elems.keys()), ["cseg"])
-            np.testing.assert_equal( elems["cseg"], [13,14,15,16,17,19,20] )
+            np.testing.assert_equal( sorted(elems["cseg"]), [13,14,15,16,17,19,20] )
 
         def test_mesh_entities_in_radius(self):
             """Test the mesh_entities_in_radius function."""
             elems = self.adjacency.mesh_entities_within_radius("node", 120, 1, 0.1)
-            np.testing.assert_equal( elems["brick"], [31,32,33,34] )
+            np.testing.assert_equal( sorted(elems["brick"]), [31,32,33,34] )
 
             elems = self.adjacency.mesh_entities_within_radius("brick", 32, 1, 0.4)
-            np.testing.assert_equal( elems["brick"], [25,26,27,28,31,32,33,34] )
+            np.testing.assert_equal( sorted(elems["brick"]), [25,26,27,28,31,32,33,34] )
 
             elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3)
-            np.testing.assert_equal( elems["shell"], [3,4,5,6,9,11] )
-            np.testing.assert_equal( elems["beam"], [5,6,37,42] )
-            np.testing.assert_equal( elems["cseg"], [2,3,5,6,8,9] )
+            np.testing.assert_equal( sorted(elems["shell"]), [3,4,5,6,9,11] )
+            np.testing.assert_equal( sorted(elems["beam"]), [5,6,37,42] )
+            np.testing.assert_equal( sorted(elems["cseg"]), [2,3,5,6,8,9] )
 
             # Test limiting by material
             elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3, material=1)
             self.assertEqual( list(elems.keys()), ["beam"] )
-            np.testing.assert_equal( elems["beam"], [5,6,37,42] )
+            np.testing.assert_equal( sorted(elems["beam"]), [5,6,37,42] )
 
             elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3, material=3)
             self.assertEqual( list(elems.keys()), ["shell"] )
-            np.testing.assert_equal( elems["shell"], [3,4,5,6,9,11] )
+            np.testing.assert_equal( sorted(elems["shell"]), [3,4,5,6,9,11] )
 
             elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3, material=4)
             self.assertEqual( list(elems.keys()), ["cseg"] )
-            np.testing.assert_equal( elems["cseg"], [2,3,5,6,8,9] )
+            np.testing.assert_equal( sorted(elems["cseg"]), [2,3,5,6,8,9] )
 
         def test_mesh_entities_near_coordinate(self):
             """Test the mesh_entities_near_coordinate function."""
             elems = self.adjacency.mesh_entities_near_coordinate([1.0825318, 0.62499994, 3.], 1, 0.1)
-            np.testing.assert_equal( elems["brick"], [31,32,33,34] )
+            np.testing.assert_equal( sorted(elems["brick"]), [31,32,33,34] )
 
             elems = self.adjacency.mesh_entities_near_coordinate([1.2828925, 0.34374997, 2.8666668], 1, 0.4)
-            np.testing.assert_equal( elems["brick"], [25,26,27,28,31,32,33,34] )
+            np.testing.assert_equal( sorted(elems["brick"]), [25,26,27,28,31,32,33,34] )
 
             elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3)
-            np.testing.assert_equal( elems["shell"], [3,4,5,6,9,11] )
-            np.testing.assert_equal( elems["beam"], [5,6,37,42] )
-            np.testing.assert_equal( elems["cseg"], [2,3,5,6,8,9] )
+            np.testing.assert_equal( sorted(elems["shell"]), [3,4,5,6,9,11] )
+            np.testing.assert_equal( sorted(elems["beam"]), [5,6,37,42] )
+            np.testing.assert_equal( sorted(elems["cseg"]), [2,3,5,6,8,9] )
 
             # Test limiting by material
             elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3, material=1)
             self.assertEqual( list(elems.keys()), ["beam"] )
-            np.testing.assert_equal( elems["beam"], [5,6,37,42] )
+            np.testing.assert_equal( sorted(elems["beam"]), [5,6,37,42] )
 
             elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3, material=3)
             self.assertEqual( list(elems.keys()), ["shell"] )
-            np.testing.assert_equal( elems["shell"], [3,4,5,6,9,11] )
+            np.testing.assert_equal( sorted(elems["shell"]), [3,4,5,6,9,11] )
 
             elems = self.adjacency.mesh_entities_near_coordinate([0.21874996, 0.8163861, 2.], 1, 0.3, material=4)
             self.assertEqual( list(elems.keys()), ["cseg"] )
-            np.testing.assert_equal( elems["cseg"], [2,3,5,6,8,9] )
+            np.testing.assert_equal( sorted(elems["cseg"]), [2,3,5,6,8,9] )
 
         def test_nearest_node(self):
             """Test the nearest_node function."""
@@ -422,67 +422,92 @@ class ParallelAdjacencyTests:
             """Test the neighbor_elements funcion."""
             elems = self.adjacency.neighbor_elements("brick", 1)
             self.assertEqual(list(elems.keys()), ["brick", "cseg"])
-            np.testing.assert_equal(elems["brick"], [1, 2, 3, 4, 7, 8, 9, 10])
-            np.testing.assert_equal(elems["cseg"], [13, 14, 16, 17])
+            np.testing.assert_equal(sorted(elems["brick"]), [1, 2, 3, 4, 7, 8, 9, 10])
+            np.testing.assert_equal(sorted(elems["cseg"]), [13, 14, 16, 17])
 
             elems = self.adjacency.neighbor_elements("brick", 1, material = 2)
             self.assertEqual(list(elems.keys()), ["brick"])
-            np.testing.assert_equal(elems["brick"], [1, 2, 3, 4, 7, 8, 9, 10])
+            np.testing.assert_equal(sorted(elems["brick"]), [1, 2, 3, 4, 7, 8, 9, 10])
 
             elems = self.adjacency.neighbor_elements("brick", 1, material = 5)
             self.assertEqual(list(elems.keys()), ["cseg"])
-            np.testing.assert_equal(elems["cseg"], [13, 14, 16, 17])
+            np.testing.assert_equal(sorted(elems["cseg"]), [13, 14, 16, 17])
 
             elems = self.adjacency.neighbor_elements("brick", 1, neighbor_radius = 2)
             self.assertEqual(list(elems.keys()), ["brick", "cseg"])
-            np.testing.assert_equal(elems["brick"], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+            np.testing.assert_equal(sorted(elems["brick"]), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
                                                     11, 12, 13, 14, 15, 16, 17, 18,
                                                     19, 21, 23, 25, 27, 29, 31, 33, 35])
-            np.testing.assert_equal(elems["cseg"], [13, 14, 15, 16, 17, 18, 19, 20, 21])
+            np.testing.assert_equal(sorted(elems["cseg"]), [13, 14, 15, 16, 17, 18, 19, 20, 21])
 
             elems = self.adjacency.neighbor_elements("brick", 1, material=2, neighbor_radius = 3)
             self.assertEqual(list(elems.keys()), ["brick"])
-            np.testing.assert_equal(elems["brick"], np.arange(1, 37)) # All brick elements are within 3 neighbors of brick 1
+            np.testing.assert_equal(sorted(elems["brick"]), np.arange(1, 37)) # All brick elements are within 3 neighbors of brick 1
 
 ###############################################
-# Tests for each parallel wrapper class
+# Tests for each parallel wrapper class with and without merge_results=True
 ###############################################
 
 class LoopWrapperGeometricMeshInfoTests(ParallelAdjacencyTests.TestParallelGeometricMeshInfo):
     file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
 
     def setUp(self):
-        self.mili = reader.open_database( LoopWrapperGeometricMeshInfoTests.file_name, suppress_parallel=True )
+        self.mili = reader.open_database( LoopWrapperGeometricMeshInfoTests.file_name, suppress_parallel=True, merge_results=False )
 
 class LoopWrapperAdjacencyMappingTests(ParallelAdjacencyTests.TestParallelAdjacencyMapping):
     file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
 
     def setUp(self):
-        self.mili = reader.open_database( LoopWrapperAdjacencyMappingTests.file_name, suppress_parallel=True )
-        self.adjacency = adjacency.AdjacencyMapping(self.mili)
-
-class PoolWrapperGeometricMeshInfoTests(ParallelAdjacencyTests.TestParallelGeometricMeshInfo):
-    file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
-
-    def setUp(self):
-        self.mili = reader.open_database( PoolWrapperGeometricMeshInfoTests.file_name, suppress_parallel=False )
-
-class PoolWrapperAdjacencyMappingTests(ParallelAdjacencyTests.TestParallelAdjacencyMapping):
-    file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
-
-    def setUp(self):
-        self.mili = reader.open_database( PoolWrapperAdjacencyMappingTests.file_name, suppress_parallel=False )
+        self.mili = reader.open_database( LoopWrapperAdjacencyMappingTests.file_name, suppress_parallel=True, merge_results=False )
         self.adjacency = adjacency.AdjacencyMapping(self.mili)
 
 class ServerWrapperGeometricMeshInfoTests(ParallelAdjacencyTests.TestParallelGeometricMeshInfo):
     file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
 
     def setUp(self):
-        self.mili = reader.open_database( ServerWrapperGeometricMeshInfoTests.file_name, suppress_parallel=False, experimental=True )
+        self.mili = reader.open_database( ServerWrapperGeometricMeshInfoTests.file_name, suppress_parallel=False, merge_results=False )
+
+    def tearDown(self):
+        self.mili.close()
 
 class ServerWrapperAdjacencyMappingTests(ParallelAdjacencyTests.TestParallelAdjacencyMapping):
     file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
 
     def setUp(self):
-        self.mili = reader.open_database( ServerWrapperAdjacencyMappingTests.file_name, suppress_parallel=False, experimental=True )
+        self.mili = reader.open_database( ServerWrapperAdjacencyMappingTests.file_name, suppress_parallel=False, merge_results=False )
         self.adjacency = adjacency.AdjacencyMapping(self.mili)
+
+    def tearDown(self):
+        self.mili.close()
+
+class LoopWrapperGeometricMeshInfoMergeResultsTests(ParallelAdjacencyTests.TestParallelGeometricMeshInfo):
+    file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
+
+    def setUp(self):
+        self.mili = reader.open_database( LoopWrapperGeometricMeshInfoTests.file_name, suppress_parallel=True, merge_results=True )
+
+class LoopWrapperAdjacencyMappingMergeResultsTests(ParallelAdjacencyTests.TestParallelAdjacencyMapping):
+    file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
+
+    def setUp(self):
+        self.mili = reader.open_database( LoopWrapperAdjacencyMappingTests.file_name, suppress_parallel=True, merge_results=True )
+        self.adjacency = adjacency.AdjacencyMapping(self.mili)
+
+class ServerWrapperGeometricMeshInfoMergeResultsTests(ParallelAdjacencyTests.TestParallelGeometricMeshInfo):
+    file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
+
+    def setUp(self):
+        self.mili = reader.open_database( ServerWrapperGeometricMeshInfoTests.file_name, suppress_parallel=False, merge_results=True )
+
+    def tearDown(self):
+        self.mili.close()
+
+class ServerWrapperAdjacencyMappingMergeResultsTests(ParallelAdjacencyTests.TestParallelAdjacencyMapping):
+    file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
+
+    def setUp(self):
+        self.mili = reader.open_database( ServerWrapperAdjacencyMappingTests.file_name, suppress_parallel=False, merge_results=True )
+        self.adjacency = adjacency.AdjacencyMapping(self.mili)
+
+    def tearDown(self):
+        self.mili.close()

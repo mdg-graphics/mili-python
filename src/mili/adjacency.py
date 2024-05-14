@@ -30,8 +30,7 @@ Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
 from __future__ import annotations
 from typing import *
 from numpy.lib.function_base import iterable
-from mili.parallel import LoopWrapper,PoolWrapper,ServerWrapper
-from mili.utils import dictionary_merge_concat_unique
+from mili.reductions import dictionary_merge_concat_unique
 import numpy as np
 
 """
@@ -44,19 +43,17 @@ elems = adjacency.mesh_entities_within_radius("brick", 1, 100, radius=1.0)
 """
 
 class AdjacencyMapping:
-  """A wrapper around MiliDatabase or Parallel Wrappers that handles adjacency queries.
+  """A wrapper around MiliDatabase that handles adjacency queries.
 
   Args:
-      obj (Union[MiliDatabase,ParallelWrapper]): The Mili database or ParallelWrapper object.
+      mili (MiliDatabase): The Mili database.
   """
-  def __init__(self, obj):
-    self.obj = obj
-    self.serial = True
-    if isinstance(obj, (LoopWrapper,PoolWrapper,ServerWrapper)):
-      self.serial = False
+  def __init__(self, mili):
+    self.mili = mili
+    self.serial = mili.serial
 
   def __compute_centroid_helper(self, class_name: str, label: int, state: int):
-    centroid = self.obj.geometry.compute_centroid(class_name, label, state)
+    centroid = self.mili.geometry.compute_centroid(class_name, label, state)
     if not self.serial:
       centroid = np.unique(list(filter(lambda x : x is not None, centroid)), axis=0)
       centroid = centroid[0] if len(centroid) == 1 else None
@@ -89,7 +86,7 @@ class AdjacencyMapping:
                                     radius: float,
                                     material: Optional[Union[str,int]] = None):
     """Get all mesh entities within a specified radius from a specified coordinate at a given state."""
-    nodes_in_radius = self.obj.geometry.nodes_within_radius( coordinate, radius, state )
+    nodes_in_radius = self.mili.geometry.nodes_within_radius( coordinate, radius, state )
     if not self.serial:
       nodes_in_radius = np.unique(np.concatenate(nodes_in_radius))
 
@@ -97,7 +94,7 @@ class AdjacencyMapping:
 
   def elems_of_nodes(self, node_labels, material=None):
     """Find elements associated with the specified nodes."""
-    elems = self.obj.geometry.elems_of_nodes(node_labels, material)
+    elems = self.mili.geometry.elems_of_nodes(node_labels, material)
     if not self.serial:
       elems = dictionary_merge_concat_unique(elems)
     return elems
@@ -116,7 +113,7 @@ class AdjacencyMapping:
     if isinstance(point, list):
       point = np.array(point)
 
-    nearest_node = self.obj.geometry.nearest_node(point, state)
+    nearest_node = self.mili.geometry.nearest_node(point, state)
     if not self.serial:
       nearest_node = min(nearest_node, key=lambda x: x[1])
     return nearest_node
@@ -134,7 +131,7 @@ class AdjacencyMapping:
     if isinstance(point, list):
       point = np.array(point)
 
-    nearest_per_proc = self.obj.geometry.nearest_element(point, state)
+    nearest_per_proc = self.mili.geometry.nearest_element(point, state)
     if not self.serial:
       nearest_per_proc = min(nearest_per_proc, key=lambda x: x[2])
     return nearest_per_proc
@@ -148,34 +145,34 @@ class AdjacencyMapping:
       material (Optional[Union[int,str]], default=None): Limit gathered elements to a specific material number.
       neighbor_radius (int, default=1): The number of neighbors to go out from the specified element.
     """
-    labels = self.obj.labels(class_name)
+    labels = self.mili.labels(class_name)
     if labels is None:
       raise ValueError(f"No labels found for class name '{class_name}'")
-    if not self.serial:
+    if not self.serial and not self.mili.merge_results:
       labels = np.unique(np.concatenate(list(filter(lambda x : x is not None, labels))))
     if label not in labels:
       raise ValueError(f"The label '{label}' was not found for the class '{class_name}'")
 
     def nodes_of_elems(element_class, element_labels):
       """Wrap call to MiliDatabase.nodes_of_elems to handle serial vs parallel"""
-      nodes = self.obj.nodes_of_elems(element_class, element_labels)
-      if not self.serial:
-        nodes = np.concatenate([n[0] for n in nodes if isinstance(n, tuple)]).ravel()
+      nodes = self.mili.nodes_of_elems(element_class, element_labels)
+      if not self.serial and not self.mili.merge_results:
+        nodes = np.concatenate([n[0] for n in nodes if n[0].size > 0]).ravel()
       else:
         nodes = nodes[0].ravel()
       return nodes
 
     def material_classes(material):
       """Wrap call to MiliDatabase.material_classes to handle serial vs parallel"""
-      classes_of_material = self.obj.material_classes(material)
-      if not self.serial:
+      classes_of_material = self.mili.material_classes(material)
+      if not self.serial and not self.mili.merge_results:
         classes_of_material = np.unique(np.concatenate(classes_of_material))
       return classes_of_material
 
     def class_labels_of_material(material, elem_class):
       """Wrap call to MiliDatabase.class_labels_of_material to handle serial vs parallel"""
-      elems_of_material = self.obj.class_labels_of_material(material, elem_class)
-      if not self.serial:
+      elems_of_material = self.mili.class_labels_of_material(material, elem_class)
+      if not self.serial and not self.mili.merge_results:
         elems_of_material = np.unique(np.concatenate(elems_of_material))
       return elems_of_material
 
@@ -220,7 +217,7 @@ class GeometricMeshInfo:
       db (MiliDatabase): The Mili database object.
   """
   def __init__(self, db):
-    self.db = db
+    self.db: MiliInternal = db
 
   def nearest_node(self, point: List[float], state: int) -> Tuple[int,float]:
     """Get the nearest node to a specified point.
@@ -255,7 +252,7 @@ class GeometricMeshInfo:
 
     nodal_coordinates = self.db.query("nodpos", "node", states=[state], output_object_labels=False)
     nodpos_data = nodal_coordinates['nodpos']['data']
-    element_connectivity = self.db.connectivity()
+    element_connectivity = self.db.connectivity_ids()
     # Calculate centroids and distances for each element class
     minimums = []
     for elem_class, elem_conns in element_connectivity.items():
@@ -279,7 +276,7 @@ class GeometricMeshInfo:
     if class_name == "node":
       elem_conns = np.array([label], dtype = np.int32)
     else:
-      connectivity = self.db.connectivity(class_name)
+      connectivity = self.db.connectivity_ids(class_name)
       if connectivity is None:
         return None
       elem_idx = np.where( np.isin(labels, label) )[0][0]
@@ -329,7 +326,7 @@ class GeometricMeshInfo:
     nlabels = np.where(np.isin(nodes, node_labels))[0]
 
     elems_of_nodes = {}
-    elem_conns = self.db.connectivity()
+    elem_conns = self.db.connectivity_ids()
     for class_name in elem_conns:
       matches, _ = np.where(np.isin(elem_conns[class_name][:,:-1], nlabels))
       if len(matches) != 0:

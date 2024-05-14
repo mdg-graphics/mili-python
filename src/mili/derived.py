@@ -30,9 +30,11 @@ Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
 from __future__ import annotations
 import inspect
 from typing import *
-from mili.reader import *
 import numpy as np
+from numpy.lib.function_base import iterable
 from itertools import groupby
+
+from mili.datatypes import Superclass
 
 class DerivedExpressions:
   """A wrapper class for MiliDatabase that calculates derived results using the primal

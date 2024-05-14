@@ -5,13 +5,12 @@ SPDX-License-Identifier: (MIT)
 # defer evaluation of type-annotations until after the module is processed, allowing class members to refer to the class
 from __future__ import annotations
 import os
+import traceback
 from typing import *
 from dataclasses import dataclass
-from itertools import chain
 from mili.datatypes import *
 from mili.reader import *
-import numpy.typing as npt
-import traceback
+from mili.afileIO import MiliAParseError, MiliFileNotFoundError
 
 
 def open_griz_interface( base_filename : os.PathLike, procs = [] ):
@@ -26,6 +25,7 @@ def open_griz_interface( base_filename : os.PathLike, procs = [] ):
     db = open_database(base_filename, procs,
                        suppress_parallel=False,
                        experimental=True,
+                       merge_results=False,
                        log_validator=False,
                        shared_memory=False)
     gdb = GrizInterface(db)
@@ -80,9 +80,9 @@ class GrizInterface:
     self.nodes = db.nodes()
     self.connectivity = db.connectivity()
     self.labels = db.labels()
-    self.mesh_object_classes = db.mesh_object_classes()
+    self.mesh_object_classes = db._mili.mesh_object_classes()
     self.element_sets = db.element_sets()
-    self.subrecords = db.subrecords()
+    self.subrecords = db._mili.subrecords()
     self.materials = { cname : db.materials_of_class_name(cname) for cname in unique_class_names}
     self.parts = { cname : db.parts_of_class_name(cname) for cname in unique_class_names}
 
@@ -126,7 +126,7 @@ class GrizInterface:
     """Get Free Node Mass/Volume if it exists."""
     fn_mass = []
     fn_vol = []
-    for proc_params in self.db.parameters():
+    for proc_params in self.db._mili.parameters():
       # Get Nodal Mass
       if "Nodal Mass" in proc_params:
         fn_mass.append(proc_params["Nodal Mass"])
@@ -142,7 +142,7 @@ class GrizInterface:
 
   def merge_parameters(self) -> None:
     """Merge the parameter dictionaries for each processor into a single dict object."""
-    for proc_params in self.db.parameters():
+    for proc_params in self.db._mili.parameters():
       for proc_key, proc_value in proc_params.items():
         if proc_key not in self.params:
           self.params[proc_key] = proc_value
