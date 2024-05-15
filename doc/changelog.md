@@ -12,7 +12,7 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Removed
 
-## [v0.7.0]
+## [v0.7.0] - 2024-5-15
 
 ### Added
 
