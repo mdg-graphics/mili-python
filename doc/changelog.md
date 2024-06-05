@@ -14,6 +14,12 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Removed
 
+## [v0.7.1] - 2024-6-5
+
+### Added
+
+- The `MiliDatabase` class now supports the context management protocol and can be used with the `with` statement as a context manager.
+
 ## [v0.7.0] - 2024-5-15
 
 ### Added
