@@ -6,6 +6,8 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Added
 
+- The `MiliDatabase` class now supports the context management protocol and can be used with the `with` statement as a context manager.
+
 ### Fixed
 
 ### Changed

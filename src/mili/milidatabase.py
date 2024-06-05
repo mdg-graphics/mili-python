@@ -110,3 +110,12 @@ class MiliDatabase:
       # Sort to perserve relative ordering of nodes (have to do this because np.unique sorts)
       indexes.sort()
       return nodes[indexes]
+
+  # We define the enter and exit methods to support using MiliDatabase as a context manager
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    if hasattr(self, "close") and callable(getattr(self, "close")):
+      # close is a ServerWrapper method that ensures all subprocesses are killed.
+      self.close()

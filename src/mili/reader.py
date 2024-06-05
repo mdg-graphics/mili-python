@@ -46,6 +46,8 @@ def open_database(base : Union[str,bytes,os.PathLike],
 
   base = os.path.basename( base )
   afiles = afiles_by_base( dir_name, base, procs )
+  if len(afiles) == 0:
+    raise MiliFileNotFoundError( f"No A files with the basename '{base}' were found in the directory '{dir_name}'")
 
   proc_bases = [ afile[:-1] for afile in afiles ] # drop the A to get each processes base filename for A,T, and S files
 

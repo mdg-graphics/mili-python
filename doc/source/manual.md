@@ -147,6 +147,8 @@ def open_database(base : Union[str,bytes,os.PathLike],
 
 This function will return a `MiliDatabase` object. The `MiliDatabase` class provides an api for interacting with Mili databases.
 
+> **NOTE**: The `MiliDatabase` class supports the context management protocol and can be used with the `with` statement as a context manager.
+
 > **NOTE**: While users can set the argument `merge_results` to False, that is not recommended.
 
 ## Examples

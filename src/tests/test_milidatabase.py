@@ -1152,6 +1152,110 @@ class ServerWrapperParallelTests(ParallelTests.ParallelSingleStateFile):
     def tearDown(self):
         self.mili.close()
 
+class LoopWrapperContextManagerParallelTests(ParallelTests.ParallelSingleStateFile):
+    file_name = file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
+
+    def run(self, result=None):
+        with reader.open_database( LoopWrapperParallelTests.file_name, suppress_parallel=True, merge_results=False ) as mili:
+            self.mili = mili
+            super(LoopWrapperContextManagerParallelTests, self).run(result)
+
+class ServerWrapperContextManagerParallelTests(ParallelTests.ParallelSingleStateFile):
+
+    file_name = file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
+
+    def run(self, result=None):
+        with reader.open_database( ServerWrapperParallelTests.file_name, suppress_parallel=False, merge_results=False ) as mili:
+            self.mili = mili
+            super(ServerWrapperContextManagerParallelTests, self).run(result)
+
+class SerialContextManagerTests(SharedSerialTests.SerialTests):
+    file_name = os.path.join(dir_path,'data','serial','sstate','d3samp6.plt')
+
+    def run(self, result=None):
+        with reader.open_database( SerialSingleStateFile.file_name, suppress_parallel = True, merge_results=False ) as mili:
+            self.mili = mili
+            super(SerialContextManagerTests, self).run(result)
+
+    # Tests unique to single state file
+    #==============================================================================
+    def test_state_variables(self):
+        state_variable_names = set(self.mili._mili.state_variables().keys())
+        SVAR_NAMES = set(['ke', 'ke_part', 'pe', 'he', 'bve', 'dre', 'stde', 'flde', 'tcon_damp_eng',
+                          'tcon_fric_eng', 'tcon_eng', 'ew', 'te', 'rbvx', 'rbvy', 'rbvz', 'rbax',
+                          'rbay', 'rbaz', 'init', 'plot', 'hsp', 'other_i_o', 'brick', 'beam', 'shell',
+                          'tshell', 'discrete', 'delam', 'cohesive', 'ml', 'ntet', 'sph', 'kin_contact',
+                          'reglag_contact', 'lag_solver', 'coupling', 'solution', 'xfem', 'total',
+                          'cpu_time', 'matpe', 'matke', 'mathe', 'matbve', 'matdre', 'matstde',
+                          'matflde', 'matte', 'matmass', 'matcgx', 'matcgy', 'matcgz', 'matxv', 'matyv',
+                          'matzv', 'matxa', 'matya', 'matza', 'con_forx', 'con_fory', 'con_forz',
+                          'con_momx', 'con_momy', 'con_momz', 'failure_bs', 'total_bs', 'cycles_bs',
+                          'con_damp_eng', 'con_fric_eng', 'con_eng', 'sn', 'shmag', 'sr', 'ss', 's1',
+                          's2', 's3', 'cseg_var', 'ux', 'uy', 'uz', 'nodpos', 'vx', 'vy', 'vz', 'nodvel',
+                          'ax', 'ay', 'az', 'nodacc', 'sx', 'sy', 'sz', 'sxy', 'syz', 'szx', 'stress',
+                          'eps', 'es_1a', 'ex', 'ey', 'ez', 'exy', 'eyz', 'ezx', 'strain', 'edrate',
+                          'es_3a', 'es_3c', 'axf', 'sfs', 'sft', 'ms', 'mt', 'tor', 'max_eps', 'svec_x',
+                          'svec_y', 'svec_z', 'svec', 'efs1', 'efs2', 'eps1', 'eps2', 'stress_mid',
+                          'eeff_mid', 'stress_in', 'eeff_in', 'stress_out', 'eeff_out', 'mxx', 'myy',
+                          'mxy', 'bend', 'qxx', 'qyy', 'shear', 'nxx', 'nyy', 'nxy', 'normal', 'thick',
+                          'edv1', 'edv2', 'inteng', 'mid', 'in', 'out', 'press_cut', 'd_1', 'd_2',
+                          'dam', 'frac_strain', 'sand', 'cause'])
+        self.assertEqual(state_variable_names, SVAR_NAMES)
+
+    #==============================================================================
+    def test_state_variable(self):
+        answer = self.mili.query('matcgx', 'mat', labels = [1,2], states = 3 )
+        self.assertEqual(answer['matcgx']['layout']['states'][0], 3)
+        self.assertEqual(list(answer.keys()), ['matcgx'] )
+        np.testing.assert_equal( answer['matcgx']['layout']['labels'], np.array( [ 1, 2 ], dtype = np.int32) )
+        np.testing.assert_equal( answer['matcgx']['data'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32) )
+
+    #==============================================================================
+    def test_node_attributes(self):
+        answer = self.mili.query('nodpos[ux]', 'node', labels = 70, states = 3 )
+        self.assertEqual(answer['nodpos[ux]']['layout']['labels'][0], 70)
+        self.assertEqual(answer['nodpos[ux]']['data'][0], 0.4330127537250519 )
+
+        answer = self.mili.query('ux', 'node', labels = 70, states = 3 )
+        self.assertEqual(answer['ux']['layout']['labels'][0], 70)
+        self.assertEqual(answer['ux']['data'][0], 0.4330127537250519)
+
+    #==============================================================================
+    def test_query_material(self):
+        answer = self.mili.query('sx', 'brick', material = 2, states = 37 )
+        self.assertEqual(answer['sx']['layout']['labels'].size, 36)
+
+        answer = self.mili.query('sx', 'brick', material = 'es_12', states = 37 )
+        self.assertEqual(answer['sx']['layout']['labels'].size, 36)
+
+    #==============================================================================
+    def test_state_variable_vector(self):
+        answer = self.mili.query('nodpos', 'node', labels = 70, states = 4 )
+        np.testing.assert_equal( answer['nodpos']['data'][0,:,:], np.array( [ [ 0.4330127537250519, 0.2500000596046448, 2.436666965484619 ] ], dtype = np.float32 ) )
+
+    #==============================================================================
+    def test_state_variable_vector_array(self):
+        answer = self.mili.query('stress', 'beam', labels = 5, states = [21,22], ips = 2 )
+        np.testing.assert_equal( answer['stress']['data'][1,:,:], np.array([ [ -1018.4232177734375, -1012.2537231445312, -6.556616085617861e-07, 1015.3384399414062, 0.3263571858406067, -0.32636013627052307 ] ], dtype = np.float32 ) )
+
+    #==============================================================================
+    def test_state_variable_vector_array_component(self):
+        answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 71, ips = 2 )
+        self.assertEqual(answer['stress[sy]']['data'][0,0,0], -5545.70751953125)
+
+    #==============================================================================
+    def test_query_glob_results(self):
+        """
+        Test querying for results for M_MESH ("glob") element class.
+        """
+        answer = self.mili.query("he", "glob", states=[22])
+        self.assertAlmostEqual( answer["he"]["data"][0,0,0], 3.0224223, delta=1e-7)
+
+        answer = self.mili.query("bve", "glob", states=[22])
+        self.assertAlmostEqual( answer["bve"]["data"][0,0,0], 2.05536485, delta=1e-7)
+
+        answer = self.mili.query("te", "glob", states=[22])
+        self.assertAlmostEqual( answer["te"]["data"][0,0,0], 1629.718, delta=1e-4)
 
 if __name__ == "__main__":
     unittest.main()
