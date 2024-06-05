@@ -6,11 +6,7 @@ from __future__ import annotations
 import warnings
 warnings.simplefilter("ignore", UserWarning) # Pandas NUMEXPR warning
 
-import numpy as np
-# TODO : account for endianness
-#        for numpy: modify the dtype to account for endianness: https://numpy.org/doc/stable/reference/generated/numpy.frombuffer.html
 import os
-import sys
 
 from typing import *
 
@@ -20,11 +16,6 @@ from mili.milidatabase import MiliDatabase
 from mili.miliinternal import _MiliInternal
 from mili.utils import *
 from mili.reductions import *
-
-if sys.version_info < (3, 7):
-  raise ImportError(f"This module requires python version >= 3.7!")
-if tuple( int(vnum) for vnum in np.__version__.split('.') ) < (1,20,0):
-  raise ImportError(f"This module requires numpy version > 1.20.0")
 
 
 def open_database(base : Union[str,bytes,os.PathLike],
