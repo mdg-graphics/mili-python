@@ -7,6 +7,7 @@ import warnings
 warnings.simplefilter("ignore", UserWarning) # Pandas NUMEXPR warning
 
 import numpy as np
+from numpy.lib.function_base import iterable
 import os
 
 from typing import *
@@ -88,11 +89,21 @@ class MiliDatabase:
     return_codes = self._mili.returncode()
     self._mili.clear_return_code()
     parse_return_codes(return_codes)
+    self.__check_for_exceptions(results)
     if self.serial or not self.merge_results:
       return results
     else:
       reduce_func = reduce_functions.get(function_name, lambda x: x)
       return reduce_func(results)
+
+  def __check_for_exceptions(self, results) -> None:
+    """Catch any unhandled exception from parallel wrappers"""
+    if self.serial and isinstance(results, Exception):
+      raise results
+    elif iterable(results):
+      for res in results:
+        if isinstance(res, Exception):
+          raise res
 
   def nodes(self) -> np.ndarray:
     """Getter for initial nodal coordinates.

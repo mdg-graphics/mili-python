@@ -37,14 +37,14 @@ from itertools import groupby
 from mili.datatypes import Superclass
 
 class DerivedExpressions:
-  """A wrapper class for MiliDatabase that calculates derived results using the primal
+  """A wrapper class for _MiliInternal that calculates derived results using the primal
   state variables found in a mili database.
 
   Args:
-      db (MiliDatabase): The mili database object
+      db (_MiliInternal): The mili internal object
 
   """
-  def __init__(self, db: MiliDatabase):
+  def __init__(self, db: _MiliInternal):
     self.db = db
 
     self.__derived_expressions = {

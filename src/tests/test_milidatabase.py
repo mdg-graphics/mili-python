@@ -52,6 +52,11 @@ class SharedSerialTests:
                 self.mili.query(['nodpos[ux]'], 'node', labels = 4, states = 'cat')
             with self.assertRaises(MiliPythonError):
                 self.mili.query(['nodpos[ux]'], 'node', labels = 4, states = 3, ips = 'cat')
+            with self.assertRaises(TypeError):
+                # class_name should be class_sname
+                self.mili.query(svar_names="sx", class_name="brick")
+            with self.assertRaises(TypeError):
+                self.mili.query("sx")
 
         #==============================================================================
         def test_nodes_getter(self):
@@ -543,6 +548,11 @@ class ParallelTests:
                 self.mili.query(['nodpos[ux]'], 'node', labels = 4, states = 'cat')
             with self.assertRaises(MiliPythonError):
                 self.mili.query(['nodpos[ux]'], 'node', labels = 4, states = 3, ips = 'cat')
+            with self.assertRaises(TypeError):
+                # class_name should be class_sname
+                self.mili.query(svar_names="sx", class_name="brick")
+            with self.assertRaises(TypeError):
+                self.mili.query("sx")
 
         #==============================================================================
         def test_nodes_getter(self):

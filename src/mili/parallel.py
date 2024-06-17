@@ -59,13 +59,13 @@ class LoopWrapper:
     if callable(getattr(cls_obj, attr)):
       try:
         result = [ getattr(cls_obj,attr)( obj, *pargs, **kwargs ) for obj in objs ]
-      except:
-        result = []
+      except Exception as e:
+        result = [e]
     else:
       try:
         result = [ getattr(obj,attr) for obj in objs ]
-      except:
-        result = []
+      except Exception as e:
+        result = [e]
     return result
 
 class SharedMemKey(dict):
@@ -189,8 +189,8 @@ class ServerWrapper:
                 result = [ getattr( self.__cls_obj, cmd )( wrapped, *pargs, **kwargs) for wrapped in self.__wrapped ]
               elif isinstance(getattr(obj_type, cmd), property):
                 result = [ getattr( wrapped, cmd ) for wrapped in self.__wrapped ]
-            except:
-              result = []
+            except Exception as e:
+              result = [e]
             self.__conn.send_bytes( dill.dumps(result) )
             # Call close() since we don't need shared_mem pargs/kwargs anymore on this subprocess
             self.__shmalloc.close()

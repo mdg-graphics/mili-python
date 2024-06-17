@@ -955,9 +955,19 @@ class _MiliInternal:
     subrec = kwargs.get("subrec", None)
     requested_result_source = kwargs.get('source', 'primal')
 
+    # Check that no unexpected keyword arguments were passed
+    expected_keywords = set(["output_object_labels", "subrec", "source", "reference_state"])
+    unexpected_keywords = set(kwargs.keys()) - expected_keywords
+    if len(unexpected_keywords) != 0:
+      self.__return_code = (ReturnCode.ERROR, f"The following unexpected keywords were provided to the query method: {unexpected_keywords}")
+      return {}
+
     res = dict.fromkeys( svar_names )
     for ikey in res.keys():
-      res[ikey] = { 'data' : np_empty( np.float32 ), 'layout' : { 'states' : np_empty( np.int32 ),  'labels' : np_empty( np.int32 ) }, 'source': '' }
+      res[ikey] = {'data' : np_empty( np.float32 ),
+                   'layout' : { 'states' : np_empty( np.int32 ),
+                                'labels' : np_empty( np.int32 ) },
+                   'source': ''}
 
     # for parallel operation it will often be the case a specific file doesn't have any labels
     labels_of_class = self.__labels.get( class_sname, np_empty(np.int32) )
