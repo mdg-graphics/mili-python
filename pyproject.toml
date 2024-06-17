@@ -58,7 +58,8 @@ dev = [
   "twine",
   "wheel",
   "sphinx",
-  "myst-parser"
+  "myst-parser",
+  "tox>=4"
 ]
 
 # When used with a pyproject.toml file, setuptools must use a minimum

@@ -26,14 +26,44 @@ before_script:
     - freturn() { return "$1" ; }
     - . .venv.sh
 
-unit_tests:
+.unit_tests:
     stage: test
     tags:
         - rzwhippet
         - shell
     script:
         - cd src
-        - salloc -N1 -n56 -p pdebug python3 -m unittest
+        - tox -e $TOX_CI_PYTHON_VERSION
+
+unit_tests_py38:
+    extends:
+        - .unit_tests
+    variables:
+        TOX_CI_PYTHON_VERSION: "py38"
+
+unit_tests_py39:
+    extends:
+        - .unit_tests
+    variables:
+        TOX_CI_PYTHON_VERSION: "py39"
+
+unit_tests_py310:
+    extends:
+        - .unit_tests
+    variables:
+        TOX_CI_PYTHON_VERSION: "py310"
+
+unit_tests_py311:
+    extends:
+        - .unit_tests
+    variables:
+        TOX_CI_PYTHON_VERSION: "py311"
+
+unit_tests_py312:
+    extends:
+        - .unit_tests
+    variables:
+        TOX_CI_PYTHON_VERSION: "py312"
 
 coverage:
     stage: test
@@ -84,4 +114,3 @@ stage-release:
 #     rules:
 #         - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 #           when: manual
-

@@ -14,7 +14,7 @@ import sys
 import warnings
 # from imports
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, IntEnum
 from numpy.core.fromnumeric import prod
 # * imports
@@ -97,8 +97,8 @@ class Param:
   file_index : int = -1
   entry_index : int = -1
   rank : int = 0
-  dims : np.ndarray = np.empty([0],dtype = np.int32)
-  data : np.ndarray = np.empty([0],dtype = np.float64)
+  dims : np.ndarray = field(default_factory=lambda: np.empty([0],dtype = np.int32))
+  data : np.ndarray = field(default_factory=lambda: np.empty([0],dtype = np.float64))
 
 @dataclass(eq=False)
 class DirectoryDecl:
@@ -243,19 +243,19 @@ class Subrecord:
   # Everything after this is calculated by the reader to make queries easier
   # TODO: break this information out into a seperate class as much as possible
   svars : List[StateVariable] = dataclasses.field(default_factory=list)
-  svar_atom_lengths : np.ndarray = np.empty([0],dtype = np.int64)
-  svar_atom_offsets : np.ndarray = np.empty([0],dtype = np.int64)
-  svar_comp_layout : np.ndarray = np.empty([0],dtype = object )
-  svar_comp_offsets : np.ndarray = np.empty([0], dtype = np.int64)
-  ordinal_blocks : np.ndarray = np.empty([0], dtype = np.int64)
-  ordinal_block_counts : np.ndarray = np.empty([0], dtype = np.int64)
-  ordinal_block_offsets : np.ndarray = np.empty([0], dtype = np.int64)
+  svar_atom_lengths : np.ndarray = field(default_factory=lambda: np.empty([0],dtype = np.int64))
+  svar_atom_offsets : np.ndarray = field(default_factory=lambda: np.empty([0],dtype = np.int64))
+  svar_comp_layout : np.ndarray = field(default_factory=lambda: np.empty([0],dtype = object ))
+  svar_comp_offsets : np.ndarray = field(default_factory=lambda: np.empty([0], dtype = np.int64))
+  ordinal_blocks : np.ndarray = field(default_factory=lambda: np.empty([0], dtype = np.int64))
+  ordinal_block_counts : np.ndarray = field(default_factory=lambda: np.empty([0], dtype = np.int64))
+  ordinal_block_offsets : np.ndarray = field(default_factory=lambda: np.empty([0], dtype = np.int64))
   state_byte_offset : int = -1
   atoms_per_label : int = -1
   byte_size : int = 0
   # for each svar in the srec, the offset
-  svar_ordinal_offsets : np.ndarray = np.empty([0], dtype = np.int64)
-  svar_byte_offsets : np.ndarray = np.empty([0], dtype = np.int64)
+  svar_ordinal_offsets : np.ndarray = field(default_factory=lambda: np.empty([0], dtype = np.int64))
+  svar_byte_offsets : np.ndarray = field(default_factory=lambda: np.empty([0], dtype = np.int64))
   srec_fmt_id: int = 0
 
   def __eq__(self, other: object):

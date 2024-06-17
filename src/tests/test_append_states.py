@@ -29,7 +29,7 @@ class TestAppendStateSerial(unittest.TestCase):
 
     def tearDown(self):
         # Only delete temp files if test passes.
-        if all([err[1] == None for err in self._outcome.errors]):
+        if self._outcome.success:
             for f in TestAppendStateSerial.required_plot_files:
                 os.remove(f"./{self._testMethodName}_{f}")
 
@@ -288,7 +288,7 @@ class TestAppendStateParallel(unittest.TestCase):
 
     def tearDown(self):
         # Only delete temp files if test passes.
-        if all([err[1] == None for err in self._outcome.errors]):
+        if self._outcome.success:
             for f in TestAppendStateParallel.required_plot_files:
                 os.remove(f"./{self._testMethodName}_{f}")
 
