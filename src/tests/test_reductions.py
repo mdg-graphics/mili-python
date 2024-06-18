@@ -79,6 +79,13 @@ class TestCombineFunction(unittest.TestCase):
         combined = combine( res )
         self.__compare_parallel_and_combined_result(res, combined)
 
+    #==============================================================================
+    def test_combine_multiple_glob_results( self ):
+        """Test combine function on multiple global results"""
+        res = self.mili.query(["pe", "he"], "glob")
+        combined = combine( res )
+        self.__compare_parallel_and_combined_result(res, combined)
+
 
 class TestMergeDataFrames(unittest.TestCase):
     "Tests for the function merge_dataframes."

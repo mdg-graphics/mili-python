@@ -1077,14 +1077,12 @@ class _MiliInternal:
         self.__return_code(ReturnCode.CRITICAL,
                            f'Invalid database: The following labels appear in multiple subrecords for the result "{queried_name}\n"'
                            f'Labels = {duplicate_labels}')
-        del res[queried_name]
         break
 
       # filter out any subrecords we have no labels for
       srecs_to_query = [ srec for srec in srecs_to_query if srec_internal_offsets[srec.name].size != 0 ]
       if not srecs_to_query:
         self.__return_code = (ReturnCode.ERROR, f"No subrecords found for the result/class combination {queried_name}, {class_sname}")
-        del res[queried_name]
         break
 
       # Get state variable data type
@@ -1121,7 +1119,6 @@ class _MiliInternal:
                               "Please use the argument 'ips' to provide a specific integration point or "
                               "to specify a set of integration points that exist for all the elements being queried\n"
                               f"{debug_str}")
-        del res[queried_name]
         break
 
       qty_comps = comp_qtys[0]
