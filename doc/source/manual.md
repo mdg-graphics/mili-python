@@ -129,7 +129,7 @@ def open_database(base : Union[str,bytes,os.PathLike],
                   suppress_parallel: Optional[bool] = False,
                   experimental: Optional[bool] = False,
                   merge_results: Optional[bool] = False,
-                  **kwargs ) -> MiliDatabase:
+                  **kwargs ):
   """Open a database for querying. This opens the database metadata files and does additional processing to optimize query
   construction and execution. Don't use this to perform database verification, instead prefer AFileIO.parse_database().
 
@@ -154,15 +154,16 @@ This function will return a `MiliDatabase` object. The `MiliDatabase` class prov
 ## Examples
 ```python
 from mili import reader
+from mili.milidatabase import MiliDatabase
 
 # To open a serial database
-db = reader.open_database('path-to-mili-files.plt')
+db: MiliDatabase = reader.open_database('path-to-mili-files.plt')
 
 # To open a parallel database in serial
-db = reader.open_database('path-to-mili-files.plt', suppress_parallel=True)
+db: MiliDatabase = reader.open_database('path-to-mili-files.plt', suppress_parallel=True)
 
 # To open a parallel database in parallel
-db = reader.open_database('path-to-mili-files.plt')
+db: MiliDatabase = reader.open_database('path-to-mili-files.plt')
 ```
 
 > **WARNING**: If on an LLNL system, you do not want to open a parallel database in parallel on a login node. This uses a lot of resources and will negatively impact machine performance for other users.

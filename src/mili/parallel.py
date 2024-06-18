@@ -45,7 +45,7 @@ class LoopWrapper:
 
     # Add member functions to this object based on the member functions of the wrapped objects
     call_lambda = lambda _attr, _cls_obj, _objs : lambda *pargs, **kwargs: self.__loop_caller(_attr,_cls_obj,_objs,*pargs,**kwargs)
-    for func in ( func for func in dir(cls_obj) if not func.startswith('_') ):
+    for func in ( func for func in dir(cls_obj) if not func.startswith('__') ):
       # Class Methods
       if callable(getattr(cls_obj,func)):
         setattr( self, func, call_lambda(func,cls_obj,objs) )
@@ -243,7 +243,7 @@ class ServerWrapper:
     # need to have a lambda that returns new lambdas for each func to avoid only have a single lambda bound for all funcs
     mem_maker = lambda attr : lambda *pargs, **kwargs : self.__worker_call( attr, *pargs, **kwargs )
     # generate member functions mimicking those in the wrapped class, excluding private and class functions
-    for func in ( func for func in dir(cls_obj) if not func.startswith('_') ):
+    for func in ( func for func in dir(cls_obj) if not func.startswith('__') ):
       # Class Methods and Properties
       if callable(getattr(cls_obj,func)) or isinstance(getattr(cls_obj, func), property):
         setattr( self, func, mem_maker(func) )
@@ -283,8 +283,8 @@ class ServerWrapper:
     for proc in self.__pool:
       proc.start()
 
-    for func in ( func for func in dir(cls_obj) if not func.startswith('__') and not func.startswith(f'_{cls_obj.__name__}') ):
-      # Rewrap properties with PoolWrapper
+    for func in ( func for func in dir(cls_obj) if not func.startswith('__') ):
+      # Rewrap properties with LoopWrapper
       if isinstance(getattr(cls_obj, func), property):
         prop_objs = getattr(self, func)([],{})
         prop_objs_type = type(prop_objs[0])

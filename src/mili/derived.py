@@ -41,7 +41,7 @@ class DerivedExpressions:
   state variables found in a mili database.
 
   Args:
-      db (_MiliInternal): The mili internal object
+      db (_MiliInternal): The _MiliInternal interface object
 
   """
   def __init__(self, db: _MiliInternal):

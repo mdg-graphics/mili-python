@@ -211,13 +211,13 @@ class AdjacencyMapping:
     return elements
 
 class GeometricMeshInfo:
-  """A wrapper around MiliDatabase objects that handles Geometric mesh info and queries.
+  """A wrapper around _MiliInternal objects that handles Geometric mesh info and queries.
 
   Args:
-      db (MiliDatabase): The Mili database object.
+      db (_MiliInternal): The _MiliInternal object.
   """
   def __init__(self, db):
-    self.db: MiliInternal = db
+    self.db: _MiliInternal = db
 
   def nearest_node(self, point: List[float], state: int) -> Tuple[int,float]:
     """Get the nearest node to a specified point.
