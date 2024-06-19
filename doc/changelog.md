@@ -6,11 +6,26 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Added
 
-- The `MiliDatabase` class now supports the context management protocol and can be used with the `with` statement as a context manager.
-
 ### Fixed
 
 ### Changed
+
+### Removed
+
+## [v0.7.2] - 2024-6-19
+
+### Added
+
+- Support for Python 3.12.
+
+### Fixed
+
+- Fixed bug causing exception when querying multiple global results.
+- Fixed bug causing exceptions in the query method to not be thrown.
+
+### Changed
+
+- Removed all dynamically added methods from the `MiliDatabase` class and replace with a static interface to better support static analysis.
 
 ### Removed
 
