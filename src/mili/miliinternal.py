@@ -615,6 +615,22 @@ class _MiliInternal:
       classes = list(set([ srec.class_name for srec in state_variable.srecs ]))
     return classes
 
+  def state_variables_of_class(self, class_name: str) -> List[str]:
+    """Get list of primal state variables for a given element class.
+
+    Args:
+      class_name (str): The element class name.
+
+    Returns:
+      List[str]: A list of primal state variables that can be queried for the specified element class.
+    """
+    state_variables = []
+    for svar_name, svar in self.__svars.items():
+      for srec in svar.srecs:
+        if srec.class_name == class_name and svar_name not in state_variables:
+          state_variables.append(svar_name)
+    return state_variables
+
   def containing_state_variables_of_class(self, svar: str, class_name: str) -> List[str]:
     """Get List of state variables that contain the specific state variable + class_name
 

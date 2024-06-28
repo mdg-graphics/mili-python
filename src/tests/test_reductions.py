@@ -263,6 +263,28 @@ class ReductionTests:
             )
 
         #==============================================================================
+        def test_state_variables_of_class(self):
+            """
+            NOTE: The state variables in the serial vs. parallel d3samp6 databases differ because
+            the databases were generated with different version of the simulation codes. This is more
+            of a regression tests that checks that this function runs
+            """
+            serial_result = self.serial.state_variables_of_class("glob")
+            parallel_result = self.parallel.state_variables_of_class("glob")
+            # Check that same type is returned by both
+            self.assertEqual( type(serial_result), type(parallel_result) )
+
+            serial_result = self.serial.state_variables_of_class("mat")
+            parallel_result = self.parallel.state_variables_of_class("mat")
+            # Check that same type is returned by both
+            self.assertEqual( type(serial_result), type(parallel_result) )
+
+            serial_result = self.serial.state_variables_of_class("brick")
+            parallel_result = self.parallel.state_variables_of_class("brick")
+            # Check that same type is returned by both
+            self.assertEqual( type(serial_result), type(parallel_result) )
+
+        #==============================================================================
         def test_connectivity(self):
             for class_name in ["brick", "beam", "shell"]:
                 serial_conns = self.serial.connectivity(class_name)

@@ -29,12 +29,17 @@ def writeable_from_results_by_element( results_dict: dict, results_by_element: d
   """Given the query result dictionary and the results_by_element dictionary generate writeable dictionary."""
   results_dict = combine(results_dict)
   for result in results_by_element:
-    if result in results_dict:
+    if result in results_dict and results_dict[result]['data'].size > 0:
+      result_shape = results_dict[result]['data'][:,0].shape
       for idx, element in enumerate(list(results_by_element[result].keys())):
           # NOTE: We are able to just use idx (0-N) because we assume results_dict and results_by_element
           # are from the same query which means that the element order in results_dict and results_by_element
           # will be the same.
-          results_dict[result]['data'][:,idx] = results_by_element[result][element]
+          write_data = np.array(results_by_element[result][element])
+          if write_data.shape != result_shape:
+            # Try to be less strict about data shape.
+            write_data = np.reshape(write_data, result_shape)
+          results_dict[result]['data'][:,idx] = write_data
   return results_dict
 
 def query_data_to_dataframe(data: np.ndarray, states: np.ndarray, labels: np.ndarray) -> pd.DataFrame:

@@ -73,7 +73,7 @@ coverage:
     script:
         - cd src
         - python3 -m coverage --version
-        - salloc -N1 -n56 -p pdebug python3 -m coverage run -m unittest
+        - salloc -N1 -n8 -t15 -p pdebug python3 -m coverage run -m unittest
         # avoid failure if there are not multiple reports
         - python3 -m coverage combine || freturn 0
         - python3 -m coverage xml

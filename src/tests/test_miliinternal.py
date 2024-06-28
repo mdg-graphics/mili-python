@@ -596,6 +596,39 @@ class TestMiliInternal(unittest.TestCase):
         self.assertEqual(axf_classes, ["beam"])
 
     #==============================================================================
+    def test_state_variables_of_class(self):
+        glob_vars = self.mili.state_variables_of_class("glob")
+        mat_vars = self.mili.state_variables_of_class("mat")
+        beam_vars = self.mili.state_variables_of_class("beam")
+        brick_vars = self.mili.state_variables_of_class("brick")
+
+        self.assertEqual(
+            glob_vars,
+            ['ke', 'ke_part', 'pe', 'he', 'bve', 'dre', 'stde', 'flde', 'tcon_damp_eng',
+             'tcon_fric_eng', 'tcon_eng', 'ew', 'te', 'rbvx', 'rbvy', 'rbvz', 'rbax', 'rbay',
+             'rbaz', 'init', 'plot', 'hsp', 'other_i_o', 'brick', 'beam', 'shell', 'tshell',
+             'discrete', 'delam', 'cohesive', 'ml', 'ntet', 'sph', 'kin_contact', 'reglag_contact',
+             'lag_solver', 'coupling', 'solution', 'xfem', 'total', 'cpu_time']
+        )
+        self.assertEqual(
+            mat_vars,
+            ['matpe', 'matke', 'mathe', 'matbve', 'matdre', 'matstde', 'matflde', 'matte',
+             'matmass', 'matcgx', 'matcgy', 'matcgz', 'matxv', 'matyv', 'matzv', 'matxa', 'matya',
+             'matza', 'con_forx', 'con_fory', 'con_forz', 'con_momx', 'con_momy', 'con_momz',
+             'con_damp_eng', 'con_fric_eng', 'con_eng']
+        )
+        self.assertEqual(
+            beam_vars,
+            ['sx', 'sy', 'sz', 'sxy', 'syz', 'szx', 'eps', 'es_1a', 'axf', 'sfs', 'sft', 'ms', 'mt',
+             'tor', 'svec_x', 'svec_y', 'svec_z', 'svec', 'sand', 'cause']
+        )
+        self.assertEqual(
+            brick_vars,
+            ['sx', 'sy', 'sz', 'sxy', 'syz', 'szx', 'stress', 'ex', 'ey', 'ez',
+             'exy', 'eyz', 'ezx', 'strain', 'edrate', 'sand', 'cause']
+        )
+
+    #==============================================================================
     def test_containing_state_variables_of_class(self):
         containing = self.mili.containing_state_variables_of_class("sx", "brick")
         self.assertEqual(containing, ["stress"])

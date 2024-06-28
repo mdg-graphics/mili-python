@@ -58,6 +58,7 @@ Mili databases commonly take one of two forms: Serial (combined) or Parallel (Un
     - [nodes](#nodes)
     - [parts_of_class_name](#parts_of_class_name)
     - [queriable_svars](#queriable_svars)
+    - [state_variables_of_class](#state_variables_of_class)
     - [state_maps](#state_maps)
     - [supported_derived_variables](#supported_derived_variables)
     - [times](#times)
@@ -1131,6 +1132,19 @@ array([[ 1.0000000e+00,  0.0000000e+00,  0.0000000e+00],
 
     Returns:
       List[str]: A list of state variable names that can be queried.
+    """
+```
+
+## state_variables_of_class
+```python
+  def state_variables_of_class(self, class_name: str) -> List[str]:
+    """Get list of primal state variables for a given element class.
+
+    Args:
+      class_name (str): The element class name.
+
+    Returns:
+      List[str]: A list of primal state variables that can be queried for the specified element class.
     """
 ```
 

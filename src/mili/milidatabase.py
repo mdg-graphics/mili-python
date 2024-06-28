@@ -13,9 +13,9 @@ import os
 
 from typing import *
 
+import mili.reductions as reductions
 from mili.parallel import ServerWrapper, LoopWrapper
 from mili.miliinternal import _MiliInternal, ReturnCode
-from mili.reductions import *
 from mili.datatypes import StateMap
 
 class MiliPythonError(Exception):
@@ -61,7 +61,7 @@ class MiliDatabase:
       else:
         self._mili = parallel_handler( _MiliInternal, proc_pargs, proc_kwargs )
 
-  def __postprocess(self, function_name: str, results: Any) -> Any:
+  def __postprocess(self, results: Any, reduce_function: Any) -> Any:
     return_codes = self._mili.returncode()
     self._mili.clear_return_code()
     parse_return_codes(return_codes)
@@ -69,8 +69,7 @@ class MiliDatabase:
     if self.serial or not self.merge_results:
       return results
     else:
-      reduce_func = reduce_functions.get(function_name, lambda x: x)
-      return reduce_func(results)
+      return reduce_function(results)
 
   def __check_for_exceptions(self, results) -> None:
     """Catch any unhandled exception from parallel wrappers"""
@@ -101,7 +100,9 @@ class MiliDatabase:
 
   def reload_state_maps(self) -> None:
     """Reload the state maps."""
-    return self.__postprocess("reload_state_maps", self._mili.reload_state_maps())
+    return self.__postprocess(
+      results = self._mili.reload_state_maps(),
+      reduce_function = reductions.zeroth_entry)
 
   def nodes(self) -> np.ndarray:
     """Getter for initial nodal coordinates.
@@ -126,7 +127,9 @@ class MiliDatabase:
     Returns:
       List[StateMap]: A list of StateMap objects.
     """
-    return self.__postprocess("state_maps", self._mili.state_maps())
+    return self.__postprocess(
+      results = self._mili.state_maps(),
+      reduce_function = reductions.zeroth_entry)
 
   def srec_fmt_qty(self) -> int:
     """Getter for State record format quantity.
@@ -134,7 +137,9 @@ class MiliDatabase:
     Returns:
       int: The number of state record formats.
     """
-    return self.__postprocess("srec_fmt_qty", self._mili.srec_fmt_qty())
+    return self.__postprocess(
+      results = self._mili.srec_fmt_qty(),
+      reduce_function = reductions.zeroth_entry)
 
   def mesh_dimensions(self) -> int:
     """Getter for Mesh Dimensions.
@@ -142,7 +147,9 @@ class MiliDatabase:
     Returns:
       int: Either 2 or 3 for the number of dimensions.
     """
-    return self.__postprocess("mesh_dimensions", self._mili.mesh_dimensions())
+    return self.__postprocess(
+      results = self._mili.mesh_dimensions(),
+      reduce_function = reductions.zeroth_entry)
 
   def class_names(self) -> List[str]:
     """Getter for all class names in the database.
@@ -150,7 +157,9 @@ class MiliDatabase:
     Returns:
       List[str]: List of element class names in the database.
     """
-    return self.__postprocess("class_names", self._mili.class_names())
+    return self.__postprocess(
+      results = self._mili.class_names(),
+      reduce_function = reductions.list_concatenate_unique_str)
 
   def int_points_of_state_variable(self, svar_name: str, class_name: str) -> np.ndarray:
     """Get the available integration points for a state variable + class_name.
@@ -162,8 +171,9 @@ class MiliDatabase:
     Returns:
       np.ndarray: Array of integration points.
     """
-    return self.__postprocess("int_points_of_state_variable",
-                              self._mili.int_points_of_state_variable(svar_name, class_name))
+    return self.__postprocess(
+      results = self._mili.int_points_of_state_variable(svar_name, class_name),
+      reduce_function = reductions.list_concatenate_unique)
 
   def element_sets(self) -> Dict[str,List[int]]:
     """Getter for the element sets.
@@ -171,7 +181,9 @@ class MiliDatabase:
     Returns:
       Dict[str,List[int]]: Keys are element set names, values are list of integers
     """
-    return self.__postprocess("element_sets", self._mili.element_sets())
+    return self.__postprocess(
+      results = self._mili.element_sets(),
+      reduce_function = reductions.dictionary_merge_no_concat)
 
   def integration_points(self) -> Dict[str,List[int]]:
     """Get the available integration points for each material.
@@ -179,7 +191,9 @@ class MiliDatabase:
     Returns:
       Dict[str,List[int]]: Keys are material numbers, values are a list of integration points.
     """
-    return self.__postprocess("integration_points", self._mili.integration_points())
+    return self.__postprocess(
+      results = self._mili.integration_points(),
+      reduce_function = reductions.dictionary_merge_no_concat)
 
   def times( self, states : Optional[Union[List[int],int]] = None ) -> np.ndarray:
     """Get the times for each state in the database.
@@ -191,7 +205,9 @@ class MiliDatabase:
     Returns:
       np.ndarray: numpy array of times.
     """
-    return self.__postprocess("times", self._mili.times(states))
+    return self.__postprocess(
+      results = self._mili.times(states),
+      reduce_function = reductions.zeroth_entry)
 
   def queriable_svars(self, vector_only = False, show_ips = False) -> List[str]:
     """Get a list of state variable names that can be queried.
@@ -203,7 +219,9 @@ class MiliDatabase:
     Returns:
       List[str]: A list of state variable names that can be queried.
     """
-    return self.__postprocess("queriable_svars", self._mili.queriable_svars(vector_only, show_ips))
+    return self.__postprocess(
+      results = self._mili.queriable_svars(vector_only, show_ips),
+      reduce_function = reductions.list_concatenate_unique_str)
 
   def supported_derived_variables(self) -> List[str]:
     """Get the derived variables that mili-python currently supports.
@@ -211,7 +229,9 @@ class MiliDatabase:
     Returns:
       List[str]: A List of derived variable names that can be calculated by mili-python.
     """
-    return self.__postprocess("supported_derived_variables", self._mili.supported_derived_variables())
+    return self.__postprocess(
+      results = self._mili.supported_derived_variables(),
+      reduce_function = reductions.zeroth_entry)
 
   def derived_variables_of_class(self, class_name: str) -> List[str]:
     """Get the derived variables that can be calculated for the specified class.
@@ -222,7 +242,9 @@ class MiliDatabase:
     Returns:
       List[str]: List of derived variables that can be calculated for the specified class.
     """
-    return self.__postprocess("derived_variables_of_class", self._mili.derived_variables_of_class(class_name))
+    return self.__postprocess(
+      results = self._mili.derived_variables_of_class(class_name),
+      reduce_function = reductions.list_concatenate_unique_str)
 
   def classes_of_derived_variable(self, var_name: str) -> List[str]:
     """Get the classes for which a derived variable can be calculated.
@@ -233,7 +255,9 @@ class MiliDatabase:
     Returns:
       List[str]: List of element class names for which var_name can be calculated.
     """
-    return self.__postprocess("classes_of_derived_variable", self._mili.classes_of_derived_variable(var_name))
+    return self.__postprocess(
+      results = self._mili.classes_of_derived_variable(var_name),
+      reduce_function = reductions.list_concatenate_unique_str)
 
   def labels(self, class_name: Optional[str] = None) -> Union[Dict[str,np.ndarray],np.ndarray]:
     """Getter for the element labels.
@@ -246,7 +270,9 @@ class MiliDatabase:
         the labels for each element class is returned. If class_name is not None, then a numpy array
         is returned containing the labels for the specified element class.
     """
-    return self.__postprocess("labels", self._mili.labels(class_name))
+    return self.__postprocess(
+      results = self._mili.labels(class_name),
+      reduce_function = reductions.reduce_labels)
 
   def materials(self) -> Dict[str,List[int]]:
     """Get materials dictionary from the database.
@@ -254,7 +280,9 @@ class MiliDatabase:
     Returns:
       Dict[str,List[int]]: Keys are the material names, Values are a list of material numbers.
     """
-    return self.__postprocess("materials", self._mili.materials())
+    return self.__postprocess(
+      results = self._mili.materials(),
+      reduce_function = reductions.zeroth_entry)
 
   def material_numbers(self) -> np.ndarray:
     """Get a List of material numbers in the database.
@@ -262,7 +290,9 @@ class MiliDatabase:
     Returns:
       np.ndarray: A numpy array of the material numbers.
     """
-    return self.__postprocess("material_numbers", self._mili.material_numbers())
+    return self.__postprocess(
+      results = self._mili.material_numbers(),
+      reduce_function = reductions.list_concatenate_unique)
 
   def connectivity( self, class_name : Optional[str] = None ) -> Union[Dict[str,np.ndarray],np.ndarray]:
     """Getter for the element connectivity as element LABELS
@@ -276,7 +306,9 @@ class MiliDatabase:
         is returned containing the connectivity for the specified element class. If the specified element
         class does not exists then None is returned.
     """
-    return self.__postprocess("connectivity", self._mili.connectivity(class_name))
+    return self.__postprocess(
+      results = self._mili.connectivity(class_name),
+      reduce_function = reductions.reduce_connectivity)
 
   def material_classes(self, mat: Union[str,int]) -> List[str]:
     """Get list of classes of a specified material.
@@ -287,7 +319,9 @@ class MiliDatabase:
     Returns:
       List[str]: List of element classes associated with the material.
     """
-    return self.__postprocess("material_classes", self._mili.material_classes(mat))
+    return self.__postprocess(
+      results = self._mili.material_classes(mat),
+      reduce_function = reductions.list_concatenate_unique_str)
 
   def classes_of_state_variable(self, svar: str) -> List[str]:
     """Get list of element classes for a state variable.
@@ -298,7 +332,22 @@ class MiliDatabase:
     Returns:
       List[str]: List of element classes the state variable exists for.
     """
-    return self.__postprocess("classes_of_state_variable", self._mili.classes_of_state_variable(svar))
+    return self.__postprocess(
+      results = self._mili.classes_of_state_variable(svar),
+      reduce_function = reductions.list_concatenate_unique_str)
+
+  def state_variables_of_class(self, class_name: str) -> List[str]:
+    """Get list of primal state variables for a given element class.
+
+    Args:
+      class_name (str): The element class name.
+
+    Returns:
+      List[str]: A list of primal state variables that can be queried for the specified element class.
+    """
+    return self.__postprocess(
+      results = self._mili.state_variables_of_class(class_name),
+      reduce_function = reductions.list_concatenate_unique_str)
 
   def containing_state_variables_of_class(self, svar: str, class_name: str) -> List[str]:
     """Get List of state variables that contain the specific state variable + class_name
@@ -310,8 +359,9 @@ class MiliDatabase:
     Returns:
       List[str]: List of containing state variables.
     """
-    return self.__postprocess("containing_state_variables_of_class",
-                              self._mili.containing_state_variables_of_class(svar, class_name))
+    return self.__postprocess(
+      results = self._mili.containing_state_variables_of_class(svar, class_name),
+      reduce_function = reductions.list_concatenate_unique_str)
 
   def components_of_vector_svar(self, svar: str) -> List[str]:
     """Get a list of component state variables of a vector state variable.
@@ -322,7 +372,9 @@ class MiliDatabase:
     Returns:
       List[str]: The components of the vector state variable.
     """
-    return self.__postprocess("components_of_vector_svar", self._mili.components_of_vector_svar(svar))
+    return self.__postprocess(
+      results = self._mili.components_of_vector_svar(svar),
+      reduce_function = reductions.list_concatenate_unique_str)
 
   def parts_of_class_name( self, class_name: str ) -> np.ndarray:
     """Get List of part numbers for all elements of a given class name.
@@ -333,7 +385,9 @@ class MiliDatabase:
     Returns:
       np.ndarray: array of part numbers for each element of the class name.
     """
-    return self.__postprocess("parts_of_class_name", self._mili.parts_of_class_name(class_name))
+    return self.__postprocess(
+      results = self._mili.parts_of_class_name(class_name),
+      reduce_function = reductions.list_concatenate)
 
   def materials_of_class_name( self, class_name: str ) -> np.ndarray:
     """Get List of materials for all elements of a given class name.
@@ -344,7 +398,9 @@ class MiliDatabase:
     Returns:
       np.ndarray: array of material numbers for each element of the class name.
     """
-    return self.__postprocess("materials_of_class_name", self._mili.materials_of_class_name(class_name))
+    return self.__postprocess(
+      results = self._mili.materials_of_class_name(class_name),
+      reduce_function = reductions.list_concatenate)
 
   def class_labels_of_material( self, mat: Union[str,int], class_name: str ) -> np.ndarray:
     """Convert a material name into labels of the specified class (if any).
@@ -356,7 +412,9 @@ class MiliDatabase:
     Returns:
       np.ndarray: array of labels of the specified class name and material.
     """
-    return self.__postprocess("class_labels_of_material", self._mili.class_labels_of_material(mat, class_name))
+    return self.__postprocess(
+      results = self._mili.class_labels_of_material(mat, class_name),
+      reduce_function = reductions.list_concatenate)
 
   def all_labels_of_material( self, mat: Union[str,int] ) -> Dict[str,np.ndarray]:
     """Given a specific material. Find all labels with that material and return their values.
@@ -367,7 +425,9 @@ class MiliDatabase:
     Returns:
       Dict[str,np.ndarray]: Keys are element class names. Values are numpy arrays of element labels.
     """
-    return self.__postprocess("all_labels_of_material", self._mili.all_labels_of_material(mat))
+    return self.__postprocess(
+      results = self._mili.all_labels_of_material(mat),
+      reduce_function = reductions.dictionary_merge_concat)
 
   def nodes_of_elems(self, class_sname: str, elem_labels: Union[int,List[int]]) -> Tuple[np.ndarray,np.ndarray]:
     """Find nodes associated with elements by label.
@@ -379,7 +439,9 @@ class MiliDatabase:
     Returns:
       Tuple[np.ndarray,np.ndarray]: (The nodal connectivity, The element labels)
     """
-    return self.__postprocess("nodes_of_elems", self._mili.nodes_of_elems(class_sname, elem_labels))
+    return self.__postprocess(
+      results = self._mili.nodes_of_elems(class_sname, elem_labels),
+      reduce_function = reductions.reduce_nodes_of_elems)
 
   def nodes_of_material(self, mat: Union[str,int] ) -> np.ndarray:
     """Find nodes associated with a material number.
@@ -390,7 +452,9 @@ class MiliDatabase:
     Returns:
       numpy.array: A list of all nodes associated with the material number.
     """
-    return self.__postprocess("nodes_of_material", self._mili.nodes_of_material(mat))
+    return self.__postprocess(
+      results = self._mili.nodes_of_material(mat),
+      reduce_function = reductions.list_concatenate_unique)
 
   def query( self,
              svar_names : Union[List[str],str],
@@ -417,7 +481,9 @@ class MiliDatabase:
                    then modify the values desired, then query again with the modified result in this param
     : param as_dataframe : optional. If True the result is returned as a Pandas DataFrame
     '''
-    return self.__postprocess("query", self._mili.query(svar_names, class_sname, material, labels, states, ips, write_data, as_dataframe, **kwargs))
+    return self.__postprocess(
+      results = self._mili.query(svar_names, class_sname, material, labels, states, ips, write_data, as_dataframe, **kwargs),
+      reduce_function = reductions.combine)
 
   def append_state(self,
                    new_state_time: float,
@@ -437,7 +503,9 @@ class MiliDatabase:
     Returns:
       int: The updated number of states in the database.
     """
-    return self.__postprocess("append_state", self._mili.append_state(new_state_time, zero_out, limit_states_per_file, limit_bytes_per_file))
+    return self.__postprocess(
+      results = self._mili.append_state(new_state_time, zero_out, limit_states_per_file, limit_bytes_per_file),
+      reduce_function = reductions.zeroth_entry)
 
   def copy_non_state_data(self, new_base_name: str) -> None:
     """Copy the geometry, states variables, subrecords and parameters from an existing Mili database
@@ -446,4 +514,6 @@ class MiliDatabase:
     Args:
       new_base_name (str): The base name of the new database.
     """
-    return self.__postprocess("copy_non_state_data", self._mili.copy_non_state_data(new_base_name))
+    return self.__postprocess(
+      results = self._mili.copy_non_state_data(new_base_name),
+      reduce_function = reductions.zeroth_entry)

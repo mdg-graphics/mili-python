@@ -6,9 +6,13 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Added
 
+- Added function `state_variables_of_class` to get the state variables that can be queried for a given element class.
+
 ### Fixed
 
 ### Changed
+
+- Updated function `writeable_from_results_by_element` to be less strict about data shape for scalar variables.
 
 ### Removed
 

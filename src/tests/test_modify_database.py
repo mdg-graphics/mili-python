@@ -543,6 +543,27 @@ class TestModifyUncombinedDatabaseResultsByElement(unittest.TestCase):
         np.testing.assert_equal( original['sx']['data'], reader.combine(res)['sx']['data'] )
 
     #==============================================================================
+    def test_modify_scalar_two(self):
+        res = self.mili.query("sx", "brick", labels=[1,2,3,4], states=[44, 45])
+        original = reader.combine(res)
+        res_by_element = {
+            "sx": {
+                1: [1.0, 1.0],
+                2: [2.0, 2.0],
+                3: [3.0, 3.0],
+                4: [4.0, 4.0],
+            }
+        }
+        # Modify database
+        writeable = reader.writeable_from_results_by_element(res, res_by_element)
+        res = self.mili.query("sx", "brick", labels=[1,2,3,4], states=[44, 45], write_data=writeable)
+        np.testing.assert_equal( writeable['sx']['data'], reader.combine(res)['sx']['data'] )
+
+        # Back to original
+        res = self.mili.query("sx", "brick", labels=[1,2,3,4], states=[44, 45], write_data=original)
+        np.testing.assert_equal( original['sx']['data'], reader.combine(res)['sx']['data'] )
+
+    #==============================================================================
     def test_modify_vector(self):
         res = self.mili.query("stress", "brick", states=[44])
         original = reader.combine(res)
