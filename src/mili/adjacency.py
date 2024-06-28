@@ -29,9 +29,11 @@ Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
 
 from __future__ import annotations
 from typing import *
+import numpy as np
 from numpy.lib.function_base import iterable
 from mili.reductions import dictionary_merge_concat_unique
-import numpy as np
+from mili.milidatabase import *
+from mili.miliinternal import *
 
 """
 Example Usage:
@@ -48,8 +50,8 @@ class AdjacencyMapping:
   Args:
       mili (MiliDatabase): The Mili database.
   """
-  def __init__(self, mili):
-    self.mili = mili
+  def __init__(self, mili: MiliDatabase):
+    self.mili: MiliDatabase = mili
     self.serial = mili.serial
 
   def __compute_centroid_helper(self, class_name: str, label: int, state: int):
@@ -67,7 +69,7 @@ class AdjacencyMapping:
                                   label: int,
                                   state: int,
                                   radius: float,
-                                  material: Optional[Union[str,int]] = None):
+                                  material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None):
     """Get all mesh entities within a specified radius from a specified mesh entity at a specified state.
 
     Args:
@@ -75,7 +77,7 @@ class AdjacencyMapping:
       label (str): The element label.
       state (int): The state number.
       radius (float): The radius within which to search.
-      material (Optional[Union[str,int]], default=None): Limit search to a specific material.
+      material (Optional[Union[Union[str,int],List[Union[str,int]]]], default=None): Limit search to specific material(s).
     """
     centroid = self.__compute_centroid_helper(class_name, label, state)
     return self.mesh_entities_near_coordinate(centroid, state, radius, material)
@@ -84,16 +86,33 @@ class AdjacencyMapping:
                                     coordinate: List[float],
                                     state: int,
                                     radius: float,
-                                    material: Optional[Union[str,int]] = None):
-    """Get all mesh entities within a specified radius from a specified coordinate at a given state."""
-    nodes_in_radius = self.mili.geometry.nodes_within_radius( coordinate, radius, state )
+                                    material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None):
+    """Get all mesh entities within a specified radius from a specified coordinate at a given state.
+
+    Args:
+      coordinate (List[float]): The coordinate.
+      state (int): The state number.
+      radius (float): The radius within which to search.
+      material (Optional[Union[Union[str,int],List[Union[str,int]]]], default=None): Limit search to specific material(s).
+    """
+    nodes_in_radius = self.mili.geometry.nodes_within_radius( coordinate, radius, state, material )
     if not self.serial:
       nodes_in_radius = np.unique(np.concatenate(nodes_in_radius))
+    elems_in_radius = self.elems_of_nodes(nodes_in_radius, material)
+    elems_in_radius["node"] = nodes_in_radius
+    return elems_in_radius
 
-    return self.elems_of_nodes(nodes_in_radius, material)
+  def elems_of_nodes(self, node_labels: List[int],
+                     material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Dict[str,np.ndarray]:
+    """Find elements associated with the specified nodes.
 
-  def elems_of_nodes(self, node_labels, material=None):
-    """Find elements associated with the specified nodes."""
+    Args:
+      node_labels (List[int]): List of node labels.
+      material (Optional[Union[Union[str,int],List[Union[str,int]]]], default=None): Limit search to specific material(s).
+
+    Returns:
+      Dict[str,np.ndarray]: Keys are element class names. Values are numpy arrays of element labels.
+    """
     elems = self.mili.geometry.elems_of_nodes(node_labels, material)
     if not self.serial:
       elems = dictionary_merge_concat_unique(elems)
@@ -136,14 +155,19 @@ class AdjacencyMapping:
       nearest_per_proc = min(nearest_per_proc, key=lambda x: x[2])
     return nearest_per_proc
 
-  def neighbor_elements(self, class_name: str, label: int, material: Optional[Union[int,str]] = None, neighbor_radius: int = 1):
+  def neighbor_elements(self, class_name: str, label: int,
+                        material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None,
+                        neighbor_radius: int = 1) -> Dict[str,np.ndarray]:
     """Gather all neighbor elements to a specified element.
 
     Args:
       class_name (str): The element class name.
       labels (int): The element label.
-      material (Optional[Union[int,str]], default=None): Limit gathered elements to a specific material number.
+      material (Optional[Union[Union[str,int],List[Union[str,int]]]] = None): Limit gathered elements to a specific material(s).
       neighbor_radius (int, default=1): The number of neighbors to go out from the specified element.
+
+    Returns:
+      Dict[str,np.ndarray]: Keys are element class names. Values are numpy arrays of element labels.
     """
     labels = self.mili.labels(class_name)
     if labels is None:
@@ -162,19 +186,30 @@ class AdjacencyMapping:
         nodes = nodes[0].ravel()
       return nodes
 
-    def material_classes(material):
+    def material_classes(material: Optional[Union[Union[str,int],List[Union[str,int]]]]) -> List[str]:
       """Wrap call to MiliDatabase.material_classes to handle serial vs parallel"""
-      classes_of_material = self.mili.material_classes(material)
-      if not self.serial and not self.mili.merge_results:
-        classes_of_material = np.unique(np.concatenate(classes_of_material))
-      return classes_of_material
+      if isinstance(material, (str,int)):
+        material = [material]
+      class_names = []
+      for mat in material:
+        classes_of_material = self.mili.material_classes(mat)
+        if not self.serial and not self.mili.merge_results:
+          classes_of_material = np.unique(np.concatenate(classes_of_material))
+        class_names.extend( classes_of_material )
+      class_names = list(set(class_names))
+      return class_names
 
-    def class_labels_of_material(material, elem_class):
+    def class_labels_of_material(material: Optional[Union[Union[str,int],List[Union[str,int]]]], elem_class: str) -> np.ndarray:
       """Wrap call to MiliDatabase.class_labels_of_material to handle serial vs parallel"""
-      elems_of_material = self.mili.class_labels_of_material(material, elem_class)
-      if not self.serial and not self.mili.merge_results:
-        elems_of_material = np.unique(np.concatenate(elems_of_material))
-      return elems_of_material
+      if isinstance(material, (str,int)):
+        material = [material]
+      class_labels = np.empty([0], dtype=np.int32)
+      for mat in material:
+        elems_of_material = self.mili.class_labels_of_material(mat, elem_class)
+        if not self.serial and not self.mili.merge_results:
+          elems_of_material = np.unique(np.concatenate(elems_of_material))
+        class_labels = np.unique(np.concatenate((class_labels, elems_of_material)))
+      return class_labels
 
     elements = {}
     nodes = nodes_of_elems(class_name, label)
@@ -291,10 +326,20 @@ class GeometricMeshInfo:
 
     return None
 
-  def nodes_within_radius(self, center, radius, state):
-    """Get all nodes within a radius of a given point at the specified state."""
+  def nodes_within_radius(self, center: List[float], radius: float, state: int,
+                          material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> np.ndarray:
+    """Get all nodes within a radius of a given point at the specified state.
+
+    Args:
+      center (List[float]): The center coordinate.
+      radius (float): The radius within which to search.
+      state (int): The state number.
+      material (Optional[Union[Union[str,int],List[Union[str,int]]]], default=None): Limit search to specific material(s).
+    """
     if isinstance(center, list):
       center = np.array(center)
+    if isinstance(material, (str,int)):
+      material = [material]
 
     bounding_box_min = center - radius
     bounding_box_max = center + radius
@@ -309,10 +354,19 @@ class GeometricMeshInfo:
     node_ids = nodes_in_bounding_box[distances_from_center <= radius]
     nodes_in_radius = nodal_coordinates["nodpos"]["layout"]["labels"][node_ids]
 
+    if material:
+      nodes_of_material = np.empty([0], dtype=np.int32)
+      for mat in material:
+        nodes_of_material = np.concatenate((nodes_of_material, self.db.nodes_of_material(mat)))
+      nodes_in_radius = np.intersect1d(nodes_in_radius, nodes_of_material)
+
     return nodes_in_radius
 
-  def elems_of_nodes(self, node_labels, material: Optional[Union[int,str]] = None):
+  def elems_of_nodes(self, node_labels,
+                     material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Dict[str,np.ndarray]:
     """Find elements associated with the specified nodes."""
+    if isinstance(material, (str,int)):
+      material = [material]
     if type(node_labels) is not list:
       if iterable(node_labels):
         node_labels = list(node_labels)
@@ -335,11 +389,15 @@ class GeometricMeshInfo:
 
     if material:
       # Filter out elements not of the specified material
-      classes_of_material = self.db.material_classes(material)
+      classes_of_material = []
+      for mat in material:
+        classes_of_material.extend( self.db.material_classes(mat) )
       elems_of_nodes = { k:v for k,v in elems_of_nodes.items() if k in classes_of_material }
 
       for elem_class in elems_of_nodes:
-        elems_of_material = self.db.class_labels_of_material(material, elem_class)
+        elems_of_material = np.empty([0], dtype=np.int32)
+        for mat in material:
+          elems_of_material = np.concatenate((elems_of_material, self.db.class_labels_of_material(mat, elem_class)))
         where = np.where(np.isin(elems_of_nodes[elem_class], elems_of_material))
         elems_of_nodes[elem_class] = elems_of_nodes[elem_class][where]
 

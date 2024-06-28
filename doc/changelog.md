@@ -6,12 +6,24 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Added
 
+### Fixed
+
+### Changed
+
+### Removed
+
+## [v0.7.3] - 2024-6-28
+
+### Added
+
 - Added function `state_variables_of_class` to get the state variables that can be queried for a given element class.
 
 ### Fixed
 
 ### Changed
 
+- The functions `mesh_entities_within_radius`, `mesh_entities_near_coordinate`, `elems_of_nodes`, and `neighbor_elements` of the `AdjacencyMapping` class now support filtering based on multiple materials. Previously only allowed limiting the results to 1 material
+- The functions `mesh_entities_within_radius` and `mesh_entities_near_coordinate` of the `AdjacencyMapping` now return the `nodes` in addition to the elements within the radius.
 - Updated function `writeable_from_results_by_element` to be less strict about data shape for scalar variables.
 
 ### Removed

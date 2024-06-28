@@ -9,7 +9,6 @@ warnings.simplefilter("ignore", UserWarning) # Pandas NUMEXPR warning
 import itertools
 import numpy as np
 import numpy.typing as npt
-import pandas as pd
 import os
 import re
 import io
@@ -23,7 +22,7 @@ from mili.afileIO import *
 from mili.parallel import *
 from mili.derived import DerivedExpressions
 from mili.adjacency import GeometricMeshInfo
-from mili.utils import *
+from mili.utils import result_dictionary_to_dataframe
 from mili.reductions import *
 
 def np_empty(dtype):
