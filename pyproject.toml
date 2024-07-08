@@ -57,8 +57,9 @@ dev = [
   "coverage>=4.0.0",
   "twine",
   "wheel",
-  "sphinx",
-  "myst-parser",
+  "sphinx==7.3.7",
+  "sphinx-rtd-theme==2.0.0",
+  "pydocstyle==6.3.0",
   "tox>=4"
 ]
 

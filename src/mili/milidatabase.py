@@ -1,4 +1,5 @@
-"""
+"""MiliDatabase module.
+
 SPDX-License-Identifier: (MIT)
 """
 from __future__ import annotations
@@ -19,9 +20,11 @@ from mili.miliinternal import _MiliInternal, ReturnCode
 from mili.datatypes import StateMap
 
 class MiliPythonError(Exception):
+  """Mili Python Exception object."""
   pass
 
 def parse_return_codes(return_codes: Union[Tuple[ReturnCode,str], List[Tuple[ReturnCode,str]]]) -> None:
+  """Processes return codes from MiliDatabase and check for errors or exceptions."""
   if isinstance(return_codes, tuple):
     return_codes = [return_codes]
   return_codes = np.array(return_codes)
@@ -38,13 +41,13 @@ def parse_return_codes(return_codes: Union[Tuple[ReturnCode,str], List[Tuple[Ret
 
 
 class MiliDatabase:
+  """MiliDatabase class that supports querying and other functions on Serial and Parallel Mili databases."""
   def __init__(self,
                dir_name: Union[str,bytes,os.PathLike],
                base_files: List[Union[str,bytes,os.PathLike]],
                parallel_handler: Type[Union[_MiliInternal,LoopWrapper,ServerWrapper]],
                merge_results: bool,
                **kwargs):
-    """MiliDatabase class supports querying and other function on Serial and Parallel Mili databases."""
     self.merge_results = merge_results
     dir_names = [dir_name] * len(base_files)
     proc_pargs = [ [dir_name,base_file] for dir_name, base_file in zip(dir_names, base_files)]
@@ -72,7 +75,7 @@ class MiliDatabase:
       return reduce_function(results)
 
   def __check_for_exceptions(self, results) -> None:
-    """Catch any unhandled exception from parallel wrappers"""
+    """Catch any unhandled exception from parallel wrappers."""
     if self.serial and isinstance(results, Exception):
       raise results
     elif iterable(results):
@@ -82,20 +85,24 @@ class MiliDatabase:
 
   # We define the enter and exit methods to support using MiliDatabase as a context manager
   def __enter__(self):
+    """__enter__ method to support context manager protocol."""
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
+    """__exit__ method to support context manager protocol."""
     if hasattr(self._mili, "close") and callable(getattr(self._mili, "close")):
       # close is a ServerWrapper method that ensures all subprocesses are killed.
       self._mili.close()
 
   def close(self):
+    """Close the mili database and shutdown any subprocesses being used."""
     if hasattr(self._mili, "close") and callable(getattr(self._mili, "close")):
       # close is a ServerWrapper method that ensures all subprocesses are killed.
       self._mili.close()
 
   @property
   def geometry(self):
+    """Getter for internal geometry object."""
     return self._mili.geometry
 
   def reload_state_maps(self) -> None:
@@ -295,7 +302,7 @@ class MiliDatabase:
       reduce_function = reductions.list_concatenate_unique)
 
   def connectivity( self, class_name : Optional[str] = None ) -> Union[Dict[str,np.ndarray],np.ndarray]:
-    """Getter for the element connectivity as element LABELS
+    """Getter for the element connectivity as element LABELS.
 
     Args:
       class_name (str): An element class name. If provided only return connectivty for the specified class.
@@ -350,7 +357,7 @@ class MiliDatabase:
       reduce_function = reductions.list_concatenate_unique_str)
 
   def containing_state_variables_of_class(self, svar: str, class_name: str) -> List[str]:
-    """Get List of state variables that contain the specific state variable + class_name
+    """Get List of state variables that contain the specific state variable + class_name.
 
     Args:
       svar (str): The state variable name.
@@ -464,23 +471,22 @@ class MiliDatabase:
              states : Optional[Union[List[int],int]] = None,
              ips : Optional[Union[List[int],int]] = None,
              write_data : Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]] = None,
-             as_dataframe: bool = False,
+             as_dataframe: Optional[bool] = False,
              **kwargs ) -> dict:
-    '''
-    Query the database for svars, returning data for the specified parameters, optionally writing data to the database.
-    The parameters passed to query can be identical across a parallel invocation of query, since each individual
-      database query object will filter only for the subset of the query it has available.
+    """Query the database for state variables or derived variables, returning data for the specified parameters, optionally writing data to the database.
 
-    : param svar_names : short names for state variables being queried
-    : param class_sname : mesh class name being queried
-    : param material : optional sname or material number to select labels from
-    : param labels : optional labels to query data about, filtered by material if material if material is supplied, default is all
-    : param states: optional state numbers from which to query data, default is all
-    : param ips : optional for svars with array or vec_array aggregation query just these components, default is all available
-    : param write_data : optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
-                   then modify the values desired, then query again with the modified result in this param
-    : param as_dataframe : optional. If True the result is returned as a Pandas DataFrame
-    '''
+    Args:
+      svar_names (Union[List[str],str]): The names of the state variables to be queried.
+      class_sname (str): The element class name being queried (e.g. brick. shell, node).
+      material (Optional[Union[str,int]], default=None): Optional material name or number to select labels from.
+      labels (Optional[Union[List[int],int]], default=None): Optional labels to query data for, filtered by material
+        if material if material is supplied, default is all.
+      states (Optional[Union[List[int],int]], default=None): Optional state numbers from which to query data, default is all.
+      ips (Optional[Union[List[int],int]], default=None): Optional integration point to query for vector array state variables, default is all available.
+      write_data (Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]], default=None): Optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
+        then modify the values desired, then query again with the modified result in this param
+      as_dataframe (Optional[bool]): If True the result is returned as a Pandas DataFrame.
+    """
     return self.__postprocess(
       results = self._mili.query(svar_names, class_sname, material, labels, states, ips, write_data, as_dataframe, **kwargs),
       reduce_function = reductions.combine)
@@ -508,8 +514,9 @@ class MiliDatabase:
       reduce_function = reductions.zeroth_entry)
 
   def copy_non_state_data(self, new_base_name: str) -> None:
-    """Copy the geometry, states variables, subrecords and parameters from an existing Mili database
-       into a new database without any states (Just the A file).
+    """Copy non state data from an existing Mili database into a new database without any states (Just the A file).
+
+    Non state data include the geometry, states variables, subrecords and parameters.
 
     Args:
       new_base_name (str): The base name of the new database.

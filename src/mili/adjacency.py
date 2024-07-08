@@ -1,30 +1,31 @@
-"""
+"""Adjacency Queries for Mili Databases.
+
 Copyright (c) 2016-2022, Lawrence Livermore National Security, LLC.
- Produced at the Lawrence Livermore National Laboratory. Written by
- William Tobin (tobin6@llnl.hov), Kevin Durrenberger (durrenberger1@llnl.gov),
- and Ryan Hathaway (hathaway6@llnl.gov).
- CODE-OCEC-16-056.
- All rights reserved.
 
- This file is part of Mili. For details, see TODO: <URL describing code
- and how to download source>.
+Produced at the Lawrence Livermore National Laboratory. Written by
+William Tobin (tobin6@llnl.hov), Kevin Durrenberger (durrenberger1@llnl.gov),
+and Ryan Hathaway (hathaway6@llnl.gov).
+CODE-OCEC-16-056.
+All rights reserved.
 
- Please also read this link-- Our Notice and GNU Lesser General
- Public License.
+This file is part of Mili. For details, see TODO: <URL describing code
+and how to download source>.
 
- This program is free software; you can redistribute it and/or modify
- it under the terms of the GNU General Public License (as published by
- the Free Software Foundation) version 2.1 dated February 1999.
+Please also read this link-- Our Notice and GNU Lesser General
+Public License.
 
- This program is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the IMPLIED WARRANTY OF
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the terms
- and conditions of the GNU General Public License for more details.
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License (as published by
+the Free Software Foundation) version 2.1 dated February 1999.
 
- You should have received a copy of the GNU Lesser General Public License
- along with this program; if not, write to the Free Software Foundation,
- Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the IMPLIED WARRANTY OF
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the terms
+and conditions of the GNU General Public License for more details.
 
+You should have received a copy of the GNU Lesser General Public License
+along with this program; if not, write to the Free Software Foundation,
+Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 """
 
 from __future__ import annotations
@@ -35,14 +36,6 @@ from mili.reductions import dictionary_merge_concat_unique
 from mili.milidatabase import *
 from mili.miliinternal import *
 
-"""
-Example Usage:
-
-db = reader.open_database(...)
-adjacency = AdjacencyMapping(db)
-
-elems = adjacency.mesh_entities_within_radius("brick", 1, 100, radius=1.0)
-"""
 
 class AdjacencyMapping:
   """A wrapper around MiliDatabase that handles adjacency queries.
@@ -178,7 +171,7 @@ class AdjacencyMapping:
       raise ValueError(f"The label '{label}' was not found for the class '{class_name}'")
 
     def nodes_of_elems(element_class, element_labels):
-      """Wrap call to MiliDatabase.nodes_of_elems to handle serial vs parallel"""
+      """Wrap call to MiliDatabase.nodes_of_elems to handle serial vs parallel."""
       nodes = self.mili.nodes_of_elems(element_class, element_labels)
       if not self.serial and not self.mili.merge_results:
         nodes = np.concatenate([n[0] for n in nodes if n[0].size > 0]).ravel()
@@ -187,7 +180,7 @@ class AdjacencyMapping:
       return nodes
 
     def material_classes(material: Optional[Union[Union[str,int],List[Union[str,int]]]]) -> List[str]:
-      """Wrap call to MiliDatabase.material_classes to handle serial vs parallel"""
+      """Wrap call to MiliDatabase.material_classes to handle serial vs parallel."""
       if isinstance(material, (str,int)):
         material = [material]
       class_names = []
@@ -200,7 +193,7 @@ class AdjacencyMapping:
       return class_names
 
     def class_labels_of_material(material: Optional[Union[Union[str,int],List[Union[str,int]]]], elem_class: str) -> np.ndarray:
-      """Wrap call to MiliDatabase.class_labels_of_material to handle serial vs parallel"""
+      """Wrap call to MiliDatabase.class_labels_of_material to handle serial vs parallel."""
       if isinstance(material, (str,int)):
         material = [material]
       class_labels = np.empty([0], dtype=np.int32)
@@ -302,7 +295,7 @@ class GeometricMeshInfo:
     return tuple(nearest_element)
 
   def compute_centroid(self, class_name: str, label: int, state: int):
-    """Computes the centroid of a given mesh entity at a given state."""
+    """Compute the centroid of a given mesh entity at a given state."""
     labels = self.db.labels(class_name)
     if labels is None or label not in labels:
       return None

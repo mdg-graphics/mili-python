@@ -1,4 +1,5 @@
-"""
+"""Internal Mili file object.
+
 SPDX-License-Identifier: (MIT)
 """
 from __future__ import annotations
@@ -26,30 +27,32 @@ from mili.utils import result_dictionary_to_dataframe
 from mili.reductions import *
 
 def np_empty(dtype):
+  """Create empty array of specified data type."""
   return np.empty([0],dtype=dtype)
 
 
 class ReturnCode(Enum):
+  """Return code enum for _MiliInternal."""
   OK = 0
   ERROR = 1
   CRITICAL = 2
 
   def str_repr(self) -> str:
+    """Get string representation of ReturnCode."""
     return ["Success", "Error", "Critical"][self.value]
 
 
 class _MiliInternal:
+  """The internal Mili object representing a single A-file and its associated state files.
+
+  Args:
+    dir_name (os.PathLike) : an os.PathLike denoting the file sytem directory to search for all state files described by the A-file
+    base_filename (os.PathLike) : the base of the files for this database (usually for one process):
+                                    - {base_filename}A is the A-file
+                                    - {base_filename}T is the T-file in mili format >= v3
+                                    - {base_filename}### are state file(s) containing state data for this database
+  """
   def __init__( self, dir_name : Union[str,bytes,os.PathLike], base_filename : Union[str,bytes,os.PathLike], **kwargs ):
-    """
-    A Mili database querying object, able to parse a single A-file and query state information
-      from the state files described by that A-file.
-    Parameters:
-      dir_name (os.PathLike) : an os.PathLike denoting the file sytem directory to search for all state files described by the A-file
-      base_filename (os.PathLike) : the base of the files for this database (usually for one process):
-                                     - {base_filename}A is the A-file
-                                     - {base_filename}T is the T-file in mili format >= v3
-                                     - {base_filename}### are state file(s) containing state data for this database
-    """
     self.__return_code = (ReturnCode.OK, "")
     self.__state_files = []
     self.__smaps = []
@@ -128,7 +131,7 @@ class _MiliInternal:
     # setup svar.svars for easier VECTOR svar traversal
     self.__svars = self.__afile.dirs[DirectoryDecl.Type.STATE_VAR_DICT]
     def addComps( svar ):
-      """small recursive function to populate svar.svars[] all the way down"""
+      """Small recursive function to populate svar.svars[] all the way down."""
       if svar.agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ] and len(svar.svars) == 0:
         for comp_name in svar.comp_names:
           comp = self.__svars[comp_name]
@@ -136,7 +139,7 @@ class _MiliInternal:
           addComps( comp )
 
     def addContaining( svar ):
-      """small recursive function to populate svar.containing_svars[] all the way down"""
+      """Small recursive function to populate svar.containing_svars[] all the way down."""
       if svar.agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:
         for comp_name in svar.comp_names:
           comp = self.__svars[comp_name]
@@ -144,7 +147,7 @@ class _MiliInternal:
           addContaining( comp )
 
     def addIntPoints( es_name, svar_comp_names ):
-      """small recursive function to populate self.__int_points all the way down"""
+      """Small recursive function to populate self.__int_points all the way down."""
       for svar_comp_name in svar_comp_names:
         if not svar_comp_name in self.__int_points.keys():
           self.__int_points[svar_comp_name] = {}
@@ -538,7 +541,7 @@ class _MiliInternal:
     return np.array(list(self.__elems_of_mat.keys()))
 
   def connectivity( self, class_name : Optional[str] = None ) -> Union[Dict[str,np.ndarray],np.ndarray]:
-    """Getter for the element connectivity as element LABELS
+    """Getter for the element connectivity as element LABELS.
 
     Args:
       class_name (str): An element class name. If provided only return connectivty for the specified class.
@@ -554,7 +557,7 @@ class _MiliInternal:
     return self.__conns_labels
 
   def connectivity_ids( self, class_name : Optional[str] = None ) -> Union[Dict[str,np.ndarray],np.ndarray]:
-    """Getter for the element connectivity as element IDS
+    """Getter for the element connectivity as element IDS.
 
     Args:
       class_name (str): An element class name. If provided only return connectivty for the specified class.
@@ -631,7 +634,7 @@ class _MiliInternal:
     return state_variables
 
   def containing_state_variables_of_class(self, svar: str, class_name: str) -> List[str]:
-    """Get List of state variables that contain the specific state variable + class_name
+    """Get List of state variables that contain the specific state variable + class_name.
 
     Args:
       svar (str): The state variable name.
@@ -805,10 +808,7 @@ class _MiliInternal:
     return np.unique( node_labels )
 
   def __parse_query_name_and_source( self, svar_query_input, requested_result_source ):
-    """
-    Parse the svar name from a query input into a base svar and component svar list
-    and determine the result source we are going to return 'primal' or 'derived'
-    """
+    """Parse the svar name from a query input into a base svar, component svar list, and result source."""
     comp_start_idx = svar_query_input.find('[')
     if comp_start_idx != -1:
       svar_name = svar_query_input[:comp_start_idx]
@@ -855,11 +855,7 @@ class _MiliInternal:
                                states : Optional[Union[List[int],int]] = None,
                                ips : Optional[Union[List[int],int]] = None,
                                write_data : Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]] = None ):
-    """
-      Parse the query parameters and normalize them to the types expected by the rest of the query operation,
-        throws TypeException and/or ValueException as appropriate. Does not throw exceptions in cases where
-        the result of the argument deviation from the norm would be expected to be encountered when operating in parallel.
-    """
+    """Parse the query parameters and normalize them to the types expected by the rest of the query operation."""
     any_invalid = False
 
     if isinstance(states, (int, np.integer)):
@@ -945,21 +941,20 @@ class _MiliInternal:
              write_data : Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]] = None,
              as_dataframe: bool = False,
              **kwargs ) -> dict:
-    '''
-    Query the database for svars, returning data for the specified parameters, optionally writing data to the database.
-    The parameters passed to query can be identical across a parallel invocation of query, since each individual
-      database query object will filter only for the subset of the query it has available.
+    """Query the database for state variables or derived variables, returning data for the specified parameters, optionally writing data to the database.
 
-    : param svar_names : short names for state variables being queried
-    : param class_sname : mesh class name being queried
-    : param material : optional sname or material number to select labels from
-    : param labels : optional labels to query data about, filtered by material if material if material is supplied, default is all
-    : param states: optional state numbers from which to query data, default is all
-    : param ips : optional for svars with array or vec_array aggregation query just these components, default is all available
-    : param write_data : optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
-                   then modify the values desired, then query again with the modified result in this param
-    : param as_dataframe : optional. If True the result is returned as a Pandas DataFrame
-    '''
+    Args:
+      svar_names (Union[List[str],str]): The names of the state variables to be queried.
+      class_sname (str): The element class name being queried (e.g. brick. shell, node).
+      material (Optional[Union[str,int]], default=None): Optional material name or number to select labels from.
+      labels (Optional[Union[List[int],int]], default=None): Optional labels to query data for, filtered by material
+        if material if material is supplied, default is all.
+      states (Optional[Union[List[int],int]], default=None): Optional state numbers from which to query data, default is all.
+      ips (Optional[Union[List[int],int]], default=None): Optional integration point to query for vector array state variables, default is all available.
+      write_data (Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]], default=None): Optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
+        then modify the values desired, then query again with the modified result in this param
+      as_dataframe (Optional[bool]): If True the result is returned as a Pandas DataFrame.
+    """
     # normalize arguments to expected types / default values
     errors, svar_names, class_sname, material, labels, states, ips, write_data = self.__init_query_parameters( svar_names, class_sname, material, labels, states, ips, write_data )
     if errors:
@@ -1305,8 +1300,9 @@ class _MiliInternal:
     return len(self.__smaps)
 
   def copy_non_state_data(self, new_base_name: str) -> None:
-    """Copy the geometry, states variables, subrecords and parameters from an existing Mili database
-       into a new database without any states (Just the A file).
+    """Copy non state data from an existing Mili database into a new database without any states (Just the A file).
+
+    Non state data include the geometry, states variables, subrecords and parameters.
 
     Args:
       new_base_name (str): The base name of the new database.

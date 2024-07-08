@@ -1,4 +1,5 @@
-"""
+"""Mili-python reader module.
+
 SPDX-License-Identifier: (MIT)
 """
 from __future__ import annotations
@@ -24,18 +25,25 @@ def open_database(base : Union[str,bytes,os.PathLike],
                   experimental: Optional[bool] = False,
                   merge_results: Optional[bool] = True,
                   **kwargs ) -> MiliDatabase:
-  """Open a database for querying. This opens the database metadata files and does additional processing to optimize query
+  """Open a database for querying.
+
+  This opens the database metadata files and does additional processing to optimize query
   construction and execution. Don't use this to perform database verification, instead prefer AFileIO.parse_database().
 
   Args:
    base (Union[str,bytes,os.PathLike]): the base filename of the mili database (e.g. for 'pltA', just 'plt', for parallel
-                                        databases like 'dblplt00A', also exclude the rank-digits, giving 'dblplt')
-   procs (Optional[List[int]]) : optionally a list of process-files to open in parallel, default is all
-   suppress_parallel (Optional[Bool]) : optionally return a serial database reader object if possible (for serial databases).
-                                        Note: if the database is parallel, suppress_parallel==True will return a reader that will
-                                        query each processes database files in series.
-   experimental (Optional[Bool]) : optional developer-only argument to try experimental parallel features
-   merge_results (Optional[Bool]): Merge parallel results into the serial format.
+      databases like 'dblplt00A', also exclude the rank-digits, giving 'dblplt').
+   procs (Optional[List[int]], default=[]) : optionally a list of process-files to open in parallel, default is all
+   suppress_parallel (Optional[Bool], default=False) : optionally return a serial database reader object if possible (for serial databases).
+      Note: if the database is parallel, suppress_parallel==True will return a reader that will
+      query each processes database files in series.
+   experimental (Optional[Bool], default=False) : optional developer-only argument to try experimental parallel features
+   merge_results (Optional[Bool], default=True): Merge parallel results into the serial format.
+
+  WARNING: Reading a database in parallel on LLNL machines should not be done on Login nodes as this can use a lot of resources and negatively
+  affect machine performance for other users.
+
+  NOTE: While users can set the argument 'merge_results' to False, that is not recommended.
   """
   # ensure dir_name is the containing dir and base is only the file name
   dir_name = os.path.dirname( base )

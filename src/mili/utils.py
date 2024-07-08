@@ -1,4 +1,5 @@
-"""
+"""Various mili-python utilities.
+
 SPDX-License-Identifier: (MIT)
 """
 
@@ -9,7 +10,7 @@ from typing import List, Union, Dict
 from mili.reductions import combine
 
 def results_by_element( result_dict: Union[Dict,List[Dict]] ) -> dict:
-  """Reorganize result data in a new dictionary with the form { svar: { element: <list_of_results> } }"""
+  """Reorganize result data in a new dictionary with the form { svar: { element: <list_of_results> } }."""
   if isinstance( result_dict, dict ):
     result_dict = [result_dict]
 
@@ -43,7 +44,7 @@ def writeable_from_results_by_element( results_dict: dict, results_by_element: d
   return results_dict
 
 def query_data_to_dataframe(data: np.ndarray, states: np.ndarray, labels: np.ndarray) -> pd.DataFrame:
-  """Creates a Pandas DataFrame from a 3d NumPy array returned by MiliDatabase.Query
+  """Creates a Pandas DataFrame from a 3d NumPy array returned by MiliDatabase.Query.
 
   Args:
     data (numpy.ndarray): A 3-dimensional NumPy array
@@ -66,7 +67,14 @@ def query_data_to_dataframe(data: np.ndarray, states: np.ndarray, labels: np.nda
   return df
 
 def result_dictionary_to_dataframe(result_dict: Union[List[dict],dict]) -> pd.DataFrame:
-  """Convert dictionary from default format of MiliDatabase.query method to a Pandas DataFrame."""
+  """Convert dictionary from default format of MiliDatabase.query method to a Pandas DataFrame.
+
+  Args:
+    result_dict (Union[List[dict],dict]): Result dictionary(s) from MiliDatabase.query methd.
+
+  Returns:
+    A Pandas DataFrame.
+  """
   result_dataframes = {}
 
   if isinstance(result_dict, list):
@@ -84,7 +92,11 @@ def result_dictionary_to_dataframe(result_dict: Union[List[dict],dict]) -> pd.Da
   return result_dataframes
 
 def dataframe_to_result_dictionary(result_df: Dict[str,pd.DataFrame]) -> dict:
-  """Convert dataframe to MiliDatabase.query result dictionary format."""
+  """Convert dataframe to MiliDatabase.query result dictionary format.
+
+  Args:
+    result_df (Dict[str,pd.DataFrame]): Result dictionary of dataframes.
+  """
   result_dict = {}
   for svar_name, svar_df in result_df.items():
     if not svar_df.empty:

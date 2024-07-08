@@ -1,0 +1,6 @@
+[pydocstyle]
+
+convention = google
+
+# D107: Missing docstring in __init__
+add-ignore = D107

@@ -19,12 +19,29 @@ variables:
     INSTALL_ROOT: "/collab/usr/gapps/mdg/python/"
 
 stages:
+    - docs
     - test
     - deploy
 
 before_script:
     - freturn() { return "$1" ; }
     - . .venv.sh
+
+build-documentation:
+    stage: docs
+    tags:
+        - rzwhippet
+        - shell
+    script:
+        # Test subset of files with pydocstyle. Only those that are added to documentation.
+        - pydocstyle src/mili/milidatabase.py
+        - pydocstyle src/mili/miliinternal.py
+        - pydocstyle src/mili/utils.py
+        - pydocstyle src/mili/adjacency.py
+        - pydocstyle src/mili/append_states.py
+        # Build documentation
+        - cd doc
+        - make html
 
 .unit_tests:
     stage: test

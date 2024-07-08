@@ -1,4 +1,5 @@
-"""
+"""Append States to MiliDatabase.
+
 SPDX-License-Identifier: (MIT)
 """
 
@@ -10,13 +11,17 @@ from typing import *
 from numpy.core.fromnumeric import prod
 
 class AppendStatesTool:
+  """Tool to append additional states + data to an existing Mili database.
 
+  Args:
+    input_dictionary (dict): Dictionary specifying data + states to be appended.
+  """
   VALID_OUTPUT_TYPES = ["mili"]
   VALID_OUTPUT_MODES = ["write", "append"]
 
   def __init__(self, input_dictionary: Dict):
     self.append_states_spec = input_dictionary
-    self.database = self.check_append_states_spec()
+    self.database = self.__check_append_states_spec()
 
   def __get_spec_var(self, key, type_ok, required=False, err_msg="" ):
     # Check key exists
@@ -56,7 +61,7 @@ class AppendStatesTool:
     return variable
 
   def __parse_svar_name( self, svar_query_input ):
-    """Handle svar names of form vector[component]"""
+    """Handle svar names of form vector[component]."""
     comp_start_idx = svar_query_input.find('[')
     if comp_start_idx != -1:
       vector = svar_query_input[:comp_start_idx]
@@ -66,11 +71,8 @@ class AppendStatesTool:
       vector = None
     return svar, vector
 
-  def check_append_states_spec(self):
+  def __check_append_states_spec(self):
     """Check append_states_spec dictionary has required info and info is compatible with original database."""
-
-    # Change input to a standard format that append_states() will expect and save in class or dictionary to return?
-
     # Check database_basename specified (required)
     in_database_name = self.__get_spec_var("database_basename", str, True)
 
@@ -310,12 +312,12 @@ class AppendStatesTool:
     return orig_database
 
   def write_states(self):
-    """Write out the new states to the database"""
+    """Write out the new states to the database."""
     if "mili" in self.append_states_spec['output_type']:
       self.__write_mili_output()
 
   def __get_new_state_times(self, database):
-    """Generate new state times and numbers to add to the database"""
+    """Generate new state times and numbers to add to the database."""
     new_state_times = []
     new_state_numbers = []
     state_times = database.times()

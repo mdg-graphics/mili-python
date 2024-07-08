@@ -1,4 +1,10 @@
+import os
+import sys
+sys.path.insert(0, os.path.abspath('../../src/'))
+
 from mili import __version__
+
+import sphinx_rtd_theme
 
 # Configuration file for the Sphinx documentation builder.
 #
@@ -19,20 +25,11 @@ release = '.'.join(map(str,__version__))
 templates_path = []
 exclude_patterns = []
 
+extensions = [
+    "sphinx.ext.autodoc",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.napoleon",
+    "sphinx_rtd_theme"
+]
 
-# Markdown configuration
-extensions = ["myst_parser"]
-myst_heading_anchors=2
-
-# Latex configuration
-latex_elements = {
-    "extraclassoptions": "openany,oneside",
-    "papersize": "a4paper",
-    "pointsize": "10pt",
-}
-
-# -- Options for HTML output -------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
-
-html_theme = 'alabaster'
-html_static_path = []
+html_theme = 'sphinx_rtd_theme'

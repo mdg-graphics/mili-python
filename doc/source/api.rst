@@ -1,0 +1,36 @@
+===============
+API
+===============
+
+.. _open database:
+
+The ``reader.open_database`` method
+======================================
+.. automodule:: mili.reader
+    :members:
+
+.. _mili database:
+
+The ``MiliDatabase`` class
+=================================
+.. autoclass:: mili.milidatabase.MiliDatabase
+    :members:
+
+.. _adjacency mapping:
+
+The ``AdjacencyMapping`` class
+=================================
+.. autoclass:: mili.adjacency.AdjacencyMapping
+    :members:
+
+.. _append states tool:
+
+The ``AppendStatesTool`` class
+=================================
+.. autoclass:: mili.append_states.AppendStatesTool
+    :members:
+
+The ``utils`` module
+==========================
+.. automodule:: mili.utils
+    :members:
