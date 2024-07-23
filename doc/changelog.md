@@ -12,6 +12,11 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Removed
 
+## [v0.7.4] - 2024-7-23
+
+### Fixed
+- Fixed issue in `query` method relating to writing out data for specific element labels. In cases where labels were valid, but ordered differently from what mili was expecting, data would be written out to the incorrect elements. This affected both the `query` method and the `AppendStatesTool`.
+
 ## [v0.7.3] - 2024-6-28
 
 ### Added

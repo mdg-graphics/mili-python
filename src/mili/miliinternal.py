@@ -1105,7 +1105,11 @@ class _MiliInternal:
         for srec in srecs_to_query:
           elements_to_write = self.__labels[class_sname][srec_element_ordinals[srec.name]]
           if elements_to_write.size > 0:
-            rows_to_write = np.where( np.isin(write_data[queried_name]['layout']['labels'], elements_to_write) )[0]
+            # We need to find the labels in write_data that are in this subrecord and use the same ordering
+            # of the labels in write_data so that the data is written correctly.
+            write_data_labels = write_data[queried_name]['layout']['labels']
+            sorter = np.argsort(write_data_labels)
+            rows_to_write = sorter[ np.searchsorted( write_data_labels, elements_to_write, sorter=sorter ) ]
             filtered_write_data[srec.name] = write_data[queried_name]['data'][:,rows_to_write,:]
 
       # initialize the results structure for this queried name

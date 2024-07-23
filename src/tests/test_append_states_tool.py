@@ -754,8 +754,9 @@ class TestAppendStatesToolParallel(unittest.TestCase):
         np.testing.assert_equal(strain['es_3c']['data'][1,1,:], np.array([18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]))
 
         axf = reader.combine(db.query("axf", "beam", labels=[1,2,3], states=[102,103]))
-        np.testing.assert_equal(axf['axf']['data'][0,:,:], np.array([[1.0], [2.0], [3.0]]))
-        np.testing.assert_equal(axf['axf']['data'][1,:,:], np.array([[4.0], [5.0], [6.0]]))
+        np.testing.assert_equal(axf['axf']['layout']['labels'], np.array([2, 3, 1]))
+        np.testing.assert_equal(axf['axf']['data'][0,:,:], np.array([[2.0], [3.0], [1.0]]))
+        np.testing.assert_equal(axf['axf']['data'][1,:,:], np.array([[5.0], [6.0], [4.0]]))
 
         stress = reader.combine(db.query("es_1a", "beam", labels=[43], states=[102,103]))
         np.testing.assert_equal(stress['es_1a']['data'][0,0,:], np.array([1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0, 3.0, 4.0, 4.0, 4.0, 4.0, 5.0, 5.0, 5.0, 5.0, 6.0, 6.0, 6.0, 6.0, 7.0, 7.0, 7.0, 7.0]))
@@ -873,8 +874,9 @@ class TestAppendStatesToolParallel(unittest.TestCase):
         np.testing.assert_equal(strain['es_3c']['data'][1,1,:], np.array([18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]))
 
         axf = reader.combine(db.query("axf", "beam", labels=[1,2,3], states=[1,2]))
-        np.testing.assert_equal(axf['axf']['data'][0,:,:], np.array([[1.0], [2.0], [3.0]]))
-        np.testing.assert_equal(axf['axf']['data'][1,:,:], np.array([[4.0], [5.0], [6.0]]))
+        np.testing.assert_equal(axf['axf']['layout']['labels'], np.array([2, 3, 1]))
+        np.testing.assert_equal(axf['axf']['data'][0,:,:], np.array([[2.0], [3.0], [1.0]]))
+        np.testing.assert_equal(axf['axf']['data'][1,:,:], np.array([[5.0], [6.0], [4.0]]))
 
         stress = reader.combine(db.query("es_1a", "beam", labels=[43], states=[1,2]))
         np.testing.assert_equal(stress['es_1a']['data'][0,0,:], np.array([1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0, 3.0, 4.0, 4.0, 4.0, 4.0, 5.0, 5.0, 5.0, 5.0, 6.0, 6.0, 6.0, 6.0, 7.0, 7.0, 7.0, 7.0]))

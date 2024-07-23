@@ -361,4 +361,5 @@ class AppendStatesTool:
         current_shape = svar_result[svar_name]['data'].shape
         new_data = np.reshape(new_data, current_shape)
         svar_result[svar_name]['data'] = new_data
+        svar_result[svar_name]['layout']['labels'] = labels
         output_database.query(svar_name, class_name, labels=labels, states=new_state_numbers, ips=int_point, write_data=svar_result)

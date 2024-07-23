@@ -91,6 +91,44 @@ class TestModifySerialSingleState(unittest.TestCase):
         np.testing.assert_equal( answer['nodpos']['data'][0,1,:], v2['nodpos']['data'][0,1,:] )
 
     #==============================================================================
+    def test_modify_vector_alt_order(self):
+        v1 = { 'nodpos' :
+                { 'layout' :
+                    {
+                        'labels' : np.array( [ 71, 70 ], dtype = np.int32 ),
+                        'states' : np.array( [4], dtype = np.int32 )
+                    },
+                  'data' : np.array( [ [ [ 5.1, 6.1, 9.1 ], [ 5.0, 6.0, 9.0 ] ] ], dtype = np.float32 )
+                }
+             }
+        v2 = { 'nodpos' :
+                { 'layout' :
+                    {
+                        'labels' : np.array( [ 70, 71 ], dtype = np.int32 ),
+                        'states' : np.array( [4], dtype = np.int32 )
+                    },
+                  'data' : np.array( [ [ [0.4330127537250519, 0.2500000596046448, 2.436666965484619], [0.4330127239227295, 0.2499999850988388, 2.7033333778381348] ] ], dtype = np.float32 )
+                }
+             }
+
+        # Before change
+        answer = self.mili.query('nodpos', 'node', labels = [70, 71], states = 4 )
+        np.testing.assert_equal( answer['nodpos']['data'][0,0,:], v2['nodpos']['data'][0,0,:] )
+        np.testing.assert_equal( answer['nodpos']['data'][0,1,:], v2['nodpos']['data'][0,1,:] )
+
+        # After change
+        idx_of_70 = 1
+        idx_of_71 = 0
+        answer = self.mili.query('nodpos', 'node', labels = [70, 71], states = 4, write_data = v1 )
+        np.testing.assert_equal( answer['nodpos']['data'][0,0,:], v1['nodpos']['data'][0,idx_of_70,:] )
+        np.testing.assert_equal( answer['nodpos']['data'][0,1,:], v1['nodpos']['data'][0,idx_of_71,:] )
+
+        # Back to original
+        answer = self.mili.query('nodpos', 'node', labels = [70, 71],  states = 4, write_data = v2 )
+        np.testing.assert_equal( answer['nodpos']['data'][0,0,:], v2['nodpos']['data'][0,0,:] )
+        np.testing.assert_equal( answer['nodpos']['data'][0,1,:], v2['nodpos']['data'][0,1,:] )
+
+    #==============================================================================
     def test_modify_vector_component(self):
         v1 = { 'nodpos[uz]' :
                 { 'layout' :
@@ -330,6 +368,44 @@ class TestModifyParallelSingleState(unittest.TestCase):
         np.testing.assert_equal( answer[0]['nodpos']['data'][0,1,:], v2['nodpos']['data'][0,1,:] )
 
     #==============================================================================
+    def test_modify_vector_alt_order(self):
+        v1 = { 'nodpos' :
+                { 'layout' :
+                    {
+                        'labels' : np.array( [ 71, 70 ], dtype = np.int32 ),
+                        'states' : np.array( [4], dtype = np.int32 )
+                    },
+                  'data' : np.array( [ [ [ 5.1, 6.1, 9.1 ], [ 5.0, 6.0, 9.0 ] ] ], dtype = np.float32 )
+                }
+             }
+        v2 = { 'nodpos' :
+                { 'layout' :
+                    {
+                        'labels' : np.array( [ 70, 71 ], dtype = np.int32 ),
+                        'states' : np.array( [4], dtype = np.int32 )
+                    },
+                  'data' : np.array( [ [ [0.4330127537250519, 0.2500000596046448, 2.436666965484619], [0.4330127239227295, 0.2499999850988388, 2.7033333778381348] ] ], dtype = np.float32 )
+                }
+             }
+
+        # Before change
+        answer = self.mili.query('nodpos', 'node', labels = [70, 71], states = 4 )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,0,:], v2['nodpos']['data'][0,0,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,1,:], v2['nodpos']['data'][0,1,:] )
+
+        # After change
+        idx_of_70 = 1
+        idx_of_71 = 0
+        answer = self.mili.query('nodpos', 'node', labels = [70, 71], states = 4, write_data = v1 )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,0,:], v1['nodpos']['data'][0,idx_of_70,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,1,:], v1['nodpos']['data'][0,idx_of_71,:] )
+
+        # Back to original
+        answer = self.mili.query('nodpos', 'node', labels = [70, 71],  states = 4, write_data = v2 )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,0,:], v2['nodpos']['data'][0,0,:] )
+        np.testing.assert_equal( answer[0]['nodpos']['data'][0,1,:], v2['nodpos']['data'][0,1,:] )
+
+    #==============================================================================
     def test_modify_vector_component(self):
         v1 = { 'nodpos[uz]' :
                 { 'layout' :
@@ -430,7 +506,6 @@ class TestModifyParallelSingleState(unittest.TestCase):
         np.testing.assert_equal( answer[2]['stress[sy]']['data'], v1['stress[sy]']['data'] )
 
 
-# TODO: Test with merge_results = True
 class TestModifyUncombinedDatabase(unittest.TestCase):
     file_name = os.path.join(dir_path,'data','parallel','d3samp6','d3samp6.plt')
 
@@ -463,6 +538,21 @@ class TestModifyUncombinedDatabase(unittest.TestCase):
         # Modify database
         modified = copy.deepcopy(original)
         modified['stress']['data'][0,:] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+        res = self.mili.query("stress", "brick", states=[35], write_data=modified)
+        np.testing.assert_equal( modified['stress']['data'], reader.combine(res)['stress']['data'] )
+
+        # Back to original
+        res = self.mili.query("stress", "brick", states=[35], write_data=original)
+        np.testing.assert_equal( original['stress']['data'], reader.combine(res)['stress']['data'] )
+
+    def test_modify_vector_alt_order(self):
+        res = self.mili.query("stress", "brick", states=[35])
+        original = reader.combine(res)
+
+        # Modify database
+        modified = copy.deepcopy(original)
+        modified['stress']['data'][0,:] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+        modified['stress']['layout']['labels'] = np.arange(36,0,-1)
         res = self.mili.query("stress", "brick", states=[35], write_data=modified)
         np.testing.assert_equal( modified['stress']['data'], reader.combine(res)['stress']['data'] )
 
