@@ -266,6 +266,11 @@ class MiliDatabase:
       results = self._mili.classes_of_derived_variable(var_name),
       reduce_function = reductions.list_concatenate_unique_str)
 
+  @overload
+  def labels(self, class_name : str) -> np.ndarray: ...
+  @overload
+  def labels(self, class_name : None = ...) -> Dict[str,np.ndarray]: ...
+
   def labels(self, class_name: Optional[str] = None) -> Union[Dict[str,np.ndarray],np.ndarray]:
     """Getter for the element labels.
 
@@ -301,7 +306,12 @@ class MiliDatabase:
       results = self._mili.material_numbers(),
       reduce_function = reductions.list_concatenate_unique)
 
-  def connectivity( self, class_name : Optional[str] = None ) -> Union[Dict[str,np.ndarray],np.ndarray]:
+  @overload
+  def connectivity(self, class_name : str) -> np.ndarray: ...
+  @overload
+  def connectivity(self, class_name : None = ...) -> Dict[str,np.ndarray]: ...
+
+  def connectivity(self, class_name : Optional[str] = None) -> Union[Dict[str,np.ndarray],np.ndarray]:
     """Getter for the element connectivity as element LABELS.
 
     Args:
