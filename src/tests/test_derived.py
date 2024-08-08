@@ -57,7 +57,7 @@ class SerialDerivedExpressions(unittest.TestCase):
                     'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure',
                     'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress',
                     'triaxiality', 'eps_rate', 'nodtangmag', 'mat_cog_disp_x', 'mat_cog_disp_y',
-                    'mat_cog_disp_z', 'element_volume',
+                    'mat_cog_disp_z', 'element_volume', 'area'
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
@@ -79,9 +79,9 @@ class SerialDerivedExpressions(unittest.TestCase):
             "prin_dev_strain2", "prin_dev_strain3", "prin_strain1_alt", "prin_strain2_alt",
             "prin_strain3_alt", "prin_dev_strain1_alt", "prin_dev_strain2_alt", "prin_dev_strain3_alt",
             "prin_stress1", "prin_stress2", "prin_stress3", "eff_stress", "pressure", "prin_dev_stress1",
-            "prin_dev_stress2", "prin_dev_stress3", "max_shear_stress", "triaxiality"
+            "prin_dev_stress2", "prin_dev_stress3", "max_shear_stress", "triaxiality", "area"
         ]
-        CSEG_DERIVED = []
+        CSEG_DERIVED = ["area"]
         NODE_DERIVED = [
             "disp_x", "disp_y", "disp_z", "disp_mag", "disp_rad_mag_xy", "vel_x", "vel_y", "vel_z",
             "acc_x", "acc_y", "acc_z"
@@ -875,7 +875,27 @@ class SerialDerivedExpressions(unittest.TestCase):
         self.assertAlmostEqual(result["element_volume"]["data"][2,0,0], 6.239515600934483E-05)
         self.assertAlmostEqual(result["element_volume"]["data"][2,1,0], 4.717303015668719E-05)
         self.assertAlmostEqual(result["element_volume"]["data"][2,2,0], 4.147314159979739E-05)
-        pass
+
+    def test_quad_area(self):
+        """Test area calculation for quad elements."""
+        result = self.mili.query("area", "cseg", labels=[1,12,24], states=[1,40,80])
+
+        np.testing.assert_equal( result["area"]["layout"]["labels"], [1,12,24])
+        np.testing.assert_equal( result["area"]["layout"]["states"], [1,40,80])
+        self.assertEqual( result["area"]["source"], "derived")
+
+        # State 1
+        self.assertAlmostEqual(result["area"]["data"][0,0,0], 0.078125)
+        self.assertAlmostEqual(result["area"]["data"][0,1,0], 0.171875)
+        self.assertAlmostEqual(result["area"]["data"][0,2,0], 0.17187496)
+        # State 40
+        self.assertAlmostEqual(result["area"]["data"][1,0,0], 0.07812971)
+        self.assertAlmostEqual(result["area"]["data"][1,1,0], 0.17187835)
+        self.assertAlmostEqual(result["area"]["data"][1,2,0], 0.17187496)
+        # State 80
+        self.assertAlmostEqual(result["area"]["data"][2,0,0], 0.07812706)
+        self.assertAlmostEqual(result["area"]["data"][2,1,0], 0.17187445)
+        self.assertAlmostEqual(result["area"]["data"][2,2,0], 0.17187496)
 
 
 class ParallelDerivedExpressions(unittest.TestCase):
@@ -1378,3 +1398,24 @@ class ParallelDerivedExpressions(unittest.TestCase):
         self.assertAlmostEqual(result["element_volume"]["data"][1,1,0], 0.0291667)
         self.assertAlmostEqual(result["element_volume"]["data"][2,0,0], 0.02083334)
         self.assertAlmostEqual(result["element_volume"]["data"][2,1,0], 0.0291667)
+
+    def test_quad_area(self):
+        """Test area calculation for quad elements."""
+        result = combine( self.mili.query("area", "cseg", labels=[1,12,24], states=[1,40,80]) )
+
+        np.testing.assert_equal( result["area"]["layout"]["labels"], [12,24,1])
+        np.testing.assert_equal( result["area"]["layout"]["states"], [1,40,80])
+        self.assertEqual( result["area"]["source"], "derived")
+
+        # State 1
+        self.assertAlmostEqual(result["area"]["data"][0,0,0], 0.171875)
+        self.assertAlmostEqual(result["area"]["data"][0,1,0], 0.17187496)
+        self.assertAlmostEqual(result["area"]["data"][0,2,0], 0.078125)
+        # State 40
+        self.assertAlmostEqual(result["area"]["data"][1,0,0], 0.17187835)
+        self.assertAlmostEqual(result["area"]["data"][1,1,0], 0.17187496)
+        self.assertAlmostEqual(result["area"]["data"][1,2,0], 0.07812971)
+        # State 80
+        self.assertAlmostEqual(result["area"]["data"][2,0,0], 0.17187445)
+        self.assertAlmostEqual(result["area"]["data"][2,1,0], 0.17187496)
+        self.assertAlmostEqual(result["area"]["data"][2,2,0], 0.07812706)

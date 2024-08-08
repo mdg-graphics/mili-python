@@ -290,6 +290,13 @@ class DerivedExpressions:
         "compute_function": self.__compute_element_volume,
         "only_sclasses": [Superclass.M_HEX, Superclass.M_TET]
       },
+      "area": {
+        "primals": ["nodpos"],
+        "primals_class": ["node"],
+        "supports_batching": False,
+        "compute_function": self.__compute_quad_area,
+        "only_sclasses": [Superclass.M_QUAD],
+      },
       # TODO: Add more primals here
     }
 
@@ -424,6 +431,9 @@ class DerivedExpressions:
 
     if labels is None:
       labels = self.db.labels().get( class_name, np.empty([0],np.int32) )
+    else:
+      available_labels = self.db.labels().get( class_name, np.empty([0],np.int32) )
+      labels = np.intersect1d( labels, available_labels )
 
     if type(ips) is int:
       ips = [ips]
@@ -1524,4 +1534,40 @@ class DerivedExpressions:
 
     vol = np.reshape( vol, vol.shape + (1,) )
     derived_result["element_volume"]["data"] = vol
+    return derived_result
+
+  def __compute_quad_area(self,
+                               result_name: str,
+                               primal_data: dict,
+                               query_args: dict):
+    """Compute the area of a QUAD element."""
+    labels = query_args['labels']
+    states = query_args['states']
+
+    # Manually construct derived result dictionary since result element class
+    # does not match primal data element class.
+    derived_result = {
+      result_name: {
+        "data": np.empty( (len(states), len(labels), 1), dtype=np.float32 ),
+        "layout": { "states": states, "labels": labels },
+        "source": "derived"
+      }
+    }
+
+    elem_node_map = query_args["elem_node_map"]
+    nodpos = primal_data["nodpos"]["data"]
+
+    fs1  = -nodpos[:, elem_node_map[:,0], 0] + nodpos[:, elem_node_map[:,1], 0] + nodpos[:, elem_node_map[:,2], 0] - nodpos[:, elem_node_map[:,3], 0]
+    fs2  = -nodpos[:, elem_node_map[:,0], 1] + nodpos[:, elem_node_map[:,1], 1] + nodpos[:, elem_node_map[:,2], 1] - nodpos[:, elem_node_map[:,3], 1]
+    fs3  = -nodpos[:, elem_node_map[:,0], 2] + nodpos[:, elem_node_map[:,1], 2] + nodpos[:, elem_node_map[:,2], 2] - nodpos[:, elem_node_map[:,3], 2]
+    ft1  = -nodpos[:, elem_node_map[:,0], 0] - nodpos[:, elem_node_map[:,1], 0] + nodpos[:, elem_node_map[:,2], 0] + nodpos[:, elem_node_map[:,3], 0]
+    ft2  = -nodpos[:, elem_node_map[:,0], 1] - nodpos[:, elem_node_map[:,1], 1] + nodpos[:, elem_node_map[:,2], 1] + nodpos[:, elem_node_map[:,3], 1]
+    ft3  = -nodpos[:, elem_node_map[:,0], 2] - nodpos[:, elem_node_map[:,1], 2] + nodpos[:, elem_node_map[:,2], 2] + nodpos[:, elem_node_map[:,3], 2]
+    e    = fs1 * fs1 + fs2 * fs2 + fs3 * fs3
+    f    = fs1 * ft1 + fs2 * ft2 + fs3 * ft3
+    g    = ft1 * ft1 + ft2 * ft2 + ft3 * ft3
+    area = np.sqrt( ((e * g - f * f) / 16.0) )
+
+    area = np.reshape( area, area.shape + (1,) )
+    derived_result[result_name]["data"] = area
     return derived_result

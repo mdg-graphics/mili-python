@@ -320,7 +320,7 @@ class TestMiliInternal(unittest.TestCase):
                     'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure',
                     'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress',
                     'triaxiality', 'eps_rate', 'nodtangmag', 'mat_cog_disp_x', 'mat_cog_disp_y',
-                    'mat_cog_disp_z', 'element_volume',
+                    'mat_cog_disp_z', 'element_volume', 'area',
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
@@ -343,9 +343,9 @@ class TestMiliInternal(unittest.TestCase):
             "prin_dev_strain2", "prin_dev_strain3", "prin_strain1_alt", "prin_strain2_alt",
             "prin_strain3_alt", "prin_dev_strain1_alt", "prin_dev_strain2_alt", "prin_dev_strain3_alt",
             "prin_stress1", "prin_stress2", "prin_stress3", "eff_stress", "pressure", "prin_dev_stress1",
-            "prin_dev_stress2", "prin_dev_stress3", "max_shear_stress", "triaxiality"
+            "prin_dev_stress2", "prin_dev_stress3", "max_shear_stress", "triaxiality", "area",
         ]
-        CSEG_DERIVED = []
+        CSEG_DERIVED = ["area"]
         NODE_DERIVED = [
             "disp_x", "disp_y", "disp_z", "disp_mag", "disp_rad_mag_xy", "vel_x", "vel_y", "vel_z",
             "acc_x", "acc_y", "acc_z"

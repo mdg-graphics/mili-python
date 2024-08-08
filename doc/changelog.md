@@ -12,6 +12,11 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Removed
 
+## [v0.7.6] - 2024-8-8
+
+## Added
+- Added derived variable `area` to calculate the area of a quad element.
+
 ## [v0.7.5] - 2024-8-1
 
 ## Added
