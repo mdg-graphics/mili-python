@@ -366,6 +366,17 @@ class MiliDatabase:
       results = self._mili.state_variables_of_class(class_name),
       reduce_function = reductions.list_concatenate_unique_str)
 
+  def state_variable_titles(self) -> dict[str,str]:
+    """Get dictionary of state variable titles for each state variable.
+
+    Returns:
+      dict[str,str]: Dictionary where keys are svar names and values are svar titles.
+    """
+    return self.__postprocess(
+      results = self._mili.state_variable_titles(),
+      reduce_function = reductions.dictionary_merge_no_concat
+    )
+
   def containing_state_variables_of_class(self, svar: str, class_name: str) -> List[str]:
     """Get List of state variables that contain the specific state variable + class_name.
 

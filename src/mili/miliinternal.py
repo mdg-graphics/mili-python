@@ -633,6 +633,17 @@ class _MiliInternal:
           state_variables.append(svar_name)
     return state_variables
 
+  def state_variable_titles(self) -> dict[str,str]:
+    """Get dictionary of state variable titles for each state variable.
+
+    Returns:
+      dict[str,str]: Dictionary where keys are svar names and values are svar titles.
+    """
+    svar_titles = {}
+    for sname, svar in self.__svars.items():
+      svar_titles[sname] = svar.title
+    return svar_titles
+
   def containing_state_variables_of_class(self, svar: str, class_name: str) -> List[str]:
     """Get List of state variables that contain the specific state variable + class_name.
 

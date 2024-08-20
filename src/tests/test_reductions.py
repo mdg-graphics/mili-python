@@ -498,6 +498,18 @@ class ReductionTests:
             self.assertEqual( set(serial_result) - set(parallel_result), set() )
 
         #==============================================================================
+        def test_state_variable_titles(self):
+            serial_result = self.serial.state_variable_titles()
+            parallel_result = self.parallel.state_variable_titles()
+            # Check that same type is returned by both
+            self.assertEqual( type(serial_result), type(parallel_result) )
+            for svar_name in serial_result:
+                np.testing.assert_equal(
+                    sorted(serial_result[svar_name]),
+                    sorted(parallel_result[svar_name])
+                )
+
+        #==============================================================================
         def test_reload_state_maps(self):
             serial_result = self.serial.reload_state_maps()
             parallel_result = self.parallel.reload_state_maps()
