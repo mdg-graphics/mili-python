@@ -214,6 +214,11 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
         self.assertEqual(node, 140)
         self.assertEqual(dist, 0.23785513406115558)
 
+        node, dist = self.adjacency.nearest_node([0.0,0.0,0.0], 1, material=[2,3])
+        self.assertEqual(node, 49)
+        self.assertEqual(dist, 2.0615528128088303)
+
+
     def test_nearest_element(self):
         """Test the nearest_element function."""
         class_name, label, dist = self.adjacency.nearest_element([0.0,0.0,0.0], 1)
@@ -230,6 +235,11 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
         self.assertEqual(class_name, "brick")
         self.assertEqual(label, 36)
         self.assertEqual(dist, 0.5292167548771606)
+
+        class_name, label, dist = self.adjacency.nearest_element([0.0,0.0,0.0], 1, material=[3])
+        self.assertEqual(class_name, "shell")
+        self.assertEqual(label, 1)
+        self.assertEqual(dist, 2.089128544941847)
 
     def test_neighbor_elements(self):
         """Test the neighbor_elements funcion."""
@@ -430,6 +440,10 @@ class ParallelAdjacencyTests:
             self.assertEqual(node, 140)
             self.assertEqual(dist, 0.23785513406115558)
 
+            node, dist = self.adjacency.nearest_node([0.0,0.0,0.0], 1, material=[2,3])
+            self.assertEqual(node, 49)
+            self.assertEqual(dist, 2.0615528128088303)
+
         def test_nearest_element(self):
             """Test the nearest_element function."""
             class_name, label, dist = self.adjacency.nearest_element([0.0,0.0,0.0], 1)
@@ -446,6 +460,11 @@ class ParallelAdjacencyTests:
             self.assertEqual(class_name, "brick")
             self.assertEqual(label, 36)
             self.assertEqual(dist, 0.5292167548771606)
+
+            class_name, label, dist = self.adjacency.nearest_element([0.0,0.0,0.0], 1, material=[3])
+            self.assertEqual(class_name, "shell")
+            self.assertEqual(label, 1)
+            self.assertEqual(dist, 2.089128544941847)
 
         def test_neighbor_elements(self):
             """Test the neighbor_elements funcion."""

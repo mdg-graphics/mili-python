@@ -6,6 +6,8 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Added
 
+- Updated the functions `AdjacencyMapping.nearest_element` and `AdjacencyMapping.nearest_node` to support filtering by material name/number.
+
 ### Fixed
 
 ### Changed

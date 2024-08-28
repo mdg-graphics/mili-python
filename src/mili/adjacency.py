@@ -111,39 +111,46 @@ class AdjacencyMapping:
       elems = dictionary_merge_concat_unique(elems)
     return elems
 
-  def nearest_node(self, point: List[float], state: int) -> Tuple[int,float]:
+  def nearest_node(self, point: List[float], state: int,
+                   material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Tuple[int,float]:
     """Get the nearest node to a specified point.
 
     Args:
       point (List[float]): The coordinates of the point.
       state (int): The state number.
-      max_search_iters (Optional[int]): The max number of search iterations.
+      material (Optional[Union[Union[str,int],List[Union[str,int]]]] = None): Limit gathered elements to a specific material(s).
 
     Returns:
       Tuple[int,float]: The node label and distance.
     """
     if isinstance(point, list):
       point = np.array(point)
+    if isinstance(material, (str,int)):
+      material = [material]
 
-    nearest_node = self.mili.geometry.nearest_node(point, state)
+    nearest_node = self.mili.geometry.nearest_node(point, state, material)
     if not self.serial:
       nearest_node = min(nearest_node, key=lambda x: x[1])
     return nearest_node
 
-  def nearest_element(self, point: List[float], state: int) -> Tuple[str,int,float]:
+  def nearest_element(self, point: List[float], state: int,
+                      material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Tuple[str,int,float]:
     """Get the nearest element to a specified point.
 
     Args:
       point (List[float]): The coordinates of the point.
       state (int): The state number.
+      material (Optional[Union[Union[str,int],List[Union[str,int]]]] = None): Limit gathered elements to a specific material(s).
 
     Returns:
       Tuple[str,int,float]: The element class, label, and distance.
     """
     if isinstance(point, list):
       point = np.array(point)
+    if isinstance(material, (str,int)):
+      material = [material]
 
-    nearest_per_proc = self.mili.geometry.nearest_element(point, state)
+    nearest_per_proc = self.mili.geometry.nearest_element(point, state, material)
     if not self.serial:
       nearest_per_proc = min(nearest_per_proc, key=lambda x: x[2])
     return nearest_per_proc
@@ -247,46 +254,73 @@ class GeometricMeshInfo:
   def __init__(self, db):
     self.db: _MiliInternal = db
 
-  def nearest_node(self, point: List[float], state: int) -> Tuple[int,float]:
+  def nearest_node(self, point: List[float], state: int,
+                   material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Tuple[int,float]:
     """Get the nearest node to a specified point.
 
     Args:
       point (List[float]): The coordinates of the point.
       state (int): The state number.
+      material (Optional[Union[Union[str,int],List[Union[str,int]]]], default=None): Limit search to specific material(s).
 
     Returns:
       Tuple[int,float]: The node label and distance.
     """
     if isinstance(point, list):
       point = np.array(point)
-    nodal_coordinates = self.db.query("nodpos", "node", states=[state])
+    if isinstance(material, (str,int)):
+      material = [material]
+
+    node_labels = None
+    if material:
+      node_labels = np.empty([0], dtype=np.int32)
+      for mat in material:
+        node_labels = np.concatenate((node_labels, self.db.nodes_of_material(mat)))
+
+    nodal_coordinates = self.db.query("nodpos", "node", labels=node_labels, states=[state])
+    if nodal_coordinates["nodpos"]["data"].size == 0:
+      return -1, np.finfo(np.float32).max
     nodpos_data = nodal_coordinates["nodpos"]["data"][0]
     distances_from_point = np.linalg.norm(nodpos_data - point, axis=1)
     node_index = np.argmin(distances_from_point)
     return nodal_coordinates['nodpos']['layout']['labels'][node_index], distances_from_point[node_index]
 
-  def nearest_element(self, point: List[float], state: int) -> Tuple[str,int,float]:
+  def nearest_element(self, point: List[float], state: int,
+                      material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Tuple[str,int,float]:
     """Get the nearest element to a specified point.
 
     Args:
       point (List[float]): The coordinates of the point.
       state (int): The state number.
+      material (Optional[Union[Union[str,int],List[Union[str,int]]]], default=None): Limit search to specific material(s).
 
     Returns:
       Tuple[str,int,float]: The element class, label, and distance.
     """
     if isinstance(point, list):
       point = np.array(point)
+    if isinstance(material, (str,int)):
+      material = [material]
+    # Need to convert any material names to numbers as that is how they are stored in the connectivity
+    if material:
+      material_dict = self.db.materials()
+      material = [ material_dict.get(mat, mat) for mat in material ]
 
     nodal_coordinates = self.db.query("nodpos", "node", states=[state], output_object_labels=False)
     nodpos_data = nodal_coordinates['nodpos']['data']
     element_connectivity = self.db.connectivity_ids()
-    # Calculate centroids and distances for each element class
     minimums = []
     for elem_class, elem_conns in element_connectivity.items():
+      # Calculate centroids and distances for each element class
       conns = elem_conns[:,:-1]
       elem_centroids = np.sum(nodpos_data[0][conns], axis=1) / float(conns.shape[1])
       distances_from_point = np.linalg.norm(elem_centroids - point, axis=1)
+      # If filtering by material, mark any distance of an invalid material as max float32 value
+      if material:
+        mats = elem_conns[:,-1]
+        invalid_mats = np.where( np.isin(mats, material, invert=True))
+        distances_from_point[invalid_mats] = np.finfo(np.float32).max
+      # Store minumum
       min_elem_index = np.argmin(distances_from_point)
       minimums.append([elem_class, min_elem_index, distances_from_point[min_elem_index]])
     nearest_element = min(minimums, key=lambda x: x[2])

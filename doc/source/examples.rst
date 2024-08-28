@@ -525,7 +525,7 @@ arguement :code:`material` that limits the search to specific material name(s) o
 
 The function :code:`mesh_entities_near_coordinate` gathers all nodes within the specified radius of the given 3d
 coordinate and returns all elements that are associated with those nodes. This function also takes the optional
-arguement :code:`material` that limits the search to specific material name(s) or number(s).
+argument :code:`material` that limits the search to specific material name(s) or number(s).
 
 .. code-block:: python
 
@@ -563,7 +563,8 @@ optional arguement :code:`material` that limits the search to specific material 
 
 The dictionary returned by :code:`elems_of_nodes` has the same format as that returned by :code:`mesh_entities_within_radius`
 
-The function :code:`nearest_node` finds the closest node to a given 3d coordinate at a specified time step.
+The function :code:`nearest_node` finds the closest node to a given 3d coordinate at a specified time step. This function also takes the optional
+argument :code:`material` that limits the search to specific material name(s) or number(s).
 
 .. code-block:: python
 
@@ -573,7 +574,8 @@ The function :code:`nearest_node` finds the closest node to a given 3d coordinat
     # Get the closest node and its distance from the point (0.0, 0.0, 0.0) at state 1.
     nearest_node, distance = adj.nearest_node( [0.0, 0.0, 0.0], 1)
 
-The function :code:`nearest_element` finds the element whose centroid is closest to a given 3d coordinate at a specified time step.
+The function :code:`nearest_element` finds the element whose centroid is closest to a given 3d coordinate at a specified time step. This function also takes the optional
+argument :code:`material` that limits the search to specific material name(s) or number(s).
 
 .. code-block:: python
 
