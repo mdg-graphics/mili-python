@@ -31,7 +31,7 @@ from __future__ import annotations
 import inspect
 from typing import *
 import numpy as np
-from numpy.lib.function_base import iterable
+from numpy import iterable
 from itertools import groupby
 
 from mili.datatypes import Superclass

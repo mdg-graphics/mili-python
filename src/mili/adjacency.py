@@ -31,7 +31,7 @@ Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 from __future__ import annotations
 from typing import *
 import numpy as np
-from numpy.lib.function_base import iterable
+from numpy import iterable
 from mili.reductions import dictionary_merge_concat_unique
 from mili.milidatabase import *
 from mili.miliinternal import *

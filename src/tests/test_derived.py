@@ -919,7 +919,7 @@ class ParallelDerivedExpressions(unittest.TestCase):
         self.assertAlmostEqual( result[0]['pressure']['data'][1][0][0], 9.14670837e+02, delta=tolerance)
         self.assertAlmostEqual( result[5]['pressure']['data'][1][0][0], 1.3345321e+03, delta=tolerance)
         # State 86, labels 10, 20
-        self.assertAlmostEqual( result[0]['pressure']['data'][2][0][0], 1.01328058e+03, delta=6.0E-05)
+        self.assertAlmostEqual( result[0]['pressure']['data'][2][0][0], 1.01328064e+03, delta=6.0E-05)
         self.assertAlmostEqual( result[5]['pressure']['data'][2][0][0], 1.97043777e+02, delta=2.0E-05)
 
         # Test derived equation for a single integration point

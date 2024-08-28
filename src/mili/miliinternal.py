@@ -15,7 +15,7 @@ import re
 import io
 
 from collections import defaultdict
-from numpy.lib.function_base import iterable
+from numpy import iterable
 from typing import *
 
 from mili.datatypes import *

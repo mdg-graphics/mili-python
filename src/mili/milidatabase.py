@@ -9,7 +9,7 @@ warnings.simplefilter("ignore", UserWarning) # Pandas NUMEXPR warning
 
 import numpy as np
 import numpy.typing as npt
-from numpy.lib.function_base import iterable
+from numpy import iterable
 import os
 
 from typing import *

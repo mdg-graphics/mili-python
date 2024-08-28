@@ -6,7 +6,7 @@ from typing import *
 from collections import defaultdict
 import numpy as np
 import numpy.typing as npt
-from numpy.lib.function_base import iterable
+from numpy import iterable
 
 # utility classes to allow users to interact with the results data structures in ways that might be more natural for them
 
