@@ -14,7 +14,10 @@ help:
 
 .PHONY: help Makefile
 
-# Catch-all target: route all unknown targets to Sphinx using the new
-# "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-%: Makefile
+derived_variables.rst:
+	mkdir -p build
+	python3 $(SOURCEDIR)/derived_variables.py
+	mv  derived_variables.rst $(SOURCEDIR)/derived_variables.rst
+
+%: Makefile derived_variables.rst
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)

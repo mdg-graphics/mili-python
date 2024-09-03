@@ -206,9 +206,7 @@ Derived Results
 mili-python supports many derived variables that can be queried using the :code:`query` method.
 To see the derived variables that are supported in mili-python use the function :code:`supported_derived_variables` as show below:
 
-.. code-block:: python
-
-    print( db.supported_derived_variables() )
+.. include:: derived_variables.rst
 
 *NOTE:* Not all of these variables are necessarily able to be calculated for every database.
 This list contains all the derived variables that mili-python can calculate if the required
