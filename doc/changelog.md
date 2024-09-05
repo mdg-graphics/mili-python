@@ -12,6 +12,12 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Removed
 
+## [v0.7.8] - 2024-9-5
+
+### Fixed
+
+- Fixed bug in `Milidatabase.nodes` method causing incorrect number of nodal coordinates to be returned in some cases.
+
 ## [v0.7.7] - 2024-8-28
 
 ### Added

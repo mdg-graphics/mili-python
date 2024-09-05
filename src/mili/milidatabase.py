@@ -120,12 +120,14 @@ class MiliDatabase:
     if self.serial or not self.merge_results:
       return self._mili.nodes()
     else:
-      # Concatenate list of node coordinates which will contain duplicates
-      nodes = np.concatenate( self._mili.nodes() )
+      # Concatenate list of node labels which will contain duplicates
+      nlabels = reductions.list_concatenate( self._mili.labels("node") )
       # Get index of first appearance of each node
-      _, indexes = np.unique(nodes, axis=0, return_index=True)
+      _, indexes = np.unique(nlabels, axis=0, return_index=True)
       # Sort to perserve relative ordering of nodes (have to do this because np.unique sorts)
       indexes.sort()
+      # Return nodal coordinates for unique node labels
+      nodes = np.concatenate( self._mili.nodes() )
       return nodes[indexes]
 
   def state_maps(self) -> List[StateMap]:
