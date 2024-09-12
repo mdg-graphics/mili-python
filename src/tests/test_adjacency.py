@@ -106,6 +106,36 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
         self.mili = reader.open_database( TestSerialAdjacencyMapping.file_name )
         self.adjacency = adjacency.AdjacencyMapping(self.mili)
 
+    def test_compute_centroid(self):
+        """Test the compute_centroid function."""
+        # Brick elements
+        centroid = self.adjacency.compute_centroid("brick", label=22, state=1)
+        np.testing.assert_allclose( centroid, np.array([0.939143, 0.939143, 2.333333]), rtol=6.0e-7 )
+
+        centroid = self.adjacency.compute_centroid("brick", label=7, state=100)
+        np.testing.assert_allclose( centroid, np.array([0.583133, 0.15625 , 2.272023]), rtol=2.0e-7 )
+
+        # Shell elements
+        centroid = self.adjacency.compute_centroid("shell", label=3, state=1)
+        np.testing.assert_allclose( centroid, np.array([0.426883, 0.426883, 2.      ]), rtol=2.0e-7 )
+
+        centroid = self.adjacency.compute_centroid("shell", label=4, state=100)
+        np.testing.assert_allclose( centroid, np.array([0.597617, 0.597617, 1.845676]), rtol=8.0e-7 )
+
+        # beam elements
+        centroid = self.adjacency.compute_centroid("beam", label=33, state=1)
+        np.testing.assert_allclose( centroid, np.array([0.579082, 0.334333, 1.466667]), rtol=1.0e-6 )
+
+        centroid = self.adjacency.compute_centroid("beam", label=45, state=100)
+        np.testing.assert_allclose( centroid, np.array([-2.934491e-08,  7.380999e-01,  1.125251e+00]) )
+
+        # Nodes
+        centroid = self.adjacency.compute_centroid("node", label=1, state=1)
+        np.testing.assert_allclose( centroid, np.array([1.0, 0.0, 0.0]) )
+
+        centroid = self.adjacency.compute_centroid("node", label=132, state=100)
+        np.testing.assert_allclose( centroid, np.array([1.5, 0.0, 2.672029]) )
+
     def test_mesh_entities_in_radius(self):
         """Test the mesh_entities_in_radius function."""
         elems = self.adjacency.mesh_entities_within_radius("node", 120, 1, 0.1)

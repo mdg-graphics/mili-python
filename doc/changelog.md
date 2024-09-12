@@ -6,6 +6,8 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Added
 
+- Added the function `AdjacencyMapping.compute_centroid` to calculate the centroid of an element.
+
 ### Fixed
 
 ### Changed
@@ -19,8 +21,6 @@ All notable changes to Mili-python will be documented in this file.
 - Fixed bug in `Milidatabase.nodes` method causing incorrect number of nodal coordinates to be returned in some cases.
 
 ## [v0.7.7] - 2024-8-28
-
-### Added
 
 - Updated the functions `AdjacencyMapping.nearest_element` and `AdjacencyMapping.nearest_node` to support filtering by material name/number.
 - Added function `state_variable_titles` to get titles of state variables.

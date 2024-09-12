@@ -47,7 +47,17 @@ class AdjacencyMapping:
     self.mili: MiliDatabase = mili
     self.serial = mili.serial
 
-  def __compute_centroid_helper(self, class_name: str, label: int, state: int):
+  def compute_centroid(self, class_name: str, label: int, state: int) -> np.array:
+    """Compute the centroid of a given mesh entity at a given state.
+
+    Args:
+      class_name (str): The element class name.
+      labels (int): The element labels.
+      state (int): The state at which to calculate the centroid
+
+    Returns:
+      np.array of float32. The coordinates of the centroid.
+    """
     centroid = self.mili.geometry.compute_centroid(class_name, label, state)
     if not self.serial:
       centroid = np.unique(list(filter(lambda x : x is not None, centroid)), axis=0)
@@ -72,7 +82,7 @@ class AdjacencyMapping:
       radius (float): The radius within which to search.
       material (Optional[Union[Union[str,int],List[Union[str,int]]]], default=None): Limit search to specific material(s).
     """
-    centroid = self.__compute_centroid_helper(class_name, label, state)
+    centroid = self.compute_centroid(class_name, label, state)
     return self.mesh_entities_near_coordinate(centroid, state, radius, material)
 
   def mesh_entities_near_coordinate(self,
