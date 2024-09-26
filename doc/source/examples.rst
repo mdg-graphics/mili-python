@@ -258,6 +258,165 @@ and effective plastic strain rate. There are a few limitations and assumptions f
 * When possible, have the analysis code output primal variables for rates instead of calculating derived variables. They will almost always be more accurate, and will never be less accurate.
 
 
+Result Modifiers.
+========================
+
+Mili-python also provides the option to modify the query results in various ways. These include:
+
+* :code:`cummin`: Calculates the cumulative min for the result across the queried states.
+* :code:`cummmax`: Calculates the cumulative max for the result across the queried states.
+* :code:`min`: Gets the minimum value at each state and the element it is associated with.
+* :code:`max`: Gets the maximum value at each state and the element it is associated with.
+* :code:`average`: Get the average value at each state.
+
+More information on each of these modifiers as well as examples of how to use them are shown below:
+
+cummin/cummax
+--------------
+
+.. code-block:: python
+
+    db = reader.open_database( 'base_filename' )
+
+    # Calculate the effective stress for brick labels 1-3 for states 10-12
+    result = db.query("eff_stress", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True)
+    print(result["eff_stress"])
+    """
+                   1             2             3
+    10  1.163891e-08  4.563550e-09  1.023006e-08
+    11  1.332866e-08  4.957851e-09  1.122568e-08
+    12  1.513155e-08  5.696233e-09  1.236915e-08
+    """
+
+    # Calculate the cumulative min for brick labels 1-3 for states 10-12
+    result = db.query("eff_stress", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True, modifier="cummin")
+    print(result["eff_stress"])
+    """
+                   1             2             3
+    10  1.163891e-08  4.563550e-09  1.023006e-08
+    11  1.163891e-08  4.563550e-09  1.023006e-08
+    12  1.163891e-08  4.563550e-09  1.023006e-08
+    """
+
+min/max
+--------------
+
+The format for min/max results varies slightly from other results. Examples are shown below.
+
+The main differences are:
+* When results are returned as a dictionary, the list of labels is the same length as the number of states and stores the label for which the min/max is associated at each state.
+* When results are returned as a dataframe, the indexes are the states and the columns are "min" or "max" and "label".
+
+.. code-block:: python
+
+    db = reader.open_database( 'base_filename' )
+
+    # Query the X Stress for brick labels 1-3 for states 10-12
+    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True)
+    print(result["sx"])
+    """
+               1             2             3
+    10 -6.095456e-09  2.199863e-09  4.260404e-09
+    11 -6.852576e-09  2.264025e-09  5.120184e-09
+    12 -7.327380e-09  2.328188e-09  5.479496e-09
+    """
+
+    # Find the min from brick labels 1-3 for states 10-12
+    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=False, modifier="min")
+    print(result["sx"])
+    """
+    {
+        'source': 'derived',
+        'data': array([[[-6.095456e-09]],
+                       [[-6.852576e-09]],
+                       [[-7.327380e-09]]], dtype=float32),
+        'layout': {
+           'states': array([10, 11, 12], dtype=int32),
+           'labels': array([1, 1, 1], dtype=int32)
+        }
+    }
+    """
+
+    # Find the min from brick labels 1-3 for states 10-12
+    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True, modifier="min")
+    print(result["sx"])
+    """
+                 min  label
+    10 -6.095456e-09      1
+    11 -6.852576e-09      1
+    12 -7.327380e-09      1
+    """
+
+    # Find the max from brick labels 1-3 for states 10-12
+    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=False, modifier="max")
+    print(result["sx"])
+    """
+    {
+        'source': 'derived',
+        'data': array([[[4.2604040e-09]],
+                       [[5.1201843e-09]],
+                       [[5.4794955e-09]]], dtype=float32),
+        'layout': {
+            'states': array([10, 11, 12], dtype=int32),
+            'labels': array([3, 3, 3], dtype=int32)
+        }
+    }
+    """
+
+    # Find the max from brick labels 1-3 for states 10-12
+    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True, modifiers="max")
+    print(result["sx"])
+    """
+                 max  label
+    10  4.260404e-09      3
+    11  5.120184e-09      3
+    12  5.479496e-09      3
+    """
+
+average
+--------------
+
+.. code-block:: python
+
+    db = reader.open_database( 'base_filename' )
+
+    # Query the X Stress for brick labels 1-3 for states 10-12
+    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True)
+    print(result["sx"])
+    """
+               1             2             3
+    10 -6.095456e-09  2.199863e-09  4.260404e-09
+    11 -6.852576e-09  2.264025e-09  5.120184e-09
+    12 -7.327380e-09  2.328188e-09  5.479496e-09
+    """
+
+    # Find the average from brick labels 1-3 for states 10-12
+    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=False, modifier="average")
+    print(result["sx"])
+    """
+    {
+        'source': 'derived',
+        'data': array([[[1.2160362e-10]],
+                       [[1.7721129e-10]],
+                       [[1.6010111e-10]]], dtype=float32),
+        'layout': {
+            'states': array([10, 11, 12], dtype=int32),
+            'labels': array([1, 2, 3], dtype=int32)
+        }
+    }
+    """
+
+    # Find the average from brick labels 1-3 for states 10-12
+    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True, modifier="average")
+    print(result["sx"])
+    """
+                 avg
+    10  1.216036e-10
+    11  1.772113e-10
+    12  1.601011e-10
+    """
+
+
 Modifying Results
 ========================
 
@@ -488,7 +647,7 @@ Adjacency Queries
 The mili-python reader provides some support for querying element adjacencies through the :code:`AdjacencyMapping`
 wrapper. The current list of supported adjacency queries includes:
 
-* Querying all elements/nodes within a specified radius of a given element using the function:code: `mesh_entities_within_radius`.
+* Querying all elements/nodes within a specified radius of a given element using the function :code:`mesh_entities_within_radius`.
 * Querying all elements/nodes within a specified radius of a given 3d coordinate using the function :code:`mesh_entities_near_coordinate`.
 * Querying all elements associated with a set of specific nodes using the :code:`elems_of_nodes` function.
 * Querying the nearest node to a 3d coordinate using the :code:`nearest_node` function.

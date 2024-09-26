@@ -13,11 +13,13 @@ from numpy import iterable
 import os
 
 from typing import *
+import pandas as pd
 
 import mili.reductions as reductions
 from mili.parallel import ServerWrapper, LoopWrapper
 from mili.miliinternal import _MiliInternal, ReturnCode
 from mili.datatypes import StateMap
+from mili.utils import result_dictionary_to_dataframe
 
 class MiliPythonError(Exception):
   """Mili Python Exception object."""
@@ -486,6 +488,87 @@ class MiliDatabase:
       results = self._mili.nodes_of_material(mat),
       reduce_function = reductions.list_concatenate_unique)
 
+  def __process_query_modifier(self, modifier: str, results: dict, as_dataframe: bool ):
+    if modifier not in ("min", "max", "average", "cummin", "cummax"):
+      raise ValueError("Invalide modifier. Must be one of (min, max, average, cummin, cummax).")
+    results = reductions.combine(results)
+
+    for svar in results:
+      results[svar]["modifier"] = modifier
+
+    ##### Minimum #####
+    if modifier == "min":
+      for svar in results:
+        labels = results[svar]['layout']['labels']
+        min_indexes = np.argmin( results[svar]["data"], axis=1, keepdims=True )
+        results[svar]["data"] = np.take_along_axis( results[svar]["data"], min_indexes, axis=1 )
+        results[svar]["layout"]["labels"] = labels[min_indexes.flatten()]
+
+      if as_dataframe:
+        # Special handing for min/max dataframes
+        for svar in results:
+          states = results[svar]["layout"]["states"]
+          labels = results[svar]["layout"]["labels"]
+          if len(states) == len(labels):
+            data = results[svar]["data"].flatten()
+          else:
+            data = np.reshape( results[svar]["data"], (len(states),-1))
+            labels = np.reshape( labels, (len(states),-1))
+          results[svar] = pd.DataFrame( zip(data,labels), index=states, columns=["min", "label"])
+
+    ##### Maximum #####
+    elif modifier == "max":
+      for svar in results:
+        labels = results[svar]['layout']['labels']
+        max_indexes = np.argmax( results[svar]["data"], axis=1, keepdims=True )
+        results[svar]["data"] = np.take_along_axis( results[svar]["data"], max_indexes, axis=1 )
+        results[svar]["layout"]["labels"] = labels[max_indexes.flatten()]
+
+      if as_dataframe:
+        # Special handing for min/max dataframes
+        for svar in results:
+          states = results[svar]["layout"]["states"]
+          labels = results[svar]["layout"]["labels"]
+          if len(states) == len(labels):
+            data = results[svar]["data"].flatten()
+          else:
+            data = np.reshape( results[svar]["data"], (len(states),-1))
+            labels = np.reshape( labels, (len(states),-1))
+          results[svar] = pd.DataFrame( zip(data,labels), index=states, columns=["max", "label"])
+
+    ##### Average #####
+    elif modifier == "average":
+      for svar in results:
+        labels = results[svar]['layout']['labels']
+        results[svar]["data"] = np.average( results[svar]["data"], axis=1, keepdims=True )
+
+      if as_dataframe:
+        # Special handing for average dataframes
+        for svar in results:
+          data = results[svar]["data"].flatten()
+          states = results[svar]["layout"]["states"]
+          if len(data) != len(states):
+            data = results[svar]["data"]
+            results[svar] = pd.DataFrame.from_records(data, index=states, columns=["average"])
+          else:
+            results[svar] = pd.DataFrame( data, index=states, columns=["average"])
+
+    ##### Cumulative Min #####
+    elif modifier == "cummin":
+      for svar in results:
+        states = results[svar]["layout"]["states"]
+        for i in range(1,len(states)):
+          results[svar]["data"][i] = np.minimum( results[svar]["data"][i], results[svar]["data"][i-1])
+
+    ##### Cumulative Max #####
+    elif modifier == "cummax":
+      for svar in results:
+        states = results[svar]["layout"]["states"]
+        for i in range(1,len(states)):
+          results[svar]["data"][i] = np.maximum( results[svar]["data"][i], results[svar]["data"][i-1])
+
+    return results
+
   def query( self,
              svar_names : Union[List[str],str],
              class_sname : str,
@@ -495,6 +578,7 @@ class MiliDatabase:
              ips : Optional[Union[List[int],int]] = None,
              write_data : Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]] = None,
              as_dataframe: Optional[bool] = False,
+             modifier: Optional[str] = None,
              **kwargs ) -> dict:
     """Query the database for state variables or derived variables, returning data for the specified parameters, optionally writing data to the database.
 
@@ -509,10 +593,18 @@ class MiliDatabase:
       write_data (Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]], default=None): Optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
         then modify the values desired, then query again with the modified result in this param
       as_dataframe (Optional[bool]): If True the result is returned as a Pandas DataFrame.
+      modifier (Optional[str]): Optional string specifying modifer to apply to results. Valid modifiers are min, max, average, cummin, cummax.
     """
-    return self.__postprocess(
-      results = self._mili.query(svar_names, class_sname, material, labels, states, ips, write_data, as_dataframe, **kwargs),
+    results = self.__postprocess(
+      results = self._mili.query(svar_names, class_sname, material, labels, states, ips, write_data, **kwargs),
       reduce_function = reductions.combine)
+
+    if modifier:
+      results = self.__process_query_modifier(modifier, results, as_dataframe)
+
+    if as_dataframe:
+      return result_dictionary_to_dataframe(results)
+    return results
 
   def append_state(self,
                    new_state_time: float,

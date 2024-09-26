@@ -57,35 +57,26 @@ class SerialDerivedExpressions(unittest.TestCase):
                     'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure',
                     'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress',
                     'triaxiality', 'eps_rate', 'nodtangmag', 'mat_cog_disp_x', 'mat_cog_disp_y',
-                    'mat_cog_disp_z', 'element_volume', 'area'
+                    'mat_cog_disp_z', 'element_volume', 'area',
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
 
     def test_derived_variables_of_class(self):
-        BRICK_DERIVED = [
-            "vol_strain", "prin_strain1", "prin_strain2", "prin_strain3", "prin_dev_strain1",
-            "prin_dev_strain2", "prin_dev_strain3", "prin_strain1_alt", "prin_strain2_alt",
-            "prin_strain3_alt", "prin_dev_strain1_alt", "prin_dev_strain2_alt", "prin_dev_strain3_alt",
-            "prin_stress1", "prin_stress2", "prin_stress3", "eff_stress", "pressure", "prin_dev_stress1",
-            "prin_dev_stress2", "prin_dev_stress3", "max_shear_stress", "triaxiality", 'element_volume'
-        ]
-        BEAM_DERIVED = [
-            "prin_stress1", "prin_stress2", "prin_stress3", "eff_stress", "pressure", "prin_dev_stress1",
-            "prin_dev_stress2", "prin_dev_stress3", "max_shear_stress", "triaxiality", "eps_rate"
-        ]
-        SHELL_DERIVED = [
-            "vol_strain", "prin_strain1", "prin_strain2", "prin_strain3", "prin_dev_strain1",
-            "prin_dev_strain2", "prin_dev_strain3", "prin_strain1_alt", "prin_strain2_alt",
-            "prin_strain3_alt", "prin_dev_strain1_alt", "prin_dev_strain2_alt", "prin_dev_strain3_alt",
-            "prin_stress1", "prin_stress2", "prin_stress3", "eff_stress", "pressure", "prin_dev_stress1",
-            "prin_dev_stress2", "prin_dev_stress3", "max_shear_stress", "triaxiality", "area"
-        ]
-        CSEG_DERIVED = ["area"]
-        NODE_DERIVED = [
-            "disp_x", "disp_y", "disp_z", "disp_mag", "disp_rad_mag_xy", "vel_x", "vel_y", "vel_z",
-            "acc_x", "acc_y", "acc_z"
-        ]
+        BRICK_DERIVED = ['vol_strain', 'prin_strain1', 'prin_strain2', 'prin_strain3', 'prin_dev_strain1', 'prin_dev_strain2',
+                         'prin_dev_strain3', 'prin_strain1_alt', 'prin_strain2_alt', 'prin_strain3_alt', 'prin_dev_strain1_alt',
+                         'prin_dev_strain2_alt', 'prin_dev_strain3_alt', 'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress',
+                         'pressure', 'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress', 'triaxiality',
+                         'element_volume',]
+        BEAM_DERIVED = ['prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure', 'prin_dev_stress1', 'prin_dev_stress2',
+                        'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'eps_rate']
+        SHELL_DERIVED = ['vol_strain', 'prin_strain1', 'prin_strain2', 'prin_strain3', 'prin_dev_strain1', 'prin_dev_strain2', 'prin_dev_strain3',
+                         'prin_strain1_alt', 'prin_strain2_alt', 'prin_strain3_alt', 'prin_dev_strain1_alt', 'prin_dev_strain2_alt', 'prin_dev_strain3_alt',
+                         'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure', 'prin_dev_stress1', 'prin_dev_stress2',
+                         'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'area',]
+        CSEG_DERIVED = ['area',]
+        NODE_DERIVED = ['disp_x', 'disp_y', 'disp_z', 'disp_mag', 'disp_rad_mag_xy', 'vel_x', 'vel_y', 'vel_z', 'acc_x', 'acc_y', 'acc_z']
+
         self.assertEqual( self.mili.derived_variables_of_class("brick"), BRICK_DERIVED )
         self.assertEqual( self.mili.derived_variables_of_class("beam"), BEAM_DERIVED )
         self.assertEqual( self.mili.derived_variables_of_class("shell"), SHELL_DERIVED )

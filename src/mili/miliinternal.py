@@ -23,7 +23,6 @@ from mili.afileIO import *
 from mili.parallel import *
 from mili.derived import DerivedExpressions
 from mili.adjacency import GeometricMeshInfo
-from mili.utils import result_dictionary_to_dataframe
 from mili.reductions import *
 
 def np_empty(dtype):
@@ -950,7 +949,6 @@ class _MiliInternal:
              states : Optional[Union[List[int],int]] = None,
              ips : Optional[Union[List[int],int]] = None,
              write_data : Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]] = None,
-             as_dataframe: bool = False,
              **kwargs ) -> dict:
     """Query the database for state variables or derived variables, returning data for the specified parameters, optionally writing data to the database.
 
@@ -964,7 +962,6 @@ class _MiliInternal:
       ips (Optional[Union[List[int],int]], default=None): Optional integration point to query for vector array state variables, default is all available.
       write_data (Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]], default=None): Optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
         then modify the values desired, then query again with the modified result in this param
-      as_dataframe (Optional[bool]): If True the result is returned as a Pandas DataFrame.
     """
     # normalize arguments to expected types / default values
     errors, svar_names, class_sname, material, labels, states, ips, write_data = self.__init_query_parameters( svar_names, class_sname, material, labels, states, ips, write_data )
@@ -1002,18 +999,12 @@ class _MiliInternal:
     # Error if any state variables don't exist
     if len(not_found) > 0:
       self.__return_code = (ReturnCode.ERROR, f"The state variables '{not_found}' do not exist.")
-      if as_dataframe:
-        return result_dictionary_to_dataframe( res )
-      else:
-        return res
+      return res
 
     # If no labels, then skip. We do this here to ensure non existant state variables are reported.
     if ordinals.size == 0:
       self.__return_code = (ReturnCode.ERROR, f"No labels found for the class {class_sname}")
-      if as_dataframe:
-        return result_dictionary_to_dataframe( res )
-      else:
-        return res
+      return res
 
     # Handle derived queries
     derived_query_names = [spec[0] for spec in derived_specs]
@@ -1187,10 +1178,7 @@ class _MiliInternal:
 
             res[ queried_name ][ "data" ][ sidx, :, : ] = var_data
 
-    if as_dataframe:
-      return result_dictionary_to_dataframe( res )
-    else:
-      return res
+    return res
 
   def __get_state_byte_data(self, state: int, zero_out: bool, byte_data: BinaryIO) -> None:
     state_size = np.sum([srec.byte_size for srec in self.__srecs])

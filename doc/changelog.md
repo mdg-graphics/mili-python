@@ -6,13 +6,18 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Added
 
-- Added the function `AdjacencyMapping.compute_centroid` to calculate the centroid of an element.
-
 ### Fixed
 
 ### Changed
 
 ### Removed
+
+## [v0.7.9] - 2024-9-26
+
+### Added
+
+- Added the function `AdjacencyMapping.compute_centroid` to calculate the centroid of an element.
+- Added support for calculate `min`, `max`, `average`, `cummin`, and `cummax` for queried results.
 
 ## [v0.7.8] - 2024-9-5
 

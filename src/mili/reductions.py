@@ -43,6 +43,7 @@ def merge_result_dictionaries( result_dicts: List[dict] ) -> Dict:
   merged_results = {}
 
   svars = list(set(np.concatenate([list(res.keys()) for res in result_dicts])))
+  svars = [str(sv) for sv in svars]
   for svar in svars:
     merged_results[svar] = {}
     # Get list of processors that contain data
@@ -65,6 +66,7 @@ def merge_dataframes(dataframes: List[pd.DataFrame]) -> pd.DataFrame:
   """Merge a list of DataFrames from the MiliDatabase.query method into a single Pandas DataFrame."""
   merged_dataframes = {}
   svars = list(set(np.concatenate([list(res.keys()) for res in dataframes])))
+  svars = [str(sv) for sv in svars]
 
   for svar in svars:
     svar_dfs = [df_dict.get(svar) for df_dict in dataframes]

@@ -308,6 +308,14 @@ class DerivedExpressions:
     """
     return list(self.__derived_expressions.keys())
 
+  def __variable_exists_for_class(self, variable: str, class_name: str) -> bool:
+    primal_exists = class_name in self.db.classes_of_state_variable(variable)
+    try:
+      derived_exists = class_name in self.db.classes_of_derived_variable(variable)
+    except:
+      derived_exists = False
+    return primal_exists or derived_exists
+
   def derived_variables_of_class(self, class_name: str) -> List[str]:
     """Return list of derived variables that can be calculated for a given class."""
     derived_list = []
@@ -321,10 +329,10 @@ class DerivedExpressions:
         primals_found = []
         for req_primal, req_primal_class in zip(specs['primals'], specs['primals_class']):
           # Check that primal exists
-          if req_primal in queriable_state_variables:
+          if req_primal in queriable_state_variables or req_primal in self.__derived_expressions:
             # Check that primal exists for required element class
             req_primal_class = class_name if req_primal_class is None else req_primal_class
-            if req_primal_class in self.db.classes_of_state_variable(req_primal):
+            if self.__variable_exists_for_class(req_primal, req_primal_class):
               primals_found.append(True)
         # Check if all primals were found
         if len(primals_found) == len(specs['primals']) and all(primals_found):
@@ -345,7 +353,7 @@ class DerivedExpressions:
         if "only_sclasses" in derived_spec:
           if class_def.sclass not in derived_spec["only_sclasses"]:
             continue
-        primals_found = [ class_name in self.db.classes_of_state_variable(primal) for primal in derived_spec['primals'] ]
+        primals_found = [ self.__variable_exists_for_class(primal, class_name) for primal in derived_spec['primals'] ]
         if all(primals_found):
           classes_of_derived.append(class_name)
     else:
@@ -354,7 +362,7 @@ class DerivedExpressions:
         if "only_sclasses" in derived_spec:
           if class_def.sclass not in derived_spec["only_sclasses"]:
             continue
-        primals_found = [ primal_class in self.db.classes_of_state_variable(primal) for primal, primal_class in zip(derived_spec['primals'],derived_spec["primals_class"]) ]
+        primals_found = [ self.__variable_exists_for_class(primal, primal_class) for primal, primal_class in zip(derived_spec['primals'],derived_spec["primals_class"]) ]
         if all(primals_found):
           classes_of_derived.append(class_name)
 
@@ -366,7 +374,7 @@ class DerivedExpressions:
     result_names = sorted(result_names)
     for res in result_names:
       if res in self.__derived_expressions:
-        groups.append( (res, self.__derived_expressions[res]["compute_function"].__name__, self.__derived_expressions[res]["supports_batching"]) )
+        groups.append( (res, self.__derived_expressions[res]["compute_function"].__name__, self.__derived_expressions[res].get("supports_batching", False)) )
     grouped_by_compute_function = [list(g) for _,g in groupby(groups, lambda x: x[1])]
     final_groups = []
     for group in grouped_by_compute_function:
@@ -453,7 +461,7 @@ class DerivedExpressions:
     # the query specification will be the same for all so we can just use the first result
     result_name = result_names[0]
 
-    required_primals = np.array( self.__derived_expressions[result_name]['primals'] )
+    required_variables = np.array( self.__derived_expressions[result_name]['primals'] )
     primal_classes = self.__derived_expressions[result_name]['primals_class']
     primal_classes = np.array( [ pclass if pclass is not None else class_name for pclass in primal_classes] )
     compute_function = self.__derived_expressions[result_name]['compute_function']
@@ -465,10 +473,12 @@ class DerivedExpressions:
         raise ValueError(f"The primal class name '{primal_class}' does not exist.")
 
     # Check that all required primals exist for the desired element class.
-    primals_found_for_class = np.array([ pclass in self.db.classes_of_state_variable(primal) for primal,pclass in zip(required_primals,primal_classes) ])
-    if np.any( primals_found_for_class == False ):
-      raise ValueError((f"The required primals do not all exist for the required_classes\n"
-                        f"required_primals = {required_primals}\n"
+    primals_found_for_class = []
+    for primal, pclass in zip(required_variables, primal_classes):
+      primals_found_for_class.append( self.__variable_exists_for_class(primal, pclass) )
+    if not all( primals_found_for_class ):
+      raise ValueError((f"The required variables do not all exist for the required_classes\n"
+                        f"required_variables = {required_variables}\n"
                         f"required_classes = {primal_classes}"))
 
     # Check that computation is supported for this element superclass
@@ -502,7 +512,7 @@ class DerivedExpressions:
             raise ValueError((f"For the derived result '{result_name}' you must "
                               f"provide the key word argument '{keyword}'"))
 
-    return required_primals, primal_classes, kwargs, supports_batching, compute_function
+    return required_variables, primal_classes, kwargs, supports_batching, compute_function
 
   def __generate_elem_node_map(self, elem_node_association):
     """Generate masks for each element that maps to nodal data.
@@ -583,12 +593,14 @@ class DerivedExpressions:
             **kwargs):
     """General derived result function.
 
-    : param result_names : The list of derived results to compute
-    : param class_sname : mesh class name being queried
-    : param material : optional sname or material number to select labels from
-    : param labels : optional labels to query data about, filtered by material if material if material is supplied, default is all
-    : param states: optional state numbers from which to query data, default is all
-    : param ips : optional for svars with array or vec_array aggregation query just these components, default is all available
+    Args:
+      result_names (Union[List[str],str]): The list of derived results to compute.
+      class_sname (str): The element class name being queried (e.g. brick. shell, node).
+      material (Optional[Union[str,int]], default=None): Optional material name or number to select labels from.
+      labels (Optional[Union[List[int],int]], default=None): Optional labels to query data for, filtered by material
+        if material if material is supplied, default is all.
+      states (Optional[Union[List[int],int]], default=None): Optional state numbers from which to query data, default is all.
+      ips (Optional[Union[List[int],int]], default=None): Optional integration point to query for vector array state variables, default is all available.
     """
     # Validate incoming data
     result_names, class_name, material, labels, states, ips = self.__init_derived_query_parameters(result_names, class_name, material, labels, states, ips)
@@ -1537,9 +1549,9 @@ class DerivedExpressions:
     return derived_result
 
   def __compute_quad_area(self,
-                               result_name: str,
-                               primal_data: dict,
-                               query_args: dict):
+                          result_name: str,
+                          primal_data: dict,
+                          query_args: dict):
     """Compute the area of a QUAD element."""
     labels = query_args['labels']
     states = query_args['states']
