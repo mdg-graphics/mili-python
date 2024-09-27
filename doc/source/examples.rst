@@ -261,13 +261,13 @@ and effective plastic strain rate. There are a few limitations and assumptions f
 Result Modifiers.
 ========================
 
-Mili-python also provides the option to modify the query results in various ways. These include:
+Mili-python also provides the option to modify the query results in various ways. These are specified using the :code:`ResultModifier` enum:
 
-* :code:`cummin`: Calculates the cumulative min for the result across the queried states.
-* :code:`cummmax`: Calculates the cumulative max for the result across the queried states.
-* :code:`min`: Gets the minimum value at each state and the element it is associated with.
-* :code:`max`: Gets the maximum value at each state and the element it is associated with.
-* :code:`average`: Get the average value at each state.
+* :code:`ResultModifier.CUMMIN`: Calculates the cumulative min for the result across the queried states.
+* :code:`ResultModifier.CUMMAX`: Calculates the cumulative max for the result across the queried states.
+* :code:`ResultModifier.MIN`: Gets the minimum value at each state and the element it is associated with.
+* :code:`ResultModifier.MAX`: Gets the maximum value at each state and the element it is associated with.
+* :code:`ResultModifier.AVERAGE`: Get the average value at each state.
 
 More information on each of these modifiers as well as examples of how to use them are shown below:
 
@@ -275,6 +275,8 @@ cummin/cummax
 --------------
 
 .. code-block:: python
+
+    from mili.milidatabase import ResultModifier
 
     db = reader.open_database( 'base_filename' )
 
@@ -289,7 +291,7 @@ cummin/cummax
     """
 
     # Calculate the cumulative min for brick labels 1-3 for states 10-12
-    result = db.query("eff_stress", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True, modifier="cummin")
+    result = db.query("eff_stress", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True, modifier=ResultModifier.CUMMIN)
     print(result["eff_stress"])
     """
                    1             2             3
@@ -309,6 +311,8 @@ The main differences are:
 
 .. code-block:: python
 
+    from mili.milidatabase import ResultModifier
+
     db = reader.open_database( 'base_filename' )
 
     # Query the X Stress for brick labels 1-3 for states 10-12
@@ -322,7 +326,7 @@ The main differences are:
     """
 
     # Find the min from brick labels 1-3 for states 10-12
-    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=False, modifier="min")
+    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=False, modifier=ResultModifier.MIN)
     print(result["sx"])
     """
     {
@@ -338,7 +342,7 @@ The main differences are:
     """
 
     # Find the min from brick labels 1-3 for states 10-12
-    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True, modifier="min")
+    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True, modifier=ResultModifier.MIN)
     print(result["sx"])
     """
                  min  label
@@ -348,7 +352,7 @@ The main differences are:
     """
 
     # Find the max from brick labels 1-3 for states 10-12
-    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=False, modifier="max")
+    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=False, modifier=ResultModifier.MAX)
     print(result["sx"])
     """
     {
@@ -364,7 +368,7 @@ The main differences are:
     """
 
     # Find the max from brick labels 1-3 for states 10-12
-    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True, modifiers="max")
+    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True, modifiers=ResultModifier.MAX)
     print(result["sx"])
     """
                  max  label
@@ -377,6 +381,8 @@ average
 --------------
 
 .. code-block:: python
+
+    from mili.milidatabase import ResultModifier
 
     db = reader.open_database( 'base_filename' )
 
@@ -391,7 +397,7 @@ average
     """
 
     # Find the average from brick labels 1-3 for states 10-12
-    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=False, modifier="average")
+    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=False, modifier=ResultModifier.AVERAGE)
     print(result["sx"])
     """
     {
@@ -407,7 +413,7 @@ average
     """
 
     # Find the average from brick labels 1-3 for states 10-12
-    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True, modifier="average")
+    result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True, modifier=ResultModifier.AVERAGE)
     print(result["sx"])
     """
                  avg

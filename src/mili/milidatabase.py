@@ -14,6 +14,7 @@ import os
 
 from typing import *
 import pandas as pd
+from enum import Enum
 
 import mili.reductions as reductions
 from mili.parallel import ServerWrapper, LoopWrapper
@@ -40,6 +41,19 @@ def parse_return_codes(return_codes: Union[Tuple[ReturnCode,str], List[Tuple[Ret
       all_errors = np.concatenate((return_codes[errors], return_codes[critical]))
       error_msgs = list(set([f"{retcode[0].str_repr()}: {retcode[1]}" for retcode in all_errors]))
       raise MiliPythonError(", ".join(error_msgs))
+
+
+class ResultModifier(Enum):
+  """Functions available for modifying results from the query method."""
+  CUMMIN = 0
+  CUMMAX = 1
+  MIN = 2
+  MAX = 3
+  AVERAGE = 4
+
+  def string_repr(self):
+    """Get string representation of enum value."""
+    return ["cummin", "cummax", "min", "max", "average"][self.value]
 
 
 class MiliDatabase:
@@ -488,16 +502,13 @@ class MiliDatabase:
       results = self._mili.nodes_of_material(mat),
       reduce_function = reductions.list_concatenate_unique)
 
-  def __process_query_modifier(self, modifier: str, results: dict, as_dataframe: bool ):
-    if modifier not in ("min", "max", "average", "cummin", "cummax"):
-      raise ValueError("Invalide modifier. Must be one of (min, max, average, cummin, cummax).")
+  def __process_query_modifier(self, modifier: ResultModifier, results: dict, as_dataframe: bool ):
     results = reductions.combine(results)
-
     for svar in results:
-      results[svar]["modifier"] = modifier
+      results[svar]["modifier"] = modifier.string_repr()
 
     ##### Minimum #####
-    if modifier == "min":
+    if modifier == ResultModifier.MIN:
       for svar in results:
         labels = results[svar]['layout']['labels']
         min_indexes = np.argmin( results[svar]["data"], axis=1, keepdims=True )
@@ -517,7 +528,7 @@ class MiliDatabase:
           results[svar] = pd.DataFrame( zip(data,labels), index=states, columns=["min", "label"])
 
     ##### Maximum #####
-    elif modifier == "max":
+    elif modifier == ResultModifier.MAX:
       for svar in results:
         labels = results[svar]['layout']['labels']
         max_indexes = np.argmax( results[svar]["data"], axis=1, keepdims=True )
@@ -537,7 +548,7 @@ class MiliDatabase:
           results[svar] = pd.DataFrame( zip(data,labels), index=states, columns=["max", "label"])
 
     ##### Average #####
-    elif modifier == "average":
+    elif modifier == ResultModifier.AVERAGE:
       for svar in results:
         labels = results[svar]['layout']['labels']
         results[svar]["data"] = np.average( results[svar]["data"], axis=1, keepdims=True )
@@ -554,14 +565,14 @@ class MiliDatabase:
             results[svar] = pd.DataFrame( data, index=states, columns=["average"])
 
     ##### Cumulative Min #####
-    elif modifier == "cummin":
+    elif modifier == ResultModifier.CUMMIN:
       for svar in results:
         states = results[svar]["layout"]["states"]
         for i in range(1,len(states)):
           results[svar]["data"][i] = np.minimum( results[svar]["data"][i], results[svar]["data"][i-1])
 
     ##### Cumulative Max #####
-    elif modifier == "cummax":
+    elif modifier == ResultModifier.CUMMAX:
       for svar in results:
         states = results[svar]["layout"]["states"]
         for i in range(1,len(states)):
@@ -578,7 +589,7 @@ class MiliDatabase:
              ips : Optional[Union[List[int],int]] = None,
              write_data : Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]] = None,
              as_dataframe: Optional[bool] = False,
-             modifier: Optional[str] = None,
+             modifier: Optional[ResultModifier] = None,
              **kwargs ) -> dict:
     """Query the database for state variables or derived variables, returning data for the specified parameters, optionally writing data to the database.
 
@@ -593,7 +604,7 @@ class MiliDatabase:
       write_data (Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]], default=None): Optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
         then modify the values desired, then query again with the modified result in this param
       as_dataframe (Optional[bool]): If True the result is returned as a Pandas DataFrame.
-      modifier (Optional[str]): Optional string specifying modifer to apply to results. Valid modifiers are min, max, average, cummin, cummax.
+      modifier (Optional[ResultModifier]): Optional modifer to apply to results.
     """
     results = self.__postprocess(
       results = self._mili.query(svar_names, class_sname, material, labels, states, ips, write_data, **kwargs),

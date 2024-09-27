@@ -6,7 +6,7 @@ SPDX-License-Identifier: (MIT)
 import os
 import unittest
 from mili import reader
-from mili.milidatabase import MiliPythonError
+from mili.milidatabase import MiliPythonError, ResultModifier
 from mili.datatypes import Superclass
 import numpy as np
 
@@ -531,7 +531,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
     def test_cummin(self):
         """Test cumulative min result modifier."""
         svar_name = "sx"
-        result = self.mili.query(svar_name, "beam", labels=[1,7,11], ips=[1], modifier="cummin")
+        result = self.mili.query(svar_name, "beam", labels=[1,7,11], ips=[1], modifier=ResultModifier.CUMMIN)
         self.assertEqual(result[svar_name]["source"], "primal")
         self.assertEqual(result[svar_name]["modifier"], "cummin")
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,7,11])
@@ -553,7 +553,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         np.testing.assert_allclose(result[svar_name]['data'][:,2,:], 0.0)
 
         svar_name = "disp_x"
-        result = self.mili.query(svar_name, "node", labels=[1,44], modifier="cummin")
+        result = self.mili.query(svar_name, "node", labels=[1,44], modifier=ResultModifier.CUMMIN)
         self.assertEqual(result[svar_name]["source"], "derived")
         self.assertEqual(result[svar_name]["modifier"], "cummin")
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,44])
@@ -567,7 +567,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
     def test_cummax(self):
         """Test cumulative max derived variable."""
         svar_name = "sx"
-        result = self.mili.query(svar_name, "beam", labels=[1,7,11], ips=[1], modifier="cummax")
+        result = self.mili.query(svar_name, "beam", labels=[1,7,11], ips=[1], modifier=ResultModifier.CUMMAX)
         self.assertEqual(result[svar_name]["source"], "primal")
         self.assertEqual(result[svar_name]["modifier"], "cummax")
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,7,11])
@@ -588,7 +588,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         np.testing.assert_allclose(result[svar_name]['data'][53:,2,:], 2199.8977)
 
         svar_name = "disp_x"
-        result = self.mili.query(svar_name, "node", labels=[1,44], modifier="cummax")
+        result = self.mili.query(svar_name, "node", labels=[1,44], modifier=ResultModifier.CUMMAX)
         self.assertEqual(result[svar_name]["source"], "derived")
         self.assertEqual(result[svar_name]["modifier"], "cummax")
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,44])
@@ -607,7 +607,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
     def test_query_min(self):
         """Test min query modifier."""
         svar_name = "sx"
-        result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier="min")
+        result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier=ResultModifier.MIN)
         self.assertEqual(result[svar_name]["source"], "primal")
         self.assertEqual(result[svar_name]["modifier"], "min")
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,6,6])
@@ -618,7 +618,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         np.testing.assert_allclose(result[svar_name]['data'][2,0,:], -840.760498)
 
         svar_name = "disp_y"
-        result = self.mili.query(svar_name, "node", states=[97,98,99], modifier="min")
+        result = self.mili.query(svar_name, "node", states=[97,98,99], modifier=ResultModifier.MIN)
         self.assertEqual(result[svar_name]["source"], "derived")
         self.assertEqual(result[svar_name]["modifier"], "min")
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,1,1])
@@ -631,7 +631,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
     def test_query_min_dataframe(self):
         """Test min query modifier with as_dataframe=True."""
         svar_name = "sx"
-        result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], as_dataframe=True, modifier="min")
+        result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], as_dataframe=True, modifier=ResultModifier.MIN)
         df = result[svar_name]
         np.testing.assert_equal(list(df.columns), ["min", "label"])
         np.testing.assert_equal(list(df.index), [21,22,23])
@@ -644,7 +644,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         np.testing.assert_allclose(df["min"][23], -840.760498)
 
         svar_name = "disp_y"
-        result = self.mili.query(svar_name, "node", states=[97,98,99], as_dataframe=True, modifier="min")
+        result = self.mili.query(svar_name, "node", states=[97,98,99], as_dataframe=True, modifier=ResultModifier.MIN)
         df = result[svar_name]
         self.assertEqual(list(df.columns), ["min", "label"])
         self.assertEqual(list(df.index), [97,98,99])
@@ -659,7 +659,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
     def test_query_max(self):
         """Test max query modifier."""
         svar_name = "sx"
-        result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier="max")
+        result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier=ResultModifier.MAX)
         self.assertEqual(result[svar_name]["source"], "primal")
         self.assertEqual(result[svar_name]["modifier"], "max")
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,5,4])
@@ -670,7 +670,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         np.testing.assert_allclose(result[svar_name]['data'][2,0,:], 41.389294)
 
         svar_name = "disp_y"
-        result = self.mili.query(svar_name, "node", states=[97,98,99], modifier="max")
+        result = self.mili.query(svar_name, "node", states=[97,98,99], modifier=ResultModifier.MAX)
         self.assertEqual(result[svar_name]["source"], "derived")
         self.assertEqual(result[svar_name]["modifier"], "max")
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [11,11,11])
@@ -683,7 +683,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
     def test_query_max_dataframe(self):
         """Test max query modifier with as_dataframe=True."""
         svar_name = "sx"
-        result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], as_dataframe=True, modifier="max")
+        result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], as_dataframe=True, modifier=ResultModifier.MAX)
         df = result[svar_name]
         np.testing.assert_equal(list(df.columns), ["max", "label"])
         np.testing.assert_equal(list(df.index), [21,22,23])
@@ -696,7 +696,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         np.testing.assert_allclose(df["max"][23], 41.389294)
 
         svar_name = "disp_y"
-        result = self.mili.query(svar_name, "node", states=[97,98,99], as_dataframe=True, modifier="max")
+        result = self.mili.query(svar_name, "node", states=[97,98,99], as_dataframe=True, modifier=ResultModifier.MAX)
         df = result[svar_name]
         self.assertEqual(list(df.columns), ["max", "label"])
         self.assertEqual(list(df.index), [97,98,99])
@@ -711,7 +711,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
     def test_query_average(self):
         """Test average query modifier."""
         svar_name = "sx"
-        result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier="average")
+        result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier=ResultModifier.AVERAGE)
         self.assertEqual(result[svar_name]["source"], "primal")
         self.assertEqual(result[svar_name]["modifier"], "average")
         np.testing.assert_equal(result[svar_name]["layout"]["states"], [21,22,23])
@@ -721,7 +721,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         np.testing.assert_allclose(result[svar_name]['data'][2,0,:], -23.06732)
 
         svar_name = "disp_y"
-        result = self.mili.query(svar_name, "node", states=[97,98,99], modifier="average")
+        result = self.mili.query(svar_name, "node", states=[97,98,99], modifier=ResultModifier.AVERAGE)
         self.assertEqual(result[svar_name]["source"], "derived")
         self.assertEqual(result[svar_name]["modifier"], "average")
         np.testing.assert_equal(result[svar_name]["layout"]["states"], [97,98,99])
@@ -733,7 +733,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
     def test_query_average_dataframe(self):
         """Test average query modifier with as_dataframe=True."""
         svar_name = "sx"
-        result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], as_dataframe=True, modifier="average")
+        result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], as_dataframe=True, modifier=ResultModifier.AVERAGE)
         df = result[svar_name]
         np.testing.assert_equal(list(df.columns), ["average"])
         np.testing.assert_equal(list(df.index), [21,22,23])
@@ -742,7 +742,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         np.testing.assert_allclose(df["average"][23], -23.06732)
 
         svar_name = "disp_y"
-        result = self.mili.query(svar_name, "node", states=[97,98,99], as_dataframe=True, modifier="average")
+        result = self.mili.query(svar_name, "node", states=[97,98,99], as_dataframe=True, modifier=ResultModifier.AVERAGE)
         df = result[svar_name]
         self.assertEqual(list(df.columns), ["average"])
         self.assertEqual(list(df.index), [97,98,99])
@@ -1401,7 +1401,7 @@ class ParallelTests:
         def test_cummin(self):
             """Test cumulative min derived variable."""
             svar_name = "sx"
-            result = self.mili.query(svar_name, "beam", labels=[1,7,11], ips=[1], modifier="cummin")
+            result = self.mili.query(svar_name, "beam", labels=[1,7,11], ips=[1], modifier=ResultModifier.CUMMIN)
             self.assertEqual(result[svar_name]["source"], "primal")
             self.assertEqual(result[svar_name]["modifier"], "cummin")
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,11,7])
@@ -1423,7 +1423,7 @@ class ParallelTests:
             np.testing.assert_allclose(result[svar_name]['data'][:,1,:], 0.0)
 
             svar_name = "disp_x"
-            result = self.mili.query(svar_name, "node", labels=[1,44], modifier="cummin")
+            result = self.mili.query(svar_name, "node", labels=[1,44], modifier=ResultModifier.CUMMIN)
             self.assertEqual(result[svar_name]["source"], "derived")
             self.assertEqual(result[svar_name]["modifier"], "cummin")
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,44])
@@ -1437,7 +1437,7 @@ class ParallelTests:
         def test_cummax(self):
             """Test cumulative max derived variable."""
             svar_name = "sx"
-            result = self.mili.query(svar_name, "beam", labels=[1,7,11], ips=[1], modifier="cummax")
+            result = self.mili.query(svar_name, "beam", labels=[1,7,11], ips=[1], modifier=ResultModifier.CUMMAX)
             self.assertEqual(result[svar_name]["source"], "primal")
             self.assertEqual(result[svar_name]["modifier"], "cummax")
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,11,7])
@@ -1458,7 +1458,7 @@ class ParallelTests:
             np.testing.assert_allclose(result[svar_name]['data'][53:,1,:], 2199.8823)
 
             svar_name = "disp_x"
-            result = self.mili.query(svar_name, "node", labels=[1,44], modifier="cummax")
+            result = self.mili.query(svar_name, "node", labels=[1,44], modifier=ResultModifier.CUMMAX)
             self.assertEqual(result[svar_name]["source"], "derived")
             self.assertEqual(result[svar_name]["modifier"], "cummax")
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,44])
@@ -1477,7 +1477,7 @@ class ParallelTests:
         def test_query_min(self):
             """Test min query modifier."""
             svar_name = "sx"
-            result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier="min")
+            result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier=ResultModifier.MIN)
             self.assertEqual(result[svar_name]["source"], "primal")
             self.assertEqual(result[svar_name]["modifier"], "min")
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [5,6,6])
@@ -1488,7 +1488,7 @@ class ParallelTests:
             np.testing.assert_allclose(result[svar_name]['data'][2,0,:], -840.760498)
 
             svar_name = "disp_y"
-            result = self.mili.query(svar_name, "node", states=[97,98,99], modifier="min")
+            result = self.mili.query(svar_name, "node", states=[97,98,99], modifier=ResultModifier.MIN)
             self.assertEqual(result[svar_name]["source"], "derived")
             self.assertEqual(result[svar_name]["modifier"], "min")
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,1,1])
@@ -1501,7 +1501,7 @@ class ParallelTests:
         def test_query_min_dataframe(self):
             """Test min query modifier with as_dataframe=True."""
             svar_name = "sx"
-            result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], as_dataframe=True, modifier="min")
+            result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], as_dataframe=True, modifier=ResultModifier.MIN)
             df = result[svar_name]
             np.testing.assert_equal(list(df.columns), ["min", "label"])
             np.testing.assert_equal(list(df.index), [21,22,23])
@@ -1514,7 +1514,7 @@ class ParallelTests:
             np.testing.assert_allclose(df["min"][23], -840.760498)
 
             svar_name = "disp_y"
-            result = self.mili.query(svar_name, "node", states=[97,98,99], as_dataframe=True, modifier="min")
+            result = self.mili.query(svar_name, "node", states=[97,98,99], as_dataframe=True, modifier=ResultModifier.MIN)
             df = result[svar_name]
             self.assertEqual(list(df.columns), ["min", "label"])
             self.assertEqual(list(df.index), [97,98,99])
@@ -1529,7 +1529,7 @@ class ParallelTests:
         def test_query_max(self):
             """Test max query modifier."""
             svar_name = "sx"
-            result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier="max")
+            result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier=ResultModifier.MAX)
             self.assertEqual(result[svar_name]["source"], "primal")
             self.assertEqual(result[svar_name]["modifier"], "max")
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [5,5,4])
@@ -1540,7 +1540,7 @@ class ParallelTests:
             np.testing.assert_allclose(result[svar_name]['data'][2,0,:], 41.389294)
 
             svar_name = "disp_y"
-            result = self.mili.query(svar_name, "node", states=[97,98,99], modifier="max")
+            result = self.mili.query(svar_name, "node", states=[97,98,99], modifier=ResultModifier.MAX)
             self.assertEqual(result[svar_name]["source"], "derived")
             self.assertEqual(result[svar_name]["modifier"], "max")
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [11,11,11])
@@ -1553,7 +1553,7 @@ class ParallelTests:
         def test_query_max_dataframe(self):
             """Test max query modifier with as_dataframe=True."""
             svar_name = "sx"
-            result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], as_dataframe=True, modifier="max")
+            result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], as_dataframe=True, modifier=ResultModifier.MAX)
             df = result[svar_name]
             np.testing.assert_equal(list(df.columns), ["max", "label"])
             np.testing.assert_equal(list(df.index), [21,22,23])
@@ -1566,7 +1566,7 @@ class ParallelTests:
             np.testing.assert_allclose(df["max"][23], 41.389294)
 
             svar_name = "disp_y"
-            result = self.mili.query(svar_name, "node", states=[97,98,99], as_dataframe=True, modifier="max")
+            result = self.mili.query(svar_name, "node", states=[97,98,99], as_dataframe=True, modifier=ResultModifier.MAX)
             df = result[svar_name]
             self.assertEqual(list(df.columns), ["max", "label"])
             self.assertEqual(list(df.index), [97,98,99])
@@ -1581,7 +1581,7 @@ class ParallelTests:
         def test_query_average(self):
             """Test average query modifier."""
             svar_name = "sx"
-            result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier="average")
+            result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier=ResultModifier.AVERAGE)
             self.assertEqual(result[svar_name]["source"], "primal")
             self.assertEqual(result[svar_name]["modifier"], "average")
             np.testing.assert_equal(result[svar_name]["layout"]["states"], [21,22,23])
@@ -1591,7 +1591,7 @@ class ParallelTests:
             np.testing.assert_allclose(result[svar_name]['data'][2,0,:], -23.06732)
 
             svar_name = "disp_y"
-            result = self.mili.query(svar_name, "node", states=[97,98,99], modifier="average")
+            result = self.mili.query(svar_name, "node", states=[97,98,99], modifier=ResultModifier.AVERAGE)
             self.assertEqual(result[svar_name]["source"], "derived")
             self.assertEqual(result[svar_name]["modifier"], "average")
             np.testing.assert_equal(result[svar_name]["layout"]["states"], [97,98,99])
@@ -1603,7 +1603,7 @@ class ParallelTests:
         def test_query_average_dataframe(self):
             """Test average query modifier with as_dataframe=True."""
             svar_name = "sx"
-            result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], as_dataframe=True, modifier="average")
+            result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], as_dataframe=True, modifier=ResultModifier.AVERAGE)
             df = result[svar_name]
             np.testing.assert_equal(list(df.columns), ["average"])
             np.testing.assert_equal(list(df.index), [21,22,23])
@@ -1612,7 +1612,7 @@ class ParallelTests:
             np.testing.assert_allclose(df["average"][23], -23.06732)
 
             svar_name = "disp_y"
-            result = self.mili.query(svar_name, "node", states=[97,98,99], as_dataframe=True, modifier="average")
+            result = self.mili.query(svar_name, "node", states=[97,98,99], as_dataframe=True, modifier=ResultModifier.AVERAGE)
             df = result[svar_name]
             self.assertEqual(list(df.columns), ["average"])
             self.assertEqual(list(df.index), [97,98,99])
