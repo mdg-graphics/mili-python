@@ -77,13 +77,14 @@ class Superclass(IntEnum):
   M_SURFACE = 12
   M_PARTICLE = 13
   M_TET10 = 14
+  M_INODE = 15
   M_QTY_SUPERCLASS = 16
   M_SHARED = 100
   M_ALL = 200
   M_INVALID_LABEL = -1
 
   def node_count(self):
-    return [ 0, 0, 2, 3, 3, 4, 4, 5, 6, 8, 0, 0, 0, 1, 10 ][self.value]
+    return [ 0, 0, 2, 3, 3, 4, 4, 5, 6, 8, 0, 0, 0, 1, 10, 1 ][self.value]
 
 @dataclass
 class StateMap:
