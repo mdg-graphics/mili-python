@@ -971,7 +971,10 @@ class _MiliInternal:
     # handle possible hidden keyword arguments
     output_object_labels = kwargs.get("output_object_labels", True)
     subrec = kwargs.get("subrec", None)
+    # Save result source and remove from kwargs so it doesn't get passed to derived query.
     requested_result_source = kwargs.get('source', 'primal')
+    if "source" in kwargs:
+      del kwargs["source"]
 
     # Check that no unexpected keyword arguments were passed
     expected_keywords = set(["output_object_labels", "subrec", "source", "reference_state"])
