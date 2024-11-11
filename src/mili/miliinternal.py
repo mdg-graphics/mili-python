@@ -441,7 +441,7 @@ class _MiliInternal:
     if states is None:
       result = np.array( [ smap.time for smap in self.__smaps ] )
     else:
-      result = np.array( [ self.__smaps[state].time for state in states ] )
+      result = np.array( [ self.__smaps[state-1].time for state in states ] )
     return result
 
   def state_variables(self) -> Dict[str,StateVariable]:

@@ -7,6 +7,8 @@ All notable changes to Mili-python will be documented in this file.
 ### Added
 
 ### Fixed
+- Fixed a bug with the `MiliDatabase.times()` argument `states` where it was expecting the
+index of the state not the state number itself.
 
 ### Changed
 

@@ -220,7 +220,7 @@ class TestMiliInternal(unittest.TestCase):
         self.assertEqual(FIRST_STATE, times[0])
         self.assertEqual(LAST_STATE, times[-1])
 
-        times = self.mili.times([0,100])
+        times = self.mili.times([1,101])
         self.assertEqual(FIRST_STATE, times[0])
         self.assertEqual(LAST_STATE, times[-1])
 
