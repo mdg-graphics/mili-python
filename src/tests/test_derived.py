@@ -238,51 +238,96 @@ class SerialDerivedExpressions(unittest.TestCase):
         """X Velocity"""
         file_name = os.path.join(dir_path,'data','serial','solids014','solids014_dblplt')
         db = open_database( file_name, suppress_parallel=True )
-        result = db.query("vel_x", "node", states=[1,3], labels=[7,1217])
-        # State 1, nodes 7, 1217
+
+        # Special case: Just querying first state
+        result = db.query("vel_x", "node", states=[1], labels=[7,1217,3602])
+        # State 1, nodes 7, 1217, 3602
         self.assertAlmostEqual( result['vel_x']['data'][0][0][0], 0.000000e+00)
         self.assertAlmostEqual( result['vel_x']['data'][0][1][0], 0.000000e+00)
-        # State 3, nodes 7, 1217
-        self.assertAlmostEqual( result['vel_x']['data'][1][0][0], 1.85962731E-03, delta=3.0E-06)
-        self.assertAlmostEqual( result['vel_x']['data'][1][1][0], -1.85962731E-03, delta=3.0E-06)
+        self.assertAlmostEqual( result['vel_x']['data'][0][2][0], 0.000000e+00)
+
+        result = db.query("vel_x", "node", states=[1,2,3], labels=[7,1217,3602])
+        # State 1, nodes 7, 1217, 3602
+        self.assertAlmostEqual( result['vel_x']['data'][0][0][0], 0.000000e+00)
+        self.assertAlmostEqual( result['vel_x']['data'][0][1][0], 0.000000e+00)
+        self.assertAlmostEqual( result['vel_x']['data'][0][2][0], 0.000000e+00)
+        # State 2, nodes 7, 1217, 3602
+        self.assertAlmostEqual( result['vel_x']['data'][1][0][0], 1.85962731E-03)
+        self.assertAlmostEqual( result['vel_x']['data'][1][1][0], -1.85962731E-03)
+        self.assertAlmostEqual( result['vel_x']['data'][1][2][0], 4.429632022E-04)
+        # State 3, nodes 7, 1217, 3602
+        self.assertAlmostEqual( result['vel_x']['data'][2][0][0], 1.85967549E-03, delta=3.0e-06)
+        self.assertAlmostEqual( result['vel_x']['data'][2][1][0], -1.85967549E-03, delta=3.0e-06)
+        self.assertAlmostEqual( result['vel_x']['data'][2][2][0], 4.434895803E-04)
 
     def test_vel_y(self):
         """Y Velocity"""
         file_name = os.path.join(dir_path,'data','serial','solids014','solids014_dblplt')
         db = open_database( file_name, suppress_parallel=True )
-        result = db.query("vel_y", "node", states=[1,3], labels=[7,1217])
-        # State 1, nodes 7, 1217
+
+        # Special case: Just querying first state
+        result = db.query("vel_y", "node", states=[1], labels=[7,1217,3602])
+        # State 1, nodes 7, 1217, 3602
         self.assertAlmostEqual( result['vel_y']['data'][0][0][0], 0.000000e+00)
         self.assertAlmostEqual( result['vel_y']['data'][0][1][0], 0.000000e+00)
-        # State 3, nodes 7, 1217
-        self.assertAlmostEqual( result['vel_y']['data'][1][0][0], 5.83404116E-03, delta=2.0E-05)
-        self.assertAlmostEqual( result['vel_y']['data'][1][1][0], 5.83404116E-03, delta=2.0E-05)
+        self.assertAlmostEqual( result['vel_y']['data'][0][2][0], 0.000000e+00)
+
+        result = db.query("vel_y", "node", states=[1,2,3], labels=[7,1217,3602])
+        # State 1, nodes 7, 1217, 3602
+        self.assertAlmostEqual( result['vel_y']['data'][0][0][0], 0.000000e+00)
+        self.assertAlmostEqual( result['vel_y']['data'][0][1][0], 0.000000e+00)
+        self.assertAlmostEqual( result['vel_y']['data'][0][2][0], 0.000000e+00)
+        # State 2, nodes 7, 1217, 3602
+        self.assertAlmostEqual( result['vel_y']['data'][1][0][0], 5.83404116E-03)
+        self.assertAlmostEqual( result['vel_y']['data'][1][1][0], 5.83404116E-03)
+        self.assertAlmostEqual( result['vel_y']['data'][1][2][0], 5.842519924E-02)
+        # State 3, nodes 7, 1217, 3602
+        self.assertAlmostEqual( result['vel_y']['data'][2][0][0], 5.83404116E-03, delta=2.0E-05)
+        self.assertAlmostEqual( result['vel_y']['data'][2][1][0], 5.83404116E-03, delta=2.0E-05)
+        self.assertAlmostEqual( result['vel_y']['data'][2][2][0], 5.83521781E-02)
 
     def test_vel_z(self):
         """Z Velocity"""
         file_name = os.path.join(dir_path,'data','serial','solids014','solids014_dblplt')
         db = open_database( file_name, suppress_parallel=True )
-        result = db.query("vel_z", "node", states=[1,3], labels=[7,1217])
-        # State 1, nodes 7, 1217
+
+        # Special case: Just querying first state
+        result = db.query("vel_z", "node", states=[1], labels=[7,1217,3602])
+        # State 1, nodes 7, 1217, 3602
         self.assertAlmostEqual( result['vel_z']['data'][0][0][0], 0.000000e+00)
         self.assertAlmostEqual( result['vel_z']['data'][0][1][0], 0.000000e+00)
-        # State 3, nodes 7, 1217
-        self.assertAlmostEqual( result['vel_z']['data'][1][0][0], 8.22748058E-03, delta=5.0E-06)
-        self.assertAlmostEqual( result['vel_z']['data'][1][1][0], 8.22748058E-03, delta=5.0E-06)
+        self.assertAlmostEqual( result['vel_z']['data'][0][2][0], 0.000000e+00)
+
+        result = db.query("vel_z", "node", states=[1,2,3], labels=[7,1217,3602])
+        # State 1, nodes 7, 1217, 3602
+        self.assertAlmostEqual( result['vel_z']['data'][0][0][0], 0.000000e+00)
+        self.assertAlmostEqual( result['vel_z']['data'][0][1][0], 0.000000e+00)
+        self.assertAlmostEqual( result['vel_z']['data'][0][2][0], 0.000000e+00)
+        # State 2, nodes 7, 1217, 3602
+        self.assertAlmostEqual( result['vel_z']['data'][1][0][0], 8.22748058E-03)
+        self.assertAlmostEqual( result['vel_z']['data'][1][1][0], 8.22748058E-03)
+        self.assertAlmostEqual( result['vel_z']['data'][1][2][0], -1.0047131E-02)
+        # State 3, nodes 7, 1217, 3602
+        self.assertAlmostEqual( result['vel_z']['data'][2][0][0], 8.22748058E-03, delta=5.0E-06)
+        self.assertAlmostEqual( result['vel_z']['data'][2][1][0], 8.22748058E-03, delta=5.0E-06)
+        self.assertAlmostEqual( result['vel_z']['data'][2][2][0], -1.0231257E-02)
 
     def test_acc_x(self):
         """X Acceleration"""
         # Answers are based on hand calculations, not griz results.
-        result = self.mili.query("acc_x", "node", states=[1,50,101], labels=[24,52])
+        result = self.mili.query("acc_x", "node", states=[1,50,51,101], labels=[24,52])
         # State 1, nodes 24, 52 (trivial cases, no displacement)
         self.assertAlmostEqual( result['acc_x']['data'][0][0][0], 0.000000e+00)
         self.assertAlmostEqual( result['acc_x']['data'][0][1][0], 0.000000e+00)
         # State 50, nodes 24, 52
         self.assertAlmostEqual( result['acc_x']['data'][1][0][0], -5.22128e+05, delta=7.0)
         self.assertAlmostEqual( result['acc_x']['data'][1][1][0], 0.000000e+00)
-        # State 101, nodes 24, 52
-        self.assertAlmostEqual( result['acc_x']['data'][2][0][0], 5.405529e+06, delta=4.0)
+        # State 51, nodes 24, 52
+        self.assertAlmostEqual( result['acc_x']['data'][2][0][0], -4.953753e+06)
         self.assertAlmostEqual( result['acc_x']['data'][2][1][0], 0.000000e+00)
+        # State 101, nodes 24, 52
+        self.assertAlmostEqual( result['acc_x']['data'][3][0][0], 5.405529e+06, delta=4.0)
+        self.assertAlmostEqual( result['acc_x']['data'][3][1][0], 0.000000e+00)
 
         # Griz Comparison
         # These tests only use the forward and backward difference algorithms.
@@ -300,30 +345,36 @@ class SerialDerivedExpressions(unittest.TestCase):
     def test_acc_y(self):
         """Y Acceleration"""
         # Answers are based on hand calculations, not griz results.
-        result = self.mili.query("acc_y", "node", states=[1,50,101], labels=[24,52])
+        result = self.mili.query("acc_y", "node", states=[1,50,51,101], labels=[24,52])
         # State 1, nodes 24, 52 (trivial cases, no displacement)
         self.assertAlmostEqual( result['acc_y']['data'][0][0][0], 0.000000e+00)
         self.assertAlmostEqual( result['acc_y']['data'][0][1][0], 0.000000e+00)
         # State 50, nodes 24, 52
         self.assertAlmostEqual( result['acc_y']['data'][1][0][0], -3.58829e+05, delta=11.0)
         self.assertAlmostEqual( result['acc_y']['data'][1][1][0], 2.37229e+05, delta=4.0)
+        # State 51, nodes 24, 52
+        self.assertAlmostEqual( result['acc_y']['data'][2][0][0], -2.8789108e+06, delta=0.05)
+        self.assertAlmostEqual( result['acc_y']['data'][2][1][0], -5.6684144e+05, delta=0.003)
         # State 101, nodes 24, 52
-        self.assertAlmostEqual( result['acc_y']['data'][2][0][0], 3.360507e+06, delta=10.0)
-        self.assertAlmostEqual( result['acc_y']['data'][2][1][0], 1.394145e+06, delta=3.0)
+        self.assertAlmostEqual( result['acc_y']['data'][3][0][0], 3.360507e+06, delta=10.0)
+        self.assertAlmostEqual( result['acc_y']['data'][3][1][0], 1.394145e+06, delta=3.0)
 
     def test_acc_z(self):
         """Z Acceleration"""
         # Answers are based on hand calculations, not griz results.
-        result = self.mili.query("acc_z", "node", states=[1,50,101], labels=[24,78])
+        result = self.mili.query("acc_z", "node", states=[1,50,51,101], labels=[24,78])
         # State 1, nodes 24, 78 (trivial cases, constant velocity)
         self.assertAlmostEqual( result['acc_z']['data'][0][0][0], 0.000000e+00)
         self.assertAlmostEqual( result['acc_z']['data'][0][1][0], 0.000000e+00)
         # State 50, nodes 24, 78
         self.assertAlmostEqual( result['acc_z']['data'][1][0][0], 1.995543e+06, delta=14.0)
         self.assertAlmostEqual( result['acc_z']['data'][1][1][0], 2.408091e+06, delta=75.0)
+        # State 51, nodes 24, 78
+        self.assertAlmostEqual( result['acc_z']['data'][2][0][0], -1.6033686e+05, delta=0.0007)
+        self.assertAlmostEqual( result['acc_z']['data'][2][1][0], 1.7476121e+06, delta=0.03)
         # State 101, nodes 24, 78
-        self.assertAlmostEqual( result['acc_z']['data'][2][0][0], -1.106856e+06, delta=2.0)
-        self.assertAlmostEqual( result['acc_z']['data'][2][1][0], 1.025e+05, delta=20.0)
+        self.assertAlmostEqual( result['acc_z']['data'][3][0][0], -1.106856e+06, delta=2.0)
+        self.assertAlmostEqual( result['acc_z']['data'][3][1][0], 1.025e+05, delta=20.0)
 
     def test_vol_strain(self):
         """Strain Trace"""

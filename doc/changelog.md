@@ -7,12 +7,16 @@ All notable changes to Mili-python will be documented in this file.
 ### Added
 
 ### Fixed
-- Fixed a bug with the `MiliDatabase.times()` argument `states` where it was expecting the
-index of the state not the state number itself.
 
 ### Changed
 
 ### Removed
+
+## [v0.7.10] - 2024-11-11
+
+### Fixed
+- Fixed a bug with the `MiliDatabase.times()` argument `states` where it was expecting the index of the state not the state number itself.
+- Fixed bugs in the Nodal velocity and acceleration derived results that caused exceptions related to mismatched shape/dimensions.
 
 ## [v0.7.9] - 2024-9-26
 

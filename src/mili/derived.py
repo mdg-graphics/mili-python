@@ -748,21 +748,24 @@ class DerivedExpressions:
     mask = (states != 1)  # Boolean list used to exclude 1st state (if requested)
     states_prev = states[mask] - 1  # list of previous states
 
-    # Query data for the previous states
-    previous_data = self.db.query( required_primal, 'node', None, labels, states_prev)
-    previous_data = previous_data[required_primal]['data']
-
-    # Compute the displacements
-    disp = primal_data[required_primal]['data'][mask] - previous_data
-
-    # Compute dt
-    time_prev = self.db.times()[states_prev-1]  # offset because state 1 = index 0 for these arrays
-    time_curr = self.db.times()[states[mask]-1]
-    dt_inv = 1.0 / (time_curr - time_prev)
-    dt_inv = np.expand_dims(dt_inv, 1)  # add dummy dimension to convert to 2D
-
-    derived_result[result_name]['data'][mask] = disp * dt_inv
     derived_result[result_name]['data'][~mask] = 0  # velocity at 1st state set to zero
+    if len(states_prev) > 0:
+      # Query data for the previous states
+      previous_data = self.db.query( required_primal, 'node', None, labels, states_prev)
+      previous_data = previous_data[required_primal]['data']
+
+      # Compute the displacements
+      disp = primal_data[required_primal]['data'][mask] - previous_data
+
+      # Compute dt
+      time_prev = self.db.times()[states_prev-1]  # offset because state 1 = index 0 for these arrays
+      time_curr = self.db.times()[states[mask]-1]
+      dt_inv = 1.0 / (time_curr - time_prev)
+      dt_inv = np.expand_dims(dt_inv, 1)  # add dummy dimension to convert from scalar to 2D
+      dt_inv = np.repeat(dt_inv, disp.shape[1], axis=1)  # Repeat values so we have the same shape as disp
+      dt_inv = np.expand_dims(dt_inv, 2)  # add dummy dimension to convert from 2d to 3D
+
+      derived_result[result_name]['data'][mask] = disp * dt_inv
 
     return derived_result
 
@@ -807,7 +810,11 @@ class DerivedExpressions:
     # Central Difference Calculation
     if any(mask_cent==True):
       delta_t = 0.5 * (times[states_next-1] - times[states_prev-1])  # Calculate average dt
+
       one_over_tsqr = 1 / (delta_t**2)
+      one_over_tsqr = np.expand_dims(one_over_tsqr, 1)  # add dummy dimension to convert from scalar to 2D
+      one_over_tsqr = np.repeat(one_over_tsqr, u_n_cent.shape[1], axis=1)  # Repeat values so we have the same shape as u_n_cent
+      one_over_tsqr = np.expand_dims(one_over_tsqr, 2)  # add dummy dimension to convert from 2d to 3D
 
       accel = (u_n_cent - 2*u_c_cent + u_p_cent) * one_over_tsqr
       derived_result[result_name]['data'][mask_cent] = accel
