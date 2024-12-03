@@ -481,22 +481,50 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         np.testing.assert_equal( answer['matcgx']['layout']['labels'], np.array( [ 1, 2 ], dtype = np.int32) )
         np.testing.assert_equal( answer['matcgx']['data'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32) )
 
+        answer = self.mili.query('matcgx', 'mat', labels = [1,2], states = -99 )
+        self.assertEqual(answer['matcgx']['layout']['states'][0], 3)
+        self.assertEqual(list(answer.keys()), ['matcgx'] )
+        np.testing.assert_equal( answer['matcgx']['layout']['labels'], np.array( [ 1, 2 ], dtype = np.int32) )
+        np.testing.assert_equal( answer['matcgx']['data'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32) )
+
     #==============================================================================
     def test_node_attributes(self):
         answer = self.mili.query('nodpos[ux]', 'node', labels = 70, states = 3 )
+        self.assertEqual(answer['nodpos[ux]']['layout']['states'], [3])
+        self.assertEqual(answer['nodpos[ux]']['layout']['labels'][0], 70)
+        self.assertEqual(answer['nodpos[ux]']['data'][0], 0.4330127537250519 )
+
+        answer = self.mili.query('nodpos[ux]', 'node', labels = 70, states = -99 )
+        self.assertEqual(answer['nodpos[ux]']['layout']['states'], [3])
         self.assertEqual(answer['nodpos[ux]']['layout']['labels'][0], 70)
         self.assertEqual(answer['nodpos[ux]']['data'][0], 0.4330127537250519 )
 
         answer = self.mili.query('ux', 'node', labels = 70, states = 3 )
+        self.assertEqual(answer['ux']['layout']['states'], [3])
+        self.assertEqual(answer['ux']['layout']['labels'][0], 70)
+        self.assertEqual(answer['ux']['data'][0], 0.4330127537250519)
+
+        answer = self.mili.query('ux', 'node', labels = 70, states = -99 )
+        self.assertEqual(answer['ux']['layout']['states'], [3])
         self.assertEqual(answer['ux']['layout']['labels'][0], 70)
         self.assertEqual(answer['ux']['data'][0], 0.4330127537250519)
 
     #==============================================================================
     def test_query_material(self):
         answer = self.mili.query('sx', 'brick', material = 2, states = 37 )
+        self.assertEqual(answer['sx']['layout']['states'], [37])
+        self.assertEqual(answer['sx']['layout']['labels'].size, 36)
+
+        answer = self.mili.query('sx', 'brick', material = 2, states = -65 )
+        self.assertEqual(answer['sx']['layout']['states'], [37])
         self.assertEqual(answer['sx']['layout']['labels'].size, 36)
 
         answer = self.mili.query('sx', 'brick', material = 'es_12', states = 37 )
+        self.assertEqual(answer['sx']['layout']['states'], [37])
+        self.assertEqual(answer['sx']['layout']['labels'].size, 36)
+
+        answer = self.mili.query('sx', 'brick', material = 'es_12', states = -65 )
+        self.assertEqual(answer['sx']['layout']['states'], [37])
         self.assertEqual(answer['sx']['layout']['labels'].size, 36)
 
     #==============================================================================
@@ -720,6 +748,16 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         np.testing.assert_allclose(result[svar_name]['data'][1,0,:], -25.27041)
         np.testing.assert_allclose(result[svar_name]['data'][2,0,:], -23.06732)
 
+        svar_name = "sx"
+        result = self.mili.query(svar_name, "beam", states=[-81,-80,-79], ips=[1], modifier=ResultModifier.AVERAGE)
+        self.assertEqual(result[svar_name]["source"], "primal")
+        self.assertEqual(result[svar_name]["modifier"], "average")
+        np.testing.assert_equal(result[svar_name]["layout"]["states"], [21,22,23])
+
+        np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.0)
+        np.testing.assert_allclose(result[svar_name]['data'][1,0,:], -25.27041)
+        np.testing.assert_allclose(result[svar_name]['data'][2,0,:], -23.06732)
+
         svar_name = "disp_y"
         result = self.mili.query(svar_name, "node", states=[97,98,99], modifier=ResultModifier.AVERAGE)
         self.assertEqual(result[svar_name]["source"], "derived")
@@ -734,6 +772,15 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         """Test average query modifier with as_dataframe=True."""
         svar_name = "sx"
         result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], as_dataframe=True, modifier=ResultModifier.AVERAGE)
+        df = result[svar_name]
+        np.testing.assert_equal(list(df.columns), ["average"])
+        np.testing.assert_equal(list(df.index), [21,22,23])
+        np.testing.assert_allclose(df["average"][21], 0.0)
+        np.testing.assert_allclose(df["average"][22], -25.27041)
+        np.testing.assert_allclose(df["average"][23], -23.06732)
+
+        svar_name = "sx"
+        result = self.mili.query(svar_name, "beam", states=[-81,-80,-79], ips=[1], as_dataframe=True, modifier=ResultModifier.AVERAGE)
         df = result[svar_name]
         np.testing.assert_equal(list(df.columns), ["average"])
         np.testing.assert_equal(list(df.index), [21,22,23])
@@ -1346,6 +1393,9 @@ class ParallelTests:
             answer = self.mili.query( 'matcgx', 'mat', labels = [1,2], states = 3 )
             np.testing.assert_equal( answer[0]['matcgx']['data'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32 ) )
 
+            answer = self.mili.query( 'matcgx', 'mat', labels = [1,2], states = -99 )
+            np.testing.assert_equal( answer[0]['matcgx']['data'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32 ) )
+
         #==============================================================================
         def test_node_attributes(self):
             """Testing accessing accessing node attributes -> this is a vector component
@@ -1355,6 +1405,11 @@ class ParallelTests:
             answer = self.mili.query( 'nodpos[ux]', 'node', labels = 70, states = 3 )
             self.assertEqual( answer[3]['nodpos[ux]']['data'][0,0,0], 0.4330127537250519)
             answer = self.mili.query( 'ux', 'node', labels = 70, states = 3 )
+            self.assertEqual( answer[3]['ux']['data'][0,0,0], 0.4330127537250519)
+
+            answer = self.mili.query( 'nodpos[ux]', 'node', labels = 70, states = -99 )
+            self.assertEqual( answer[3]['nodpos[ux]']['data'][0,0,0], 0.4330127537250519)
+            answer = self.mili.query( 'ux', 'node', labels = 70, states = -99 )
             self.assertEqual( answer[3]['ux']['data'][0,0,0], 0.4330127537250519)
 
         #==============================================================================
@@ -1378,6 +1433,9 @@ class ParallelTests:
         def test_state_variable_vector_array(self):
             """Test accessing a vector array"""
             answer = self.mili.query('stress', 'beam', labels = 5, states = [21,22], ips = 2 )
+            np.testing.assert_equal( answer[2]['stress']['data'][1,:,:], np.array([ [ -1018.4232177734375, -1012.2537231445312, -6.556616085617861e-07, 1015.3384399414062, 0.3263571858406067, -0.32636013627052307] ], dtype = np.float32 ) )
+
+            answer = self.mili.query('stress', 'beam', labels = 5, states = [-81,-80], ips = 2 )
             np.testing.assert_equal( answer[2]['stress']['data'][1,:,:], np.array([ [ -1018.4232177734375, -1012.2537231445312, -6.556616085617861e-07, 1015.3384399414062, 0.3263571858406067, -0.32636013627052307] ], dtype = np.float32 ) )
 
         #==============================================================================

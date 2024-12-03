@@ -6,6 +6,8 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Added
 
+- Added support for negative indexing to the `MiliDatabase.query` method argument `states`. The state `-1` can be used to get the last state, `-2` the second to last state, etc.
+
 ### Fixed
 
 ### Changed

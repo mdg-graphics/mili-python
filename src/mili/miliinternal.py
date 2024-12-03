@@ -882,6 +882,11 @@ class _MiliInternal:
       self.__return_code = (ReturnCode.ERROR, f"'states' must be None, an integer, or a list of integers" )
       any_invalid = True
     else:
+      # Support negative indexing
+      if np.any( states < 0 ):
+        where = np.where( states < 0 )[0]
+        states[where] = (max_st + 1) + states[where]
+        states = np.sort( states )
       # Check for any states that are out of bounds
       if np.any( states < min_st ) or np.any( states > max_st ):
           self.__return_code = (ReturnCode.ERROR, f"Attempting to query states that do not exist. "

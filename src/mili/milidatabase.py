@@ -599,7 +599,8 @@ class MiliDatabase:
       material (Optional[Union[str,int]], default=None): Optional material name or number to select labels from.
       labels (Optional[Union[List[int],int]], default=None): Optional labels to query data for, filtered by material
         if material if material is supplied, default is all.
-      states (Optional[Union[List[int],int]], default=None): Optional state numbers from which to query data, default is all.
+      states (Optional[Union[List[int],int]], default=None): Optional state numbers from which to query data, default is all. This does
+        support negative indexing where -1 can be used to get the last state, -2 the second to last, etc.
       ips (Optional[Union[List[int],int]], default=None): Optional integration point to query for vector array state variables, default is all available.
       write_data (Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]], default=None): Optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
         then modify the values desired, then query again with the modified result in this param
