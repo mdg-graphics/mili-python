@@ -6,6 +6,16 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Added
 
+### Fixed
+
+### Changed
+
+### Removed
+
+## [v0.8.0] - 2024-12-12
+
+### Added
+
 - Added support for negative indexing to the `MiliDatabase.query` method argument `states`. The state `-1` can be used to get the last state, `-2` the second to last state, etc.
 - Multiple new fields have been added to the dictionary returned by the `MiliDatabase.query` method. These include:
   - `class_name`: The name of the element class that was queried.
@@ -13,12 +23,6 @@ All notable changes to Mili-python will be documented in this file.
   - `times` (added to `layout` dictionary): The times for each state in the query.
   - `components` (added to `layout` dictionary): The components of the state variable that were queried.
 - Added support for plotting results using matplotlib with the new `MatPlotLibPlotter` object.
-
-### Fixed
-
-### Changed
-
-### Removed
 
 ## [v0.7.10] - 2024-11-11
 
