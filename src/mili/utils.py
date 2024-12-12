@@ -10,7 +10,15 @@ from typing import List, Union, Dict
 from mili.reductions import combine
 
 def results_by_element( result_dict: Union[Dict,List[Dict]] ) -> dict:
-  """Reorganize result data in a new dictionary with the form { svar: { element: <list_of_results> } }."""
+  """Reorganize result data in a new dictionary with the form { svar: { element: <list_of_results> } }.
+
+  Args:
+    result_dict (Union[List[dict],dict]): Result dictionary(s) from MiliDatabase.query method.
+
+  NOTE: This transformation loses some of the information stored in the result_dictionary. The
+        times, class_name, source, title and components in the original result dictionary are
+        not transferred.
+  """
   result_dict = combine(result_dict)
 
   reorganized_data = {}
@@ -81,6 +89,10 @@ def result_dictionary_to_dataframe(result_dict: Union[List[dict],dict]) -> pd.Da
 
   Returns:
     A Pandas DataFrame.
+
+  NOTE: This transformation loses some of the information stored in the result_dictionary. The
+        times, class_name, source, title and components in the original result dictionary are
+        not transferred.
   """
   result_dataframes = {}
 

@@ -34,3 +34,8 @@ The ``utils`` module
 ==========================
 .. automodule:: mili.utils
     :members:
+
+The ``MatPlotLibPlotter`` class
+==================================
+.. autoclass:: mili.plotting.MatPlotLibPlotter
+    :members:

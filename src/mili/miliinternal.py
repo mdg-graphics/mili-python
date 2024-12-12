@@ -639,6 +639,7 @@ class _MiliInternal:
       dict[str,str]: Dictionary where keys are svar names and values are svar titles.
     """
     svar_titles = {}
+    svar_titles.update( self.__derived.derived_variable_titles() )
     for sname, svar in self.__svars.items():
       svar_titles[sname] = svar.title
     return svar_titles
@@ -833,7 +834,7 @@ class _MiliInternal:
     if svar_name in self.__svars.keys():
       primal_exists = True
     if not all([comp_svar_name in self.__svars.keys() for comp_svar_name in svar_comps]):
-      primal_exists = True
+      primal_exists = False
     if svar_name in self.__derived.supported_variables():
       derived_exists = True
 
@@ -990,10 +991,18 @@ class _MiliInternal:
 
     res = dict.fromkeys( svar_names )
     for ikey in res.keys():
-      res[ikey] = {'data' : np_empty( np.float32 ),
-                   'layout' : { 'states' : np_empty( np.int32 ),
-                                'labels' : np_empty( np.int32 ) },
-                   'source': ''}
+      res[ikey] = {
+        'data' : np_empty( np.float32 ),    # Numpy array of results
+        'layout' : {
+          'states' : np_empty( np.int32 ),  # The state numbers in the results
+          'labels' : np_empty( np.int32 ),  # The element labels in the results
+          'components'   : [],              # The components of the state variable in the results.
+          'times'  : np_empty( np.float32 ) # The times at each state in the query
+        },
+        'source': '',                       # primals vs. derived
+        'class_name': class_sname,          # Element class name for the result
+        'title': '',                        # The state variable title
+      }
 
     # for parallel operation it will often be the case a specific file doesn't have any labels
     labels_of_class = self.__labels.get( class_sname, np_empty(np.int32) )
@@ -1029,7 +1038,9 @@ class _MiliInternal:
       queried_name, queried_svar_name, comp_svar_names, actual_result_source = query_spec
 
       res[queried_name]['layout']['states'] = states
+      res[queried_name]['layout']['times'] = np.array([self.__smaps[state-1].time for state in states])
       res[queried_name]['source'] = actual_result_source
+      res[queried_name]['title'] = self.__svars[queried_svar_name].title
 
       match_aggregate_svar = ""
       if self.__svars[queried_svar_name].agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:
@@ -1062,17 +1073,26 @@ class _MiliInternal:
 
       # if we're looking for ip data determine which int_points we can get for each svar in each subrec
       matching_int_points = dict()
-      if len( ips ) > 0:
-        for svar in svars_to_query:
-          comp_svar_name = svar.name
-          candidate_ip_svars = list( self.__int_points.get( comp_svar_name, [] ) )
-          for candidate in candidate_ip_svars:
-            candidate_srecs = self.__svars[ candidate ].srecs
-            for srec in candidate_srecs:
-              if srec.class_name == class_sname:
-                if comp_svar_name not in matching_int_points:
-                  matching_int_points[ comp_svar_name ] = {}
+      int_point_labels = dict()
+      for svar in svars_to_query:
+        comp_svar_name = svar.name
+        candidate_ip_svars = list( self.__int_points.get( comp_svar_name, [] ) )
+        for candidate in candidate_ip_svars:
+          candidate_srecs = self.__svars[ candidate ].srecs
+          for srec in candidate_srecs:
+            if srec.class_name == class_sname:
+              if comp_svar_name not in matching_int_points:
+                matching_int_points[ comp_svar_name ] = {}
+              if len(ips) > 0:
+                # Matching subset
                 matching_int_points[ comp_svar_name ][ srec.name ] = [ self.__int_points[comp_svar_name][candidate].index(ip) for ip in ips ]
+              else:
+                # Matching All
+                matching_int_points[ comp_svar_name ][ srec.name ] = [ i for i in range(self.__int_points[comp_svar_name][candidate][-1]) ]
+
+              if comp_svar_name not in int_point_labels:
+                int_point_labels[ comp_svar_name ] = {}
+              int_point_labels[ comp_svar_name ] = [ self.__int_points[comp_svar_name][candidate][idx] for idx in matching_int_points[comp_svar_name][srec.name] ]
 
       # For each subrecord, determine which elements (labels) appear in that subrecord
       # and create a dictionary entry for each subrecord that contains the labels in that
@@ -1147,6 +1167,15 @@ class _MiliInternal:
 
       qty_comps = comp_qtys[0]
       res[queried_name]['data'] = np.empty( [ qty_states, qty_elems, qty_comps ], dtype = svar_np_dtype )
+
+      # Specify result components in result dictionary
+      for svar in svars_to_query:
+        int_points = int_point_labels.get(svar.name, [])
+        if len(int_points) > 0:
+          for label in int_points:
+            res[queried_name]['layout']['components'].append(f"{svar.name} ipt. {label}")
+        else:
+          res[queried_name]['layout']['components'].append(f"{svar.name}")
 
       # Determine which states (of those requested) appear in each of the state files.
       # This way we can open each file only once and process all the states that appear in it

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-
 """
+Testing for the MiliDatabase Module/class.
+
 SPDX-License-Identifier: (MIT)
 """
+
 import os
 import unittest
 from mili import reader
@@ -476,70 +478,117 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
     #==============================================================================
     def test_state_variable(self):
         answer = self.mili.query('matcgx', 'mat', labels = [1,2], states = 3 )
-        self.assertEqual(answer['matcgx']['layout']['states'][0], 3)
         self.assertEqual(list(answer.keys()), ['matcgx'] )
+        self.assertEqual(answer['matcgx']['title'], "C.G. X-Position")
+        self.assertEqual(answer['matcgx']['class_name'], "mat")
+        self.assertEqual(answer['matcgx']['layout']['states'][0], 3)
+        self.assertEqual(answer['matcgx']['layout']['components'], ["matcgx"])
+        np.testing.assert_allclose(answer['matcgx']['layout']['times'], [2.0e-05])
         np.testing.assert_equal( answer['matcgx']['layout']['labels'], np.array( [ 1, 2 ], dtype = np.int32) )
         np.testing.assert_equal( answer['matcgx']['data'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32) )
 
         answer = self.mili.query('matcgx', 'mat', labels = [1,2], states = -99 )
-        self.assertEqual(answer['matcgx']['layout']['states'][0], 3)
         self.assertEqual(list(answer.keys()), ['matcgx'] )
+        self.assertEqual(answer['matcgx']['title'], "C.G. X-Position")
+        self.assertEqual(answer['matcgx']['class_name'], "mat")
+        self.assertEqual(answer['matcgx']['layout']['states'][0], 3)
+        self.assertEqual(answer['matcgx']['layout']['components'], ["matcgx"])
+        np.testing.assert_allclose(answer['matcgx']['layout']['times'], [2.0e-05])
         np.testing.assert_equal( answer['matcgx']['layout']['labels'], np.array( [ 1, 2 ], dtype = np.int32) )
         np.testing.assert_equal( answer['matcgx']['data'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32) )
 
     #==============================================================================
     def test_node_attributes(self):
         answer = self.mili.query('nodpos[ux]', 'node', labels = 70, states = 3 )
+
+        self.assertEqual(answer['nodpos[ux]']['title'], "Node Position")
+        self.assertEqual(answer['nodpos[ux]']['class_name'], "node")
+        self.assertEqual(answer['nodpos[ux]']['layout']['components'], ['ux'])
         self.assertEqual(answer['nodpos[ux]']['layout']['states'], [3])
-        self.assertEqual(answer['nodpos[ux]']['layout']['labels'][0], 70)
+        np.testing.assert_allclose(answer['nodpos[ux]']['layout']['times'], [2.0e-05])
+        self.assertEqual(answer['nodpos[ux]']['layout']['labels'], [70])
         self.assertEqual(answer['nodpos[ux]']['data'][0], 0.4330127537250519 )
 
         answer = self.mili.query('nodpos[ux]', 'node', labels = 70, states = -99 )
         self.assertEqual(answer['nodpos[ux]']['layout']['states'], [3])
+        np.testing.assert_allclose(answer['nodpos[ux]']['layout']['times'], [2.0e-05])
         self.assertEqual(answer['nodpos[ux]']['layout']['labels'][0], 70)
         self.assertEqual(answer['nodpos[ux]']['data'][0], 0.4330127537250519 )
 
         answer = self.mili.query('ux', 'node', labels = 70, states = 3 )
+        self.assertEqual(answer['ux']['title'], "X Position")
+        self.assertEqual(answer['ux']['class_name'], "node")
+        self.assertEqual(answer['ux']['layout']['components'], ['ux'])
         self.assertEqual(answer['ux']['layout']['states'], [3])
-        self.assertEqual(answer['ux']['layout']['labels'][0], 70)
+        np.testing.assert_allclose(answer['ux']['layout']['times'], [2.0e-05])
+        self.assertEqual(answer['ux']['layout']['labels'], [70])
         self.assertEqual(answer['ux']['data'][0], 0.4330127537250519)
 
         answer = self.mili.query('ux', 'node', labels = 70, states = -99 )
         self.assertEqual(answer['ux']['layout']['states'], [3])
+        np.testing.assert_allclose(answer['ux']['layout']['times'], [2.0e-05])
         self.assertEqual(answer['ux']['layout']['labels'][0], 70)
         self.assertEqual(answer['ux']['data'][0], 0.4330127537250519)
 
     #==============================================================================
     def test_query_material(self):
         answer = self.mili.query('sx', 'brick', material = 2, states = 37 )
+        self.assertEqual(answer['sx']['title'], 'X Stress')
+        self.assertEqual(answer['sx']['class_name'], 'brick')
+        self.assertEqual(answer['sx']['layout']['components'], ['sx'])
         self.assertEqual(answer['sx']['layout']['states'], [37])
+        np.testing.assert_allclose(answer['sx']['layout']['times'], [3.6e-04])
         self.assertEqual(answer['sx']['layout']['labels'].size, 36)
 
         answer = self.mili.query('sx', 'brick', material = 2, states = -65 )
         self.assertEqual(answer['sx']['layout']['states'], [37])
+        np.testing.assert_allclose(answer['sx']['layout']['times'], [3.6e-04])
         self.assertEqual(answer['sx']['layout']['labels'].size, 36)
 
         answer = self.mili.query('sx', 'brick', material = 'es_12', states = 37 )
+        self.assertEqual(answer['sx']['title'], 'X Stress')
+        self.assertEqual(answer['sx']['class_name'], 'brick')
+        self.assertEqual(answer['sx']['layout']['components'], ['sx'])
         self.assertEqual(answer['sx']['layout']['states'], [37])
+        np.testing.assert_allclose(answer['sx']['layout']['times'], [3.6e-04])
         self.assertEqual(answer['sx']['layout']['labels'].size, 36)
 
         answer = self.mili.query('sx', 'brick', material = 'es_12', states = -65 )
         self.assertEqual(answer['sx']['layout']['states'], [37])
+        np.testing.assert_allclose(answer['sx']['layout']['times'], [3.6e-04])
         self.assertEqual(answer['sx']['layout']['labels'].size, 36)
 
     #==============================================================================
     def test_state_variable_vector(self):
         answer = self.mili.query('nodpos', 'node', labels = 70, states = 4 )
+        self.assertEqual( answer['nodpos']['title'], 'Node Position')
+        self.assertEqual( answer['nodpos']['class_name'], 'node')
+        self.assertEqual( answer['nodpos']['layout']['components'], ['ux', 'uy', 'uz'] )
+        np.testing.assert_equal(answer['nodpos']['layout']['labels'], [70])
+        np.testing.assert_equal(answer['nodpos']['layout']['states'], [4])
+        np.testing.assert_allclose(answer['nodpos']['layout']['times'], [3.0e-05])
         np.testing.assert_equal( answer['nodpos']['data'][0,:,:], np.array( [ [ 0.4330127537250519, 0.2500000596046448, 2.436666965484619 ] ], dtype = np.float32 ) )
 
     #==============================================================================
     def test_state_variable_vector_array(self):
         answer = self.mili.query('stress', 'beam', labels = 5, states = [21,22], ips = 2 )
+        self.assertEqual( answer['stress']['title'], 'Stress')
+        self.assertEqual( answer['stress']['class_name'], 'beam')
+        np.testing.assert_equal(answer['stress']['layout']['labels'], [5])
+        np.testing.assert_equal(answer['stress']['layout']['states'], [21,22])
+        np.testing.assert_allclose(answer['stress']['layout']['times'], [2.0e-04, 2.1e-04])
+        self.assertEqual( answer['stress']['layout']['components'], ['sx ipt. 2', 'sy ipt. 2', 'sz ipt. 2', 'sxy ipt. 2', 'syz ipt. 2', 'szx ipt. 2'] )
         np.testing.assert_equal( answer['stress']['data'][1,:,:], np.array([ [ -1018.4232177734375, -1012.2537231445312, -6.556616085617861e-07, 1015.3384399414062, 0.3263571858406067, -0.32636013627052307 ] ], dtype = np.float32 ) )
 
     #==============================================================================
     def test_state_variable_vector_array_component(self):
         answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 71, ips = 2 )
+        self.assertEqual( answer['stress[sy]']['title'], 'Stress')
+        self.assertEqual( answer['stress[sy]']['class_name'], 'beam')
+        self.assertEqual( answer['stress[sy]']['layout']['components'], ['sy ipt. 2'] )
+        np.testing.assert_equal(answer['stress[sy]']['layout']['labels'], [5])
+        np.testing.assert_equal(answer['stress[sy]']['layout']['states'], [71])
+        np.testing.assert_allclose(answer['stress[sy]']['layout']['times'], [7.0e-04])
         self.assertEqual(answer['stress[sy]']['data'][0,0,0], -5545.70751953125)
 
     #==============================================================================
@@ -548,22 +597,44 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         Test querying for results for M_MESH ("glob") element class.
         """
         answer = self.mili.query("he", "glob", states=[22])
+        self.assertEqual( answer['he']['title'], 'Hourglass Energy')
+        self.assertEqual( answer['he']['class_name'], 'glob')
+        self.assertEqual( answer['he']['layout']['components'], ['he'] )
+        np.testing.assert_equal( answer['he']['layout']['labels'], [1] )
+        np.testing.assert_equal( answer['he']['layout']['states'], [22] )
+        np.testing.assert_allclose( answer['he']['layout']['times'], [2.1e-04] )
         self.assertAlmostEqual( answer["he"]["data"][0,0,0], 3.0224223, delta=1e-7)
 
         answer = self.mili.query("bve", "glob", states=[22])
+        self.assertEqual( answer['bve']['title'], 'Bulk Vis. Energy')
+        self.assertEqual( answer['bve']['class_name'], 'glob')
+        self.assertEqual( answer['bve']['layout']['components'], ['bve'] )
+        np.testing.assert_equal( answer['bve']['layout']['labels'], [1] )
+        np.testing.assert_equal( answer['bve']['layout']['states'], [22] )
+        np.testing.assert_allclose( answer['bve']['layout']['times'], [2.1e-04] )
         self.assertAlmostEqual( answer["bve"]["data"][0,0,0], 2.05536485, delta=1e-7)
 
         answer = self.mili.query("te", "glob", states=[22])
+        self.assertEqual( answer['te']['title'], 'Total Energy')
+        self.assertEqual( answer['te']['class_name'], 'glob')
+        self.assertEqual( answer['te']['layout']['components'], ['te'] )
+        np.testing.assert_equal( answer['te']['layout']['labels'], [1] )
+        np.testing.assert_equal( answer['te']['layout']['states'], [22] )
+        np.testing.assert_allclose( answer['te']['layout']['times'], [2.1e-04] )
         self.assertAlmostEqual( answer["te"]["data"][0,0,0], 1629.718, delta=1e-4)
 
     def test_cummin(self):
         """Test cumulative min result modifier."""
         svar_name = "sx"
         result = self.mili.query(svar_name, "beam", labels=[1,7,11], ips=[1], modifier=ResultModifier.CUMMIN)
+        self.assertEqual(result[svar_name]["title"], "X Stress")
+        self.assertEqual(result[svar_name]["class_name"], "beam")
         self.assertEqual(result[svar_name]["source"], "primal")
         self.assertEqual(result[svar_name]["modifier"], "cummin")
+        self.assertEqual(result[svar_name]["layout"]["components"], ["sx ipt. 1"])
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,7,11])
-        self.assertEqual(len(result[svar_name]["layout"]["states"]), 101)
+        np.testing.assert_equal(result[svar_name]["layout"]["states"], np.arange(1,102))
+        np.testing.assert_allclose(result[svar_name]["layout"]["times"], np.arange(0.0,1.01e-03, 1.0e-05))
 
         # Beam 1 has max of 0.0 across all states
         np.testing.assert_allclose(result[svar_name]['data'][:,0,:], 0.0)
@@ -582,10 +653,14 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
 
         svar_name = "disp_x"
         result = self.mili.query(svar_name, "node", labels=[1,44], modifier=ResultModifier.CUMMIN)
+        self.assertEqual(result[svar_name]["title"], "X Displacement")
+        self.assertEqual(result[svar_name]["class_name"], "node")
         self.assertEqual(result[svar_name]["source"], "derived")
         self.assertEqual(result[svar_name]["modifier"], "cummin")
+        self.assertEqual(result[svar_name]["layout"]["components"], ["disp_x"])
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,44])
-        self.assertEqual(len(result[svar_name]["layout"]["states"]), 101)
+        np.testing.assert_equal(result[svar_name]["layout"]["states"], np.arange(1,102))
+        np.testing.assert_allclose(result[svar_name]["layout"]["times"], np.arange(0.0,1.01e-03, 1.0e-05))
 
         # Node 1
         np.testing.assert_allclose(result[svar_name]['data'][:,0,:], 0.0)
@@ -596,10 +671,14 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         """Test cumulative max derived variable."""
         svar_name = "sx"
         result = self.mili.query(svar_name, "beam", labels=[1,7,11], ips=[1], modifier=ResultModifier.CUMMAX)
+        self.assertEqual(result[svar_name]["title"], "X Stress")
+        self.assertEqual(result[svar_name]["class_name"], "beam")
         self.assertEqual(result[svar_name]["source"], "primal")
         self.assertEqual(result[svar_name]["modifier"], "cummax")
+        self.assertEqual(result[svar_name]["layout"]["components"], ["sx ipt. 1"])
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,7,11])
-        self.assertEqual(len(result[svar_name]["layout"]["states"]), 101)
+        np.testing.assert_equal(result[svar_name]["layout"]["states"], np.arange(1,102))
+        np.testing.assert_allclose(result[svar_name]["layout"]["times"], np.arange(0.0,1.01e-03, 1.0e-05))
 
         # Beam 1 has max of 0.0 across all states
         np.testing.assert_allclose(result[svar_name]['data'][:,0,:], 0.0)
@@ -617,10 +696,14 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
 
         svar_name = "disp_x"
         result = self.mili.query(svar_name, "node", labels=[1,44], modifier=ResultModifier.CUMMAX)
+        self.assertEqual(result[svar_name]["title"], "X Displacement")
+        self.assertEqual(result[svar_name]["class_name"], "node")
         self.assertEqual(result[svar_name]["source"], "derived")
         self.assertEqual(result[svar_name]["modifier"], "cummax")
+        self.assertEqual(result[svar_name]["layout"]["components"], ["disp_x"])
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,44])
-        self.assertEqual(len(result[svar_name]["layout"]["states"]), 101)
+        np.testing.assert_equal(result[svar_name]["layout"]["states"], np.arange(1,102))
+        np.testing.assert_allclose(result[svar_name]["layout"]["times"], np.arange(0.0,1.01e-03, 1.0e-05))
 
         # Node 1 has max of 0.0 across all states
         np.testing.assert_allclose(result[svar_name]['data'][:,0,:], 0.0)
@@ -638,8 +721,12 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier=ResultModifier.MIN)
         self.assertEqual(result[svar_name]["source"], "primal")
         self.assertEqual(result[svar_name]["modifier"], "min")
+        self.assertEqual(result[svar_name]["title"], "X Stress")
+        self.assertEqual(result[svar_name]["class_name"], "beam")
+        self.assertEqual(result[svar_name]["layout"]["components"], ["sx ipt. 1"])
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,6,6])
         np.testing.assert_equal(result[svar_name]["layout"]["states"], [21,22,23])
+        np.testing.assert_allclose(result[svar_name]["layout"]["times"], [2.0e-04, 2.1e-04, 2.2e-04])
 
         np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.0)
         np.testing.assert_allclose(result[svar_name]['data'][1,0,:], -1370.853882)
@@ -649,8 +736,12 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         result = self.mili.query(svar_name, "node", states=[97,98,99], modifier=ResultModifier.MIN)
         self.assertEqual(result[svar_name]["source"], "derived")
         self.assertEqual(result[svar_name]["modifier"], "min")
+        self.assertEqual(result[svar_name]["title"], "Y Displacement")
+        self.assertEqual(result[svar_name]["class_name"], "node")
+        self.assertEqual(result[svar_name]["layout"]["components"], ["disp_y"])
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,1,1])
         np.testing.assert_equal(result[svar_name]["layout"]["states"], [97,98,99])
+        np.testing.assert_allclose(result[svar_name]["layout"]["times"], [9.6e-04, 9.7e-04, 9.8e-04])
 
         np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.0)
         np.testing.assert_allclose(result[svar_name]['data'][1,0,:], 0.0)
@@ -690,8 +781,12 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier=ResultModifier.MAX)
         self.assertEqual(result[svar_name]["source"], "primal")
         self.assertEqual(result[svar_name]["modifier"], "max")
+        self.assertEqual(result[svar_name]["title"], "X Stress")
+        self.assertEqual(result[svar_name]["class_name"], "beam")
+        self.assertEqual(result[svar_name]["layout"]["components"], ["sx ipt. 1"])
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,5,4])
         np.testing.assert_equal(result[svar_name]["layout"]["states"], [21,22,23])
+        np.testing.assert_allclose(result[svar_name]["layout"]["times"], [2.0e-04, 2.1e-04, 2.2e-04])
 
         np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.0)
         np.testing.assert_allclose(result[svar_name]['data'][1,0,:], 307.012909)
@@ -701,8 +796,12 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         result = self.mili.query(svar_name, "node", states=[97,98,99], modifier=ResultModifier.MAX)
         self.assertEqual(result[svar_name]["source"], "derived")
         self.assertEqual(result[svar_name]["modifier"], "max")
+        self.assertEqual(result[svar_name]["title"], "Y Displacement")
+        self.assertEqual(result[svar_name]["class_name"], "node")
+        self.assertEqual(result[svar_name]["layout"]["components"], ["disp_y"])
         np.testing.assert_equal(result[svar_name]["layout"]["labels"], [11,11,11])
         np.testing.assert_equal(result[svar_name]["layout"]["states"], [97,98,99])
+        np.testing.assert_allclose(result[svar_name]["layout"]["times"], [9.6e-04, 9.7e-04, 9.8e-04])
 
         np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.146183, rtol=4.0e-06)
         np.testing.assert_allclose(result[svar_name]['data'][1,0,:], 0.145862, rtol=10.0e-07)
@@ -742,7 +841,11 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier=ResultModifier.AVERAGE)
         self.assertEqual(result[svar_name]["source"], "primal")
         self.assertEqual(result[svar_name]["modifier"], "average")
+        self.assertEqual(result[svar_name]["title"], "X Stress")
+        self.assertEqual(result[svar_name]["class_name"], "beam")
+        self.assertEqual(result[svar_name]["layout"]["components"], ["sx ipt. 1"])
         np.testing.assert_equal(result[svar_name]["layout"]["states"], [21,22,23])
+        np.testing.assert_allclose(result[svar_name]["layout"]["times"], [2.0e-04, 2.1e-04, 2.2e-04])
 
         np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.0)
         np.testing.assert_allclose(result[svar_name]['data'][1,0,:], -25.27041)
@@ -753,6 +856,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         self.assertEqual(result[svar_name]["source"], "primal")
         self.assertEqual(result[svar_name]["modifier"], "average")
         np.testing.assert_equal(result[svar_name]["layout"]["states"], [21,22,23])
+        np.testing.assert_allclose(result[svar_name]["layout"]["times"], [2.0e-04, 2.1e-04, 2.2e-04])
 
         np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.0)
         np.testing.assert_allclose(result[svar_name]['data'][1,0,:], -25.27041)
@@ -762,7 +866,11 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         result = self.mili.query(svar_name, "node", states=[97,98,99], modifier=ResultModifier.AVERAGE)
         self.assertEqual(result[svar_name]["source"], "derived")
         self.assertEqual(result[svar_name]["modifier"], "average")
+        self.assertEqual(result[svar_name]["title"], "Y Displacement")
+        self.assertEqual(result[svar_name]["class_name"], "node")
+        self.assertEqual(result[svar_name]["layout"]["components"], ["disp_y"])
         np.testing.assert_equal(result[svar_name]["layout"]["states"], [97,98,99])
+        np.testing.assert_allclose(result[svar_name]["layout"]["times"], [9.6e-04, 9.7e-04, 9.8e-04])
 
         np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.010688, rtol=3.0e-05)
         np.testing.assert_allclose(result[svar_name]['data'][1,0,:], 0.010649, rtol=5.0e-05)
@@ -1391,6 +1499,8 @@ class ParallelTests:
         def test_state_variable(self):
             """Testing accessing a variable at a given state"""
             answer = self.mili.query( 'matcgx', 'mat', labels = [1,2], states = 3 )
+            self.assertEqual(answer[0]['matcgx']['title'], "C.G. X-Position")
+            self.assertEqual(answer[0]['matcgx']['class_name'], "mat")
             np.testing.assert_equal( answer[0]['matcgx']['data'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32 ) )
 
             answer = self.mili.query( 'matcgx', 'mat', labels = [1,2], states = -99 )
@@ -1403,8 +1513,21 @@ class ParallelTests:
             *Note* this is another case of state variable
             """
             answer = self.mili.query( 'nodpos[ux]', 'node', labels = 70, states = 3 )
+            self.assertEqual(answer[3]['nodpos[ux]']['title'], "Node Position")
+            self.assertEqual(answer[3]['nodpos[ux]']['class_name'], "node")
+            self.assertEqual(answer[3]['nodpos[ux]']['layout']['components'], ['ux'])
+            self.assertEqual(answer[3]['nodpos[ux]']['layout']['labels'], [70])
+            self.assertEqual(answer[3]['nodpos[ux]']['layout']['states'], [3])
+            np.testing.assert_allclose(answer[3]['nodpos[ux]']['layout']['times'], [2.0e-05])
             self.assertEqual( answer[3]['nodpos[ux]']['data'][0,0,0], 0.4330127537250519)
+
             answer = self.mili.query( 'ux', 'node', labels = 70, states = 3 )
+            self.assertEqual(answer[3]['ux']['title'], "X Position")
+            self.assertEqual(answer[3]['ux']['class_name'], "node")
+            self.assertEqual(answer[3]['ux']['layout']['components'], ['ux'])
+            self.assertEqual(answer[3]['ux']['layout']['labels'], [70])
+            self.assertEqual(answer[3]['ux']['layout']['states'], [3])
+            np.testing.assert_allclose(answer[3]['ux']['layout']['times'], [2.0e-05])
             self.assertEqual( answer[3]['ux']['data'][0,0,0], 0.4330127537250519)
 
             answer = self.mili.query( 'nodpos[ux]', 'node', labels = 70, states = -99 )
@@ -1416,6 +1539,12 @@ class ParallelTests:
         def test_state_variable_vector(self):
             """Testing the accessing of a vector, in this case node position"""
             answer = self.mili.query('nodpos', 'node', labels = 70, states = 4 )
+            self.assertEqual(answer[3]['nodpos']['title'], 'Node Position')
+            self.assertEqual(answer[3]['nodpos']['class_name'], 'node')
+            self.assertEqual(answer[3]['nodpos']['layout']['components'], ['ux', 'uy', 'uz'])
+            np.testing.assert_equal(answer[3]['nodpos']['layout']['labels'], [70])
+            np.testing.assert_equal(answer[3]['nodpos']['layout']['states'], [4])
+            np.testing.assert_allclose(answer[3]['nodpos']['layout']['times'], [3.0e-05])
             np.testing.assert_equal(answer[3]['nodpos']['data'][0,0,:], np.array( [0.4330127537250519, 0.2500000596046448, 2.436666965484619], dtype = np.float32 ) )
 
         #==============================================================================
@@ -1433,37 +1562,77 @@ class ParallelTests:
         def test_state_variable_vector_array(self):
             """Test accessing a vector array"""
             answer = self.mili.query('stress', 'beam', labels = 5, states = [21,22], ips = 2 )
+            self.assertEqual( answer[2]['stress']['title'], 'Stress')
+            self.assertEqual( answer[2]['stress']['class_name'], 'beam')
+            self.assertEqual( answer[2]['stress']['layout']['components'], ['sx ipt. 2', 'sy ipt. 2', 'sz ipt. 2', 'sxy ipt. 2', 'syz ipt. 2', 'szx ipt. 2'] )
+            np.testing.assert_equal(answer[2]['stress']['layout']['labels'], [5])
+            np.testing.assert_equal(answer[2]['stress']['layout']['states'], [21,22])
+            np.testing.assert_allclose(answer[2]['stress']['layout']['times'], [2.0e-04, 2.1e-04])
             np.testing.assert_equal( answer[2]['stress']['data'][1,:,:], np.array([ [ -1018.4232177734375, -1012.2537231445312, -6.556616085617861e-07, 1015.3384399414062, 0.3263571858406067, -0.32636013627052307] ], dtype = np.float32 ) )
 
             answer = self.mili.query('stress', 'beam', labels = 5, states = [-81,-80], ips = 2 )
+            self.assertEqual( answer[2]['stress']['title'], 'Stress')
+            self.assertEqual( answer[2]['stress']['class_name'], 'beam')
+            self.assertEqual( answer[2]['stress']['layout']['components'], ['sx ipt. 2', 'sy ipt. 2', 'sz ipt. 2', 'sxy ipt. 2', 'syz ipt. 2', 'szx ipt. 2'] )
+            np.testing.assert_equal(answer[2]['stress']['layout']['labels'], [5])
+            np.testing.assert_equal(answer[2]['stress']['layout']['states'], [21,22])
+            np.testing.assert_allclose(answer[2]['stress']['layout']['times'], [2.0e-04, 2.1e-04])
             np.testing.assert_equal( answer[2]['stress']['data'][1,:,:], np.array([ [ -1018.4232177734375, -1012.2537231445312, -6.556616085617861e-07, 1015.3384399414062, 0.3263571858406067, -0.32636013627052307] ], dtype = np.float32 ) )
 
         #==============================================================================
         def test_state_variable_vector_array_component(self):
             """Test accessing a vector array component"""
             answer = self.mili.query('stress[sy]', 'beam', labels = 5, states = 70, ips = 2 )
+            self.assertEqual( answer[2]['stress[sy]']['title'], 'Stress')
+            self.assertEqual( answer[2]['stress[sy]']['class_name'], 'beam')
+            self.assertEqual( answer[2]['stress[sy]']['layout']['components'], ['sy ipt. 2'] )
+            np.testing.assert_equal(answer[2]['stress[sy]']['layout']['labels'], [5])
+            np.testing.assert_equal(answer[2]['stress[sy]']['layout']['states'], [70])
+            np.testing.assert_allclose(answer[2]['stress[sy]']['layout']['times'], [6.9e-04])
             self.assertEqual(answer[2]['stress[sy]']['data'][0,0,0], -5373.53173828125)
 
         #==============================================================================
         def test_query_glob_results(self):
             """Test querying for results for M_MESH ("glob") element class."""
             answer = self.mili.query("he", "glob", states=[22])
+            self.assertEqual( answer[0]['he']['title'], 'Hourglass Energy')
+            self.assertEqual( answer[0]['he']['class_name'], 'glob')
+            self.assertEqual( answer[0]['he']['layout']['components'], ['he'] )
+            np.testing.assert_equal( answer[0]['he']['layout']['labels'], [1] )
+            np.testing.assert_equal( answer[0]['he']['layout']['states'], [22] )
+            np.testing.assert_allclose( answer[0]['he']['layout']['times'], [2.1e-04] )
             self.assertAlmostEqual( answer[0]["he"]["data"][0,0,0], 3.0224223, delta=1e-7)
 
             answer = self.mili.query("bve", "glob", states=[22])
+            self.assertEqual( answer[0]['bve']['title'], 'Bulk Vis. Energy')
+            self.assertEqual( answer[0]['bve']['class_name'], 'glob')
+            self.assertEqual( answer[0]['bve']['layout']['components'], ['bve'] )
+            np.testing.assert_equal( answer[0]['bve']['layout']['labels'], [1] )
+            np.testing.assert_equal( answer[0]['bve']['layout']['states'], [22] )
+            np.testing.assert_allclose( answer[0]['bve']['layout']['times'], [2.1e-04] )
             self.assertAlmostEqual( answer[0]["bve"]["data"][0,0,0], 2.05536485, delta=1e-7)
 
             answer = self.mili.query("te", "glob", states=[22])
+            self.assertEqual( answer[0]['te']['title'], 'Total Energy')
+            self.assertEqual( answer[0]['te']['class_name'], 'glob')
+            self.assertEqual( answer[0]['te']['layout']['components'], ['te'] )
+            np.testing.assert_equal( answer[0]['te']['layout']['labels'], [1] )
+            np.testing.assert_equal( answer[0]['te']['layout']['states'], [22] )
+            np.testing.assert_allclose( answer[0]['te']['layout']['times'], [2.1e-04] )
             self.assertAlmostEqual( answer[0]["te"]["data"][0,0,0], 1629.718, delta=1e-4)
 
         def test_cummin(self):
             """Test cumulative min derived variable."""
             svar_name = "sx"
             result = self.mili.query(svar_name, "beam", labels=[1,7,11], ips=[1], modifier=ResultModifier.CUMMIN)
+            self.assertEqual(result[svar_name]["title"], "X Stress")
+            self.assertEqual(result[svar_name]["class_name"], "beam")
             self.assertEqual(result[svar_name]["source"], "primal")
             self.assertEqual(result[svar_name]["modifier"], "cummin")
+            self.assertEqual(result[svar_name]["layout"]["components"], ["sx ipt. 1"])
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,11,7])
-            self.assertEqual(len(result[svar_name]["layout"]["states"]), 101)
+            np.testing.assert_equal(result[svar_name]["layout"]["states"], np.arange(1,102))
+            np.testing.assert_allclose(result[svar_name]["layout"]["times"], np.arange(0.0,1.01e-03, 1.0e-05))
 
             # Beam 1 has max of 0.0 across all states
             np.testing.assert_allclose(result[svar_name]['data'][:,0,:], 0.0)
@@ -1482,10 +1651,14 @@ class ParallelTests:
 
             svar_name = "disp_x"
             result = self.mili.query(svar_name, "node", labels=[1,44], modifier=ResultModifier.CUMMIN)
+            self.assertEqual(result[svar_name]["title"], "X Displacement")
+            self.assertEqual(result[svar_name]["class_name"], "node")
             self.assertEqual(result[svar_name]["source"], "derived")
             self.assertEqual(result[svar_name]["modifier"], "cummin")
+            self.assertEqual(result[svar_name]["layout"]["components"], ["disp_x"])
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,44])
-            self.assertEqual(len(result[svar_name]["layout"]["states"]), 101)
+            np.testing.assert_equal(result[svar_name]["layout"]["states"], np.arange(1,102))
+            np.testing.assert_allclose(result[svar_name]["layout"]["times"], np.arange(0.0,1.01e-03, 1.0e-05))
 
             # Node 1
             np.testing.assert_allclose(result[svar_name]['data'][:,0,:], 0.0)
@@ -1496,10 +1669,14 @@ class ParallelTests:
             """Test cumulative max derived variable."""
             svar_name = "sx"
             result = self.mili.query(svar_name, "beam", labels=[1,7,11], ips=[1], modifier=ResultModifier.CUMMAX)
+            self.assertEqual(result[svar_name]["title"], "X Stress")
+            self.assertEqual(result[svar_name]["class_name"], "beam")
             self.assertEqual(result[svar_name]["source"], "primal")
             self.assertEqual(result[svar_name]["modifier"], "cummax")
+            self.assertEqual(result[svar_name]["layout"]["components"], ["sx ipt. 1"])
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,11,7])
-            self.assertEqual(len(result[svar_name]["layout"]["states"]), 101)
+            np.testing.assert_equal(result[svar_name]["layout"]["states"], np.arange(1,102))
+            np.testing.assert_allclose(result[svar_name]["layout"]["times"], np.arange(0.0,1.01e-03, 1.0e-05))
 
             # Beam 1 has max of 0.0 across all states
             np.testing.assert_allclose(result[svar_name]['data'][:,0,:], 0.0)
@@ -1517,10 +1694,14 @@ class ParallelTests:
 
             svar_name = "disp_x"
             result = self.mili.query(svar_name, "node", labels=[1,44], modifier=ResultModifier.CUMMAX)
+            self.assertEqual(result[svar_name]["title"], "X Displacement")
+            self.assertEqual(result[svar_name]["class_name"], "node")
             self.assertEqual(result[svar_name]["source"], "derived")
             self.assertEqual(result[svar_name]["modifier"], "cummax")
+            self.assertEqual(result[svar_name]["layout"]["components"], ["disp_x"])
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,44])
-            self.assertEqual(len(result[svar_name]["layout"]["states"]), 101)
+            np.testing.assert_equal(result[svar_name]["layout"]["states"], np.arange(1,102))
+            np.testing.assert_allclose(result[svar_name]["layout"]["times"], np.arange(0.0,1.01e-03, 1.0e-05))
 
             # Node 1 has max of 0.0 across all states
             np.testing.assert_allclose(result[svar_name]['data'][:,0,:], 0.0)
@@ -1538,8 +1719,12 @@ class ParallelTests:
             result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier=ResultModifier.MIN)
             self.assertEqual(result[svar_name]["source"], "primal")
             self.assertEqual(result[svar_name]["modifier"], "min")
+            self.assertEqual(result[svar_name]["title"], "X Stress")
+            self.assertEqual(result[svar_name]["class_name"], "beam")
+            self.assertEqual(result[svar_name]["layout"]["components"], ["sx ipt. 1"])
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [5,6,6])
             np.testing.assert_equal(result[svar_name]["layout"]["states"], [21,22,23])
+            np.testing.assert_allclose(result[svar_name]["layout"]["times"], [2.0e-04, 2.1e-04, 2.2e-04])
 
             np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.0)
             np.testing.assert_allclose(result[svar_name]['data'][1,0,:], -1370.853882)
@@ -1549,8 +1734,12 @@ class ParallelTests:
             result = self.mili.query(svar_name, "node", states=[97,98,99], modifier=ResultModifier.MIN)
             self.assertEqual(result[svar_name]["source"], "derived")
             self.assertEqual(result[svar_name]["modifier"], "min")
+            self.assertEqual(result[svar_name]["title"], "Y Displacement")
+            self.assertEqual(result[svar_name]["class_name"], "node")
+            self.assertEqual(result[svar_name]["layout"]["components"], ["disp_y"])
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,1,1])
             np.testing.assert_equal(result[svar_name]["layout"]["states"], [97,98,99])
+            np.testing.assert_allclose(result[svar_name]["layout"]["times"], [9.6e-04, 9.7e-04, 9.8e-04])
 
             np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.0)
             np.testing.assert_allclose(result[svar_name]['data'][1,0,:], 0.0)
@@ -1590,8 +1779,12 @@ class ParallelTests:
             result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier=ResultModifier.MAX)
             self.assertEqual(result[svar_name]["source"], "primal")
             self.assertEqual(result[svar_name]["modifier"], "max")
+            self.assertEqual(result[svar_name]["title"], "X Stress")
+            self.assertEqual(result[svar_name]["class_name"], "beam")
+            self.assertEqual(result[svar_name]["layout"]["components"], ["sx ipt. 1"])
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [5,5,4])
             np.testing.assert_equal(result[svar_name]["layout"]["states"], [21,22,23])
+            np.testing.assert_allclose(result[svar_name]["layout"]["times"], [2.0e-04, 2.1e-04, 2.2e-04])
 
             np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.0)
             np.testing.assert_allclose(result[svar_name]['data'][1,0,:], 307.012909)
@@ -1601,8 +1794,12 @@ class ParallelTests:
             result = self.mili.query(svar_name, "node", states=[97,98,99], modifier=ResultModifier.MAX)
             self.assertEqual(result[svar_name]["source"], "derived")
             self.assertEqual(result[svar_name]["modifier"], "max")
+            self.assertEqual(result[svar_name]["title"], "Y Displacement")
+            self.assertEqual(result[svar_name]["class_name"], "node")
+            self.assertEqual(result[svar_name]["layout"]["components"], ["disp_y"])
             np.testing.assert_equal(result[svar_name]["layout"]["labels"], [11,11,11])
             np.testing.assert_equal(result[svar_name]["layout"]["states"], [97,98,99])
+            np.testing.assert_allclose(result[svar_name]["layout"]["times"], [9.6e-04, 9.7e-04, 9.8e-04])
 
             np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.146183, rtol=4.0e-06)
             np.testing.assert_allclose(result[svar_name]['data'][1,0,:], 0.145862, rtol=10.0e-07)
@@ -1642,7 +1839,11 @@ class ParallelTests:
             result = self.mili.query(svar_name, "beam", states=[21,22,23], ips=[1], modifier=ResultModifier.AVERAGE)
             self.assertEqual(result[svar_name]["source"], "primal")
             self.assertEqual(result[svar_name]["modifier"], "average")
+            self.assertEqual(result[svar_name]["title"], "X Stress")
+            self.assertEqual(result[svar_name]["class_name"], "beam")
+            self.assertEqual(result[svar_name]["layout"]["components"], ["sx ipt. 1"])
             np.testing.assert_equal(result[svar_name]["layout"]["states"], [21,22,23])
+            np.testing.assert_allclose(result[svar_name]["layout"]["times"], [2.0e-04, 2.1e-04, 2.2e-04])
 
             np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.0)
             np.testing.assert_allclose(result[svar_name]['data'][1,0,:], -25.27041)
@@ -1652,7 +1853,11 @@ class ParallelTests:
             result = self.mili.query(svar_name, "node", states=[97,98,99], modifier=ResultModifier.AVERAGE)
             self.assertEqual(result[svar_name]["source"], "derived")
             self.assertEqual(result[svar_name]["modifier"], "average")
+            self.assertEqual(result[svar_name]["title"], "Y Displacement")
+            self.assertEqual(result[svar_name]["class_name"], "node")
+            self.assertEqual(result[svar_name]["layout"]["components"], ["disp_y"])
             np.testing.assert_equal(result[svar_name]["layout"]["states"], [97,98,99])
+            np.testing.assert_allclose(result[svar_name]["layout"]["times"], [9.6e-04, 9.7e-04, 9.8e-04])
 
             np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.010688, rtol=3.0e-05)
             np.testing.assert_allclose(result[svar_name]['data'][1,0,:], 0.010649, rtol=5.0e-05)

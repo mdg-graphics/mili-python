@@ -51,7 +51,11 @@ def merge_result_dictionaries( result_dicts: List[dict] ) -> Dict:
     if processors_with_data:
       merged_results[svar]['layout'] = {}
       merged_results[svar]['source'] = processors_with_data[0][svar]['source']
+      merged_results[svar]['title'] = processors_with_data[0][svar]['title']
+      merged_results[svar]['class_name'] = processors_with_data[0][svar]['class_name']
       merged_results[svar]['layout']['states'] = processors_with_data[0][svar]['layout']['states']
+      merged_results[svar]['layout']['times'] = processors_with_data[0][svar]['layout']['times']
+      merged_results[svar]['layout']['components'] = processors_with_data[0][svar]['layout']['components']
       merged_results[svar]['data'] = np.concatenate( [d[svar]['data'][:,:,:] for d in processors_with_data], axis=1 )
       merged_results[svar]['layout']['labels'] = np.concatenate( [d[svar]['layout']['labels'] for d in processors_with_data] )
 

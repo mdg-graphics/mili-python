@@ -26,9 +26,18 @@ class TestCombineFunction(unittest.TestCase):
             for svar in processor_result:
                 # Check svar exists
                 self.assertTrue(svar in combined_result)
+
+                if processor_result[svar]['data'].size > 0:
+                    # Check that attributes are the same
+                    self.assertEqual(processor_result[svar]['class_name'], combined_result[svar]['class_name'])
+                    self.assertEqual(processor_result[svar]['source'], combined_result[svar]['source'])
+                    self.assertEqual(processor_result[svar]['title'], combined_result[svar]['title'])
+                    self.assertEqual(processor_result[svar]['layout']['components'], combined_result[svar]['layout']['components'])
                 # Check that states are the same
                 if processor_result[svar]['layout']['states'].size != 0:
                     np.testing.assert_equal(processor_result[svar]['layout']['states'], combined_result[svar]['layout']['states'])
+                if processor_result[svar]['layout']['times'].size != 0:
+                    np.testing.assert_equal(processor_result[svar]['layout']['times'], combined_result[svar]['layout']['times'])
                 for elem_index, element in enumerate(processor_result[svar]['layout']['labels']):
                     # Check that element exists
                     self.assertTrue( element in combined_result[svar]['layout']['labels'] )

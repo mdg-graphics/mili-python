@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-
 """
+Testing of Modifying database results using the MiliDatabase.query method.
+
 SPDX-License-Identifier: (MIT)
 """
+
 import os
 import copy
 import unittest

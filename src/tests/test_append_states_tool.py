@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-
 """
+Test using the AppendStatesTool to add states to a Mili database.
+
 SPDX-License-Identifier: (MIT)
 """
+
 import os
 import shutil
 import unittest

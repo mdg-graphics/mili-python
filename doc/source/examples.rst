@@ -88,10 +88,15 @@ The return format for the above example is:
     result = {
         'nodpos[ux]' : {
             'layout' : {
-                'states'  : <numpy_array_of_states>
-                'labels' : <numpy_array_of_labels>
+                'states'  : <numpy_array_of_states>,  # The states numbers in the query. Dim 1 of data array.
+                'labels' : <numpy_array_of_labels>,   # The element labels in the query. Dim 2 of data array.
+                'components': ['ux'],                 # The components of the result. Dim 3 of data array.
+                'times' : <numpy_array_of_times>      # The corresponding times for each state in the query.
             }
-            'data': <numpy_multidim_array_of_data>
+            'data': <numpy_multidim_array_of_data>,
+            'source': 'primal',                       # The result source. 'primal' or 'derived'.
+            'class_name': 'node',                     # The element class name that was queried.
+            'title': 'Nodal Position',                # The title (long name) of the state variable.
         },
     }
 
@@ -645,6 +650,145 @@ to the :code:`AppendStatesTool` object must still have the same format as :code:
 
     append_tool = AppendStatesTool(append_states_spec)
     append_tool.write_states()
+
+
+Plotting Results
+========================
+
+The following section describes how to plot Mili results using matplotlib.
+
+Using Matplotlib
+--------------------
+
+A basic example of using matplotlib to graph results is shown below. This is taken from their quick start
+guide `here <https://matplotlib.org/stable/users/explain/quick_start.html>`_.
+
+.. code-block:: python
+
+    import matploblib.pyplot as plt
+
+    fig, ax = plt.subplots()             # Create a figure containing a single Axes.
+    ax.plot([1, 2, 3, 4], [1, 4, 2, 3])  # Plot some data on the Axes.
+    plt.show()                           # Show the figure.
+
+The Figure :code:`fig` represents the whole figure which may contain 1 or more graphs/plots and the
+Axes :code:`ax` is a region for plotting data in the figure.
+
+A Basic Plot
+----------------
+
+Mili-python provides the :code:`MatPlotLibPlotter` class to help users plot results in a similar method as shown above.
+Here is a basic code snippet to create a simple plot:
+
+.. code-block:: python
+
+    from mili.reader import open_database
+    from mili.milidatabase import MiliDatabase
+    from mili.plotting import MatPlotLibPlotter
+    import matplotlib.pyplot as plt
+
+    db: MiliDatabase = open_database("example.plt")
+    result = db.query("sx", "brick", labels=[10,11,12])
+
+    plot: MatPlotLibPlotter = MatPlotLibPlotter()
+    fig, axs = plot.initialize_plot()
+    plot.update_plot(result, axs)
+    plt.show()
+
+The :code:`MatPlotLibPlotter` class provides the method :code:`initialize_plot` to help users generate a
+:code:`Figure` and :code:`Axes` and the :code:`update_plot` method to plot all the results in the result
+dictionary passed to the function. Below is the output of the code snippet above:
+
+.. image:: images/basic_plot.png
+    :width: 400
+    :alt: A basic plot
+
+As you can see the results are plotted, but everything is pretty basic. The main intention of the :code:`MatPlotLibPlotter` object
+is to simplify adding results to the plots and provide users with the Matplotlib objects so that they can do further
+customization themselves if desired.
+
+A Customized Plot
+--------------------
+
+Below is an example of some of the further customization that can be done.
+
+.. code-block:: python
+
+    from mili.reader import open_database
+    from mili.milidatabase import MiliDatabase
+    from mili.plotting import MatPlotLibPlotter
+    import matplotlib.pyplot as plt
+
+    db: MiliDatabase = open_database("example.plt")
+    result = db.query("sx", "brick", labels=[10,11,12])
+
+    plot: MatPlotLibPlotter = MatPlotLibPlotter()
+
+    ### CUSTOMIZATION ###
+    plt.style.use("ggplot")
+    #####################
+
+    fig, axs = plot.initialize_plot()
+    plot.update_plot(result, axs)
+
+    ### CUSTOMIZATION ###
+    axs.set_title("Hex X Stress vs. Time")
+    axs.set_ylabel("Hex X Stress\n(units)")
+    axs.set_xlabel("Time\n(units)")
+    axs.yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.2e}'))
+    axs.xaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.2e}'))
+    axs.tick_params(axis='x', labelrotation=45)
+    axs.grid(visible=True)
+    #####################
+
+    plt.show()
+
+This produces:
+
+.. image:: images/customized_plot.png
+    :width: 400
+    :alt: A customized plot
+
+Creating Multiple plots
+----------------------------
+
+It is also possible to generate multiple plots in the same Figure. This is shown below
+
+.. code-block:: python
+
+    from mili.reader import open_database
+    from mili.milidatabase import MiliDatabase
+    from mili.plotting import MatPlotLibPlotter
+    import matplotlib.pyplot as plt
+
+    db: MiliDatabase = open_database("example.plt")
+
+    result_one = db.query("ex", "brick", labels=[10,11,12])
+    result_two = db.query("ez", "brick", labels=[10,11,12])
+
+    plot: MatPlotLibPlotter = MatPlotLibPlotter()
+
+    fig, axs = plot.initialize_plot(2,1)
+    plot.update_plot(result_one, axs[0])
+    plot.update_plot(result_two, axs[1])
+
+    axs[0].set_ylabel("X Strain (units)")
+    axs[0].set_xlabel("Time (units)")
+    axs[0].yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.2e}'))
+    axs[0].xaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.2e}'))
+    axs[0].grid(visible=True)
+
+    axs[1].set_ylabel("Z Strain (units)")
+    axs[1].set_xlabel("Time (units)")
+    axs[1].yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.2e}'))
+    axs[1].xaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.2e}'))
+    axs[1].grid(visible=True)
+
+This produces the following figure:
+
+.. image:: images/multiple_plots.png
+    :width: 400
+    :alt: Plotting multiple results
 
 
 Adjacency Queries

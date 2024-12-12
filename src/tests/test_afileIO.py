@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-
 """
+Test the afileIO module.
+
 SPDX-License-Identifier: (MIT)
 """
 

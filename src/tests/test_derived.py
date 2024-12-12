@@ -1,36 +1,10 @@
 #!/usr/bin/env python3
-
 """
-Copyright (c) 2016-present, Lawrence Livermore National Security, LLC.
- Produced at the Lawrence Livermore National Laboratory. Written by:
+Testing for the Derived Variables module.
 
- William Tobin (tobin6@llnl.gov),
- Ryan Hathaway (hathaway6@llnl.gov),
- Kevin Durrenberger (durrenberger1@llnl.gov).
-
- CODE-OCEC-16-056.
- All rights reserved.
-
- This file is part of Mili. For details, see TODO: <URL describing code
- and how to download source>.
-
- Please also read this link-- Our Notice and GNU Lesser General
- Public License.
-
- This program is free software; you can redistribute it and/or modify
- it under the terms of the GNU General Public License (as published by
- the Free Software Foundation) version 2.1 dated February 1999.
-
- This program is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the IMPLIED WARRANTY OF
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the terms
- and conditions of the GNU General Public License for more details.
-
- You should have received a copy of the GNU Lesser General Public License
- along with this program; if not, write to the Free Software Foundation,
- Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-
+SPDX-License-Identifier: (MIT)
 """
+
 import re
 import os
 import unittest
@@ -98,6 +72,12 @@ class SerialDerivedExpressions(unittest.TestCase):
         result = self.mili.query(["pressure", "eff_stress"], "brick", states=[2,44,86], labels=[10,20])
 
         self.assertEqual(result['pressure']['source'], 'derived')
+        self.assertEqual(result['pressure']['class_name'], 'brick')
+        self.assertEqual(result['pressure']['title'], 'Pressure')
+        self.assertEqual(result['pressure']['layout']['components'], ['pressure'])
+        np.testing.assert_equal(result['pressure']['layout']['labels'], [10,20])
+        np.testing.assert_allclose(result['pressure']['layout']['states'], [2,44,86] )
+        np.testing.assert_allclose(result['pressure']['layout']['times'], [1.0e-05, 4.3e-04, 8.5e-04] )
         # State 2, labels 10, 20
         self.assertAlmostEqual( result['pressure']['data'][0][0][0], 3.839578e-10, delta=tolerance)
         self.assertAlmostEqual( result['pressure']['data'][0][1][0], -7.582866e-10, delta=tolerance)
@@ -109,6 +89,12 @@ class SerialDerivedExpressions(unittest.TestCase):
         self.assertAlmostEqual( result['pressure']['data'][2][1][0], 1.9704016e+02, delta=tolerance)
 
         self.assertEqual(result['eff_stress']['source'], 'derived')
+        self.assertEqual(result['eff_stress']['class_name'], 'brick')
+        self.assertEqual(result['eff_stress']['title'], 'Effective Stress')
+        self.assertEqual(result['eff_stress']['layout']['components'], ['eff_stress'])
+        np.testing.assert_equal(result['eff_stress']['layout']['labels'], [10,20])
+        np.testing.assert_allclose(result['eff_stress']['layout']['states'], [2,44,86] )
+        np.testing.assert_allclose(result['eff_stress']['layout']['times'], [1.0e-05, 4.3e-04, 8.5e-04] )
         # State 2, labels 10, 20
         self.assertAlmostEqual( result['eff_stress']['data'][0][0][0], 3.88536481e-10, delta=1e-18)
         self.assertAlmostEqual( result['eff_stress']['data'][0][1][0], 7.60721042e-10, delta=1e-18)
@@ -124,6 +110,12 @@ class SerialDerivedExpressions(unittest.TestCase):
         tolerance = 1e-5
         result = self.mili.query("pressure", "brick", states=[2,44,86], labels=[10,20])
         self.assertEqual(result['pressure']['source'], 'derived')
+        self.assertEqual(result['pressure']['class_name'], 'brick')
+        self.assertEqual(result['pressure']['title'], 'Pressure')
+        self.assertEqual(result['pressure']['layout']['components'], ['pressure'])
+        np.testing.assert_equal(result['pressure']['layout']['labels'], [10,20])
+        np.testing.assert_allclose(result['pressure']['layout']['states'], [2,44,86] )
+        np.testing.assert_allclose(result['pressure']['layout']['times'], [1.0e-05, 4.3e-04, 8.5e-04] )
         # State 2, labels 10, 20
         self.assertAlmostEqual( result['pressure']['data'][0][0][0], 3.839578e-10, delta=tolerance)
         self.assertAlmostEqual( result['pressure']['data'][0][1][0], -7.582866e-10, delta=tolerance)
@@ -643,6 +635,12 @@ class SerialDerivedExpressions(unittest.TestCase):
         """Effective (von Mises) Stress"""
         result = self.mili.query("eff_stress", "brick", states=[2,44,86], labels=[10, 20])
         self.assertEqual(result['eff_stress']['source'], 'derived')
+        self.assertEqual(result['eff_stress']['class_name'], 'brick')
+        self.assertEqual(result['eff_stress']['title'], 'Effective Stress')
+        self.assertEqual(result['eff_stress']['layout']['components'], ['eff_stress'])
+        np.testing.assert_equal(result['eff_stress']['layout']['labels'], [10,20])
+        np.testing.assert_allclose(result['eff_stress']['layout']['states'], [2,44,86] )
+        np.testing.assert_allclose(result['eff_stress']['layout']['times'], [1.0e-05, 4.3e-04, 8.5e-04] )
         # State 2, labels 10, 20
         self.assertAlmostEqual( result['eff_stress']['data'][0][0][0], 3.88536481e-10, delta=1e-18)
         self.assertAlmostEqual( result['eff_stress']['data'][0][1][0], 7.60721042e-10, delta=1e-18)
@@ -894,6 +892,13 @@ class SerialDerivedExpressions(unittest.TestCase):
         """Test Element Volume calculation for Hexes."""
         result = self.mili.query("element_volume", "brick", labels=[1,4], states=[1,3,4])
 
+        np.testing.assert_equal( result["element_volume"]["layout"]["labels"], [1,4])
+        np.testing.assert_equal( result["element_volume"]["layout"]["states"], [1,3,4])
+        np.testing.assert_allclose( result["element_volume"]["layout"]["times"], [0.0e00, 2.0e-05, 3.0e-05])
+        self.assertEqual( result["element_volume"]["source"], "derived")
+        self.assertEqual( result["element_volume"]["class_name"], "brick")
+        self.assertEqual( result["element_volume"]["title"], "Element Volume")
+
         self.assertAlmostEqual(result["element_volume"]["data"][0,0,0], 0.02083334)
         self.assertAlmostEqual(result["element_volume"]["data"][0,1,0], 0.0291667)
         self.assertAlmostEqual(result["element_volume"]["data"][1,0,0], 0.02083334)
@@ -908,6 +913,14 @@ class SerialDerivedExpressions(unittest.TestCase):
         db = open_database( file_name, suppress_parallel=True )
 
         result = db.query("element_volume", "tet", labels=[53,59,65], states=[1,49,81])
+
+        np.testing.assert_equal( result["element_volume"]["layout"]["labels"], [53,59,65])
+        np.testing.assert_equal( result["element_volume"]["layout"]["states"], [1,49,81])
+        np.testing.assert_allclose( result["element_volume"]["layout"]["times"], [0.0,  48.0, 80.0])
+        self.assertEqual( result["element_volume"]["source"], "derived")
+        self.assertEqual( result["element_volume"]["class_name"], "tet")
+        self.assertEqual( result["element_volume"]["title"], "Element Volume")
+
         self.assertAlmostEqual(result["element_volume"]["data"][0,0,0], 6.291125304843772E-05)
         self.assertAlmostEqual(result["element_volume"]["data"][0,1,0], 4.703088313429738E-05)
         self.assertAlmostEqual(result["element_volume"]["data"][0,2,0], 4.166676663023120E-05)
@@ -924,7 +937,10 @@ class SerialDerivedExpressions(unittest.TestCase):
 
         np.testing.assert_equal( result["area"]["layout"]["labels"], [1,12,24])
         np.testing.assert_equal( result["area"]["layout"]["states"], [1,40,80])
+        np.testing.assert_allclose( result["area"]["layout"]["times"], [0.0,  0.00039, 0.00079])
         self.assertEqual( result["area"]["source"], "derived")
+        self.assertEqual( result["area"]["class_name"], "cseg")
+        self.assertEqual( result["area"]["title"], "Quad Area")
 
         # State 1
         self.assertAlmostEqual(result["area"]["data"][0,0,0], 0.078125)
@@ -1288,6 +1304,22 @@ class ParallelDerivedExpressions(unittest.TestCase):
     def test_eff_stress(self):
         """Effective (von Mises) Stress"""
         result = self.mili.query("eff_stress", "brick", states=[2,44,86], labels=[10, 20])
+
+        self.assertEqual(result[0]['eff_stress']['source'], 'derived')
+        self.assertEqual(result[0]['eff_stress']['class_name'], 'brick')
+        self.assertEqual(result[0]['eff_stress']['title'], 'Effective Stress')
+        self.assertEqual(result[0]['eff_stress']['layout']['components'], ['eff_stress'])
+        np.testing.assert_equal(result[0]['eff_stress']['layout']['labels'], [10])
+        np.testing.assert_allclose(result[0]['eff_stress']['layout']['states'], [2,44,86] )
+        np.testing.assert_allclose(result[0]['eff_stress']['layout']['times'], [1.0e-05, 4.3e-04, 8.5e-04] )
+        self.assertEqual(result[5]['eff_stress']['source'], 'derived')
+        self.assertEqual(result[5]['eff_stress']['class_name'], 'brick')
+        self.assertEqual(result[5]['eff_stress']['title'], 'Effective Stress')
+        self.assertEqual(result[5]['eff_stress']['layout']['components'], ['eff_stress'])
+        np.testing.assert_equal(result[5]['eff_stress']['layout']['labels'], [20])
+        np.testing.assert_allclose(result[5]['eff_stress']['layout']['states'], [2,44,86] )
+        np.testing.assert_allclose(result[5]['eff_stress']['layout']['times'], [1.0e-05, 4.3e-04, 8.5e-04] )
+
         # State 2, labels 10, 20
         self.assertAlmostEqual( result[0]['eff_stress']['data'][0][0][0], 3.88536481e-10, delta=1e-18)
         self.assertAlmostEqual( result[5]['eff_stress']['data'][0][0][0], 7.60721042e-10, delta=1e-18)
@@ -1425,6 +1457,13 @@ class ParallelDerivedExpressions(unittest.TestCase):
         """Test Element Volume calculation for Hexes."""
         result = self.mili.query("element_volume", "brick", labels=[1,4], states=[1,3,4])
 
+        np.testing.assert_equal( result[3]["element_volume"]["layout"]["labels"], [1,4])
+        np.testing.assert_equal( result[3]["element_volume"]["layout"]["states"], [1,3,4])
+        np.testing.assert_allclose( result[3]["element_volume"]["layout"]["times"], [0.0e00, 2.0e-05, 3.0e-05])
+        self.assertEqual( result[3]["element_volume"]["source"], "derived")
+        self.assertEqual( result[3]["element_volume"]["class_name"], "brick")
+        self.assertEqual( result[3]["element_volume"]["title"], "Element Volume")
+
         self.assertAlmostEqual(result[3]["element_volume"]["data"][0,0,0], 0.02083334)
         self.assertAlmostEqual(result[3]["element_volume"]["data"][0,1,0], 0.0291667)
         self.assertAlmostEqual(result[3]["element_volume"]["data"][1,0,0], 0.02083334)
@@ -1433,6 +1472,13 @@ class ParallelDerivedExpressions(unittest.TestCase):
         self.assertAlmostEqual(result[3]["element_volume"]["data"][2,1,0], 0.0291667)
 
         result = combine( self.mili.query("element_volume", "brick", labels=[1,4], states=[1,3,4]) )
+
+        np.testing.assert_equal( result["element_volume"]["layout"]["labels"], [1,4])
+        np.testing.assert_equal( result["element_volume"]["layout"]["states"], [1,3,4])
+        np.testing.assert_allclose( result["element_volume"]["layout"]["times"], [0.0e00, 2.0e-05, 3.0e-05])
+        self.assertEqual( result["element_volume"]["source"], "derived")
+        self.assertEqual( result["element_volume"]["class_name"], "brick")
+        self.assertEqual( result["element_volume"]["title"], "Element Volume")
 
         self.assertAlmostEqual(result["element_volume"]["data"][0,0,0], 0.02083334)
         self.assertAlmostEqual(result["element_volume"]["data"][0,1,0], 0.0291667)
@@ -1447,7 +1493,10 @@ class ParallelDerivedExpressions(unittest.TestCase):
 
         np.testing.assert_equal( result["area"]["layout"]["labels"], [12,24,1])
         np.testing.assert_equal( result["area"]["layout"]["states"], [1,40,80])
+        np.testing.assert_allclose( result["area"]["layout"]["times"], [0.0,  0.00039, 0.00079])
         self.assertEqual( result["area"]["source"], "derived")
+        self.assertEqual( result["area"]["class_name"], "cseg")
+        self.assertEqual( result["area"]["title"], "Quad Area")
 
         # State 1
         self.assertAlmostEqual(result["area"]["data"][0,0,0], 0.171875)

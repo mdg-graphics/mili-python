@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-
 """
+Testing Various Bug fixes that have been made to Mili-python.
+
 SPDX-License-Identifier: (MIT)
 """
+
 import re
 import os
 import unittest
@@ -212,8 +214,16 @@ class Bugfixes0_2_5(unittest.TestCase):
         ''' prior to the 0.2.5 bugfixes, this returned 0,0,1e10,0,1e10,0 due to an srec offset error '''
         desired = { 'strain' :
                     { 'data' : np.array([[[0., 0., 0., 0., 0., 0.]]], dtype=np.float32),
-                      'layout': { 'states': np.array([1], dtype=np.int32), 'labels': np.array([1], dtype=np.int32) },
-                      'source': 'primal'
+                      'layout': {
+                            'states': np.array([1], dtype=np.int32),
+                            'labels': np.array([1], dtype=np.int32),
+                            'components': ["ex ipt. 1", "ey ipt. 1", "ez ipt. 1",
+                                           "exy ipt. 1", "eyz ipt. 1", "ezx ipt. 1"],
+                            'times': np.array([0.0], dtype=np.float32)
+                        },
+                      'source': 'primal',
+                      'class_name': 'shell',
+                      'title': 'Strain Tensor'
                     }
                   }
         answer = self.mili.query('strain','shell',labels=1,states=1)

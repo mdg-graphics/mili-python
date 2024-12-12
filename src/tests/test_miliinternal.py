@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-
 """
+Testing of the _MiliInternal object.
+
 SPDX-License-Identifier: (MIT)
 """
+
 import os
 import unittest
 from mili import miliinternal

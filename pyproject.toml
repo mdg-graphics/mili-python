@@ -35,6 +35,7 @@ dependencies = [
   "pathos",
   "pandas",
   "psutil",
+  "matplotlib",
 ]
 
 # The `optional-dependencies` target is used here to separate dev from user
