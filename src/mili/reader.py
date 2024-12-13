@@ -4,9 +4,6 @@ SPDX-License-Identifier: (MIT)
 """
 from __future__ import annotations
 
-import warnings
-warnings.simplefilter("ignore", UserWarning) # Pandas NUMEXPR warning
-
 import os
 
 from typing import *
