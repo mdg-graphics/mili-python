@@ -10,13 +10,14 @@ from numpy import iterable
 import os
 
 from typing import *
+from typing import Literal
 import pandas as pd
 from enum import Enum
 
 import mili.reductions as reductions
 from mili.parallel import ServerWrapper, LoopWrapper
 from mili.miliinternal import _MiliInternal, ReturnCode
-from mili.datatypes import StateMap
+from mili.datatypes import StateMap, QueryDict
 from mili.utils import result_dictionary_to_dataframe
 
 class MiliPythonError(Exception):
@@ -577,6 +578,20 @@ class MiliDatabase:
 
     return results
 
+  @overload
+  def query( self, svar_names : Union[List[str],str], class_sname : str, material : Optional[Union[str,int]] = None,
+             labels : Optional[Union[List[int],int]] = None, states : Optional[Union[List[int],int]] = None,
+             ips : Optional[Union[List[int],int]] = None, write_data : Optional[Dict[str,QueryDict]] = None,
+             as_dataframe: Literal[False] = False, modifier: Optional[ResultModifier] = None,
+             **kwargs ) -> Dict[str,QueryDict]: ...
+
+  @overload
+  def query( self, svar_names : Union[List[str],str], class_sname : str, material : Optional[Union[str,int]] = None,
+             labels : Optional[Union[List[int],int]] = None, states : Optional[Union[List[int],int]] = None,
+             ips : Optional[Union[List[int],int]] = None, write_data : Optional[Dict[str,QueryDict]] = None,
+             as_dataframe: Literal[True] = ..., modifier: Optional[ResultModifier] = None,
+             **kwargs ) -> pd.DataFrame: ...
+
   def query( self,
              svar_names : Union[List[str],str],
              class_sname : str,
@@ -584,10 +599,10 @@ class MiliDatabase:
              labels : Optional[Union[List[int],int]] = None,
              states : Optional[Union[List[int],int]] = None,
              ips : Optional[Union[List[int],int]] = None,
-             write_data : Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]] = None,
+             write_data : Optional[Dict[str,QueryDict]] = None,
              as_dataframe: Optional[bool] = False,
              modifier: Optional[ResultModifier] = None,
-             **kwargs ) -> dict:
+             **kwargs ) -> Union[pd.DataFrame,Dict[str,QueryDict]]:
     """Query the database for state variables or derived variables, returning data for the specified parameters, optionally writing data to the database.
 
     Args:
@@ -599,9 +614,9 @@ class MiliDatabase:
       states (Optional[Union[List[int],int]], default=None): Optional state numbers from which to query data, default is all. This does
         support negative indexing where -1 can be used to get the last state, -2 the second to last, etc.
       ips (Optional[Union[List[int],int]], default=None): Optional integration point to query for vector array state variables, default is all available.
-      write_data (Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]], default=None): Optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
+      write_data (Optional[Dict[str,QueryDict]], default=None): Optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
         then modify the values desired, then query again with the modified result in this param
-      as_dataframe (Optional[bool]): If True the result is returned as a Pandas DataFrame.
+      as_dataframe (Optional[bool], default = False): If True the result is returned as a Pandas DataFrame.
       modifier (Optional[ResultModifier]): Optional modifer to apply to results.
     """
     results = self.__postprocess(

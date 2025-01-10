@@ -13,7 +13,7 @@ import numpy as np
 from numpy import iterable
 from itertools import groupby
 
-from mili.datatypes import Superclass
+from mili.datatypes import Superclass, QueryDict, QueryLayout
 
 class DerivedExpressions:
   """A wrapper class for _MiliInternal that calculates derived results using the primal
@@ -614,7 +614,7 @@ class DerivedExpressions:
             labels : Optional[Union[List[int],int]] = None,
             states : Optional[Union[List[int],int]] = None,
             ips : Optional[Union[List[int],int]] = None,
-            **kwargs):
+            **kwargs) -> Dict[str,QueryDict]:
     """General derived result function.
 
     Args:
@@ -655,10 +655,13 @@ class DerivedExpressions:
     if isinstance(result_names, str):
       result_names = [result_names]
     for result_name in result_names:
-      derived_result[result_name] = { 'source': 'derived', 'class_name': class_name }
-      derived_result[result_name]['title'] = self.__derived_expressions[result_name]['title']
-      derived_result[result_name]['data'] = np.empty_like( primal_data[primal]['data'])
-      derived_result[result_name]['layout'] = primal_data[primal]['layout']
+      derived_result[result_name] = QueryDict(
+        class_name = class_name,
+        source = 'derived',
+        data = np.empty_like( primal_data[primal]['data'] ),
+        title = self.__derived_expressions[result_name]['title'],
+        layout = primal_data[primal]['layout']
+      )
       derived_result[result_name]['layout']['components'] = [result_name]
     return derived_result
 
@@ -1489,13 +1492,18 @@ class DerivedExpressions:
     # Manually construct derived result dictionary since result element class
     # does not match primal data element class.
     derived_result = {
-      result_name: {
-        "data": np.empty( (len(states), len(labels), 1), dtype=np.float32 ),
-        "layout": { "states": states, "labels": labels, "components": [result_name], "times": times },
-        "source": "derived",
-        "class_name": class_name,
-        "title": self.__derived_expressions[result_name]["title"],
-      }
+      result_name: QueryDict(
+        class_name=class_name,
+        source='derived',
+        title=self.__derived_expressions[result_name]["title"],
+        data=np.empty( (len(states), len(labels), 1), dtype=np.float32 ),
+        layout=QueryLayout(
+          states=states,
+          labels=labels,
+          components=[result_name],
+          times=times,
+        )
+      )
     }
 
     elem_node_map = query_args["elem_node_map"]
@@ -1616,13 +1624,18 @@ class DerivedExpressions:
     # Manually construct derived result dictionary since result element class
     # does not match primal data element class.
     derived_result = {
-      result_name: {
-        "data": np.empty( (len(states), len(labels), 1), dtype=np.float32 ),
-        "layout": { "states": states, "labels": labels, "components": [result_name], "times": times },
-        "source": "derived",
-        "class_name": class_name,
-        "title": self.__derived_expressions[result_name]["title"],
-      }
+      result_name: QueryDict(
+        class_name=class_name,
+        source='derived',
+        title=self.__derived_expressions[result_name]["title"],
+        data=np.empty( (len(states), len(labels), 1), dtype=np.float32 ),
+        layout=QueryLayout(
+          states=states,
+          labels=labels,
+          components=[result_name],
+          times=times,
+        )
+      )
     }
 
     elem_node_map = query_args["elem_node_map"]

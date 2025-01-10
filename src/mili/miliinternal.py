@@ -951,8 +951,8 @@ class _MiliInternal:
              labels : Optional[Union[List[int],int]] = None,
              states : Optional[Union[List[int],int]] = None,
              ips : Optional[Union[List[int],int]] = None,
-             write_data : Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]] = None,
-             **kwargs ) -> dict:
+             write_data : Optional[Dict[str,QueryDict]] = None,
+             **kwargs ) -> Dict[str,QueryDict]:
     """Query the database for state variables or derived variables, returning data for the specified parameters, optionally writing data to the database.
 
     Args:
@@ -963,7 +963,7 @@ class _MiliInternal:
         if material if material is supplied, default is all.
       states (Optional[Union[List[int],int]], default=None): Optional state numbers from which to query data, default is all.
       ips (Optional[Union[List[int],int]], default=None): Optional integration point to query for vector array state variables, default is all available.
-      write_data (Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]], default=None): Optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
+      write_data (Optional[Dict[str,QueryDict]], default=None): Optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
         then modify the values desired, then query again with the modified result in this param
     """
     # normalize arguments to expected types / default values
@@ -988,18 +988,18 @@ class _MiliInternal:
 
     res = dict.fromkeys( svar_names )
     for ikey in res.keys():
-      res[ikey] = {
-        'data' : np_empty( np.float32 ),    # Numpy array of results
-        'layout' : {
-          'states' : np_empty( np.int32 ),  # The state numbers in the results
-          'labels' : np_empty( np.int32 ),  # The element labels in the results
-          'components'   : [],              # The components of the state variable in the results.
-          'times'  : np_empty( np.float32 ) # The times at each state in the query
-        },
-        'source': '',                       # primals vs. derived
-        'class_name': class_sname,          # Element class name for the result
-        'title': '',                        # The state variable title
-      }
+      res[ikey] = QueryDict(
+        data = np_empty( np.float32 ),    # Numpy array of results
+        layout = QueryLayout(
+          states = np_empty( np.int32 ),  # The state numbers in the results
+          labels = np_empty( np.int32 ),  # The element labels in the results
+          components  = [],              # The components of the state variable in the results.
+          times = np_empty( np.float32 ) # The times at each state in the query
+        ),
+        source = '',                       # primals vs. derived
+        class_name = class_sname,          # Element class name for the result
+        title = '',                        # The state variable title
+      )
 
     # for parallel operation it will often be the case a specific file doesn't have any labels
     labels_of_class = self.__labels.get( class_sname, np_empty(np.int32) )

@@ -6,6 +6,8 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Added
 
+- Added improved type hinting to the dictionary returned by the `MiliDatabase.query` method.
+
 ### Fixed
 
 ### Changed

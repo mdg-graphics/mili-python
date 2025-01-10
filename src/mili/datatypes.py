@@ -502,3 +502,16 @@ class AFile:
       new_afile.dirs[DirectoryDecl.Type.APPLICATION_PARAM]['state_count'] = 0
 
     return new_afile
+
+class QueryLayout(TypedDict):
+  states: np.ndarray[np.int32]
+  labels: np.ndarray[np.int32]
+  components: List[str]
+  times: np.ndarray[np.float32]
+
+class QueryDict(TypedDict):
+  class_name: str
+  source: str
+  title: str
+  data: np.ndarray[np.float]
+  layout: QueryLayout
