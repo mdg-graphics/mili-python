@@ -10,6 +10,8 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Fixed
 
+- Fixed import error with the `adjacency` module.
+
 ### Changed
 
 ### Removed

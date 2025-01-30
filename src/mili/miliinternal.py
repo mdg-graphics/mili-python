@@ -19,7 +19,7 @@ from mili.datatypes import *
 from mili.afileIO import *
 from mili.parallel import *
 from mili.derived import DerivedExpressions
-from mili.adjacency import GeometricMeshInfo
+from mili.geometric_mesh_info import GeometricMeshInfo
 from mili.reductions import *
 
 def np_empty(dtype):

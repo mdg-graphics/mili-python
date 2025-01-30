@@ -6,6 +6,7 @@ SPDX-License-Identifier: (MIT)
 """
 from __future__ import annotations
 from typing import Dict, List, Any, Tuple, Union, Optional
+from typing import overload, Literal
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 from matplotlib.axes import Axes
@@ -65,6 +66,18 @@ class MatPlotLibPlotter(Plotter):
   """Plotter for Matplotlib."""
   def __init__(self):
     super(MatPlotLibPlotter, self).__init__()
+
+  @overload
+  def initialize_plot(self) -> Tuple[Figure,Axes]: ...
+
+  @overload
+  def initialize_plot(self, nrows: Literal[1], ncols: Literal[1]) -> Tuple[Figure,Axes]: ...
+
+  @overload
+  def initialize_plot(self, nrows: int, ncols: int) -> Tuple[Figure,List[Axes]]: ...
+
+  @overload
+  def initialize_plot(self, nrows: Optional[int] = 1, ncols: Optional[int] = 1) -> Tuple[Figure,Union[Axes,List[Axes]]]: ...
 
   def initialize_plot(self, nrows: Optional[int] = 1, ncols: Optional[int] = 1) -> Tuple[Figure,Union[Axes,List[Axes]]]:
     """Initialize a Figure and one or more Axes object to plot results on.

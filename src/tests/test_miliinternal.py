@@ -9,7 +9,7 @@ import os
 import unittest
 from mili import miliinternal
 from mili.miliinternal import *
-from mili.adjacency import GeometricMeshInfo
+from mili.geometric_mesh_info import GeometricMeshInfo
 import numpy as np
 
 dir_path = os.path.dirname(os.path.realpath(__file__))

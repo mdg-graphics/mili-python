@@ -3,12 +3,9 @@
 SPDX-License-Identifier: (MIT)
 """
 
-import argparse
-import importlib
 import numpy as np
 from mili import reader, datatypes
 from typing import *
-from numpy.core.fromnumeric import prod
 
 class AppendStatesTool:
   """Tool to append additional states + data to an existing Mili database.
@@ -202,7 +199,7 @@ class AppendStatesTool:
 
         svar_atom_qty = svar_def.atom_qty
         if svar_def.agg_type == datatypes.StateVariable.Aggregation.VEC_ARRAY:
-          svar_atom_qty = int(svar_atom_qty / prod(svar_def.dims) )
+          svar_atom_qty = int(svar_atom_qty / np.prod(svar_def.dims) )
 
         # Check svar and svar_class exist in original database
         orig_svar_classes = orig_database.classes_of_state_variable(svar)

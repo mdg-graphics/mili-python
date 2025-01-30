@@ -16,7 +16,6 @@ import warnings
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum, IntEnum
-from numpy.core.fromnumeric import prod
 # * imports
 from typing import *
 
@@ -218,9 +217,9 @@ class StateVariable:
     if self.agg_type == StateVariable.Aggregation.VECTOR:
       return sum( svar.atom_qty for svar in self.svars )
     elif self.agg_type == StateVariable.Aggregation.ARRAY:
-      return int( prod( self.dims ) )
+      return int( np.prod( self.dims ) )
     elif self.agg_type == StateVariable.Aggregation.VEC_ARRAY:
-      return int( prod( self.dims ) ) * sum( svar.atom_qty for svar in self.svars )
+      return int( np.prod( self.dims ) ) * sum( svar.atom_qty for svar in self.svars )
     return 1
 
 @dataclass(eq=False)
