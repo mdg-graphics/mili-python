@@ -262,6 +262,36 @@ and effective plastic strain rate. There are a few limitations and assumptions f
 * Results for the first and last states use forward and backward difference methods, which are less accurate than the central difference method used for the other states. The exception is that nodal velocity uses backward difference for all states (except state 1), which is consistent with the griz calculation. The nodal velocity at state 1 is set to zero.
 * When possible, have the analysis code output primal variables for rates instead of calculating derived variables. They will almost always be more accurate, and will never be less accurate.
 
+Displacements
+---------------
+
+The following derived variables:
+
+:code:`disp_x`, :code:`disp_y`, :code:`disp_z`, :code:`disp_mag`,
+:code:`disp_rad_mag_xy`, :code:`mat_cog_disp_x`, :code:`mat_cog_disp_y`, :code:`mat_cog_disp_z`
+
+calculate the displacement of the nodes from their reference state. By default the reference state is the initial nodal positions in the Mili database.
+This can be changed to an arbitrary state using the :code:`reference_state` keyword argument with the query method.
+
+.. code-block:: python
+
+    result = db.query('disp_x', 'node', reference_state=101)
+
+    result = db.mili.query( 'disp_mag', 'node', labels = [6,7,8], states = [20,30,40], reference_state=10)
+
+
+Surface Strains
+----------------
+
+The Hex Surface strain derived variables (:code:`surfstrainx`, :code:`surfstrainy`, :code:`surfstrainz`, :code:`surfstrainxy`,
+:code:`surfstrainyz`, :code:`surfstrainzx`) have an additional keyword argument that is required: :code:`face`. This keyword
+argument specifies the face number to calculate the strain for. The function :code:`Milidatabase.faces` may be useful for identifying
+the different faces of a given Hex element.
+
+.. code-block:: python
+
+    result = db.query("surfstrainx", "brick", labels=[12], face=1)
+
 
 Result Modifiers.
 ========================

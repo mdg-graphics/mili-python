@@ -568,6 +568,45 @@ class _MiliInternal:
       return self.__conns_ids.get(class_name, None)
     return self.__conns_ids
 
+  def faces(self, class_name: str, label: int) -> Dict[int,np.array]:
+    """Getter for the faces of an element of a specified class.
+
+    NOTE: Currently only supports HEX elements.
+
+    Args:
+      class_name (str): The element class.
+      label (int): The element label.
+
+    Returns:
+      Dict[int,np.array]: A dictionary with the keys 1-6 for each face of the hex element. The value for
+        each key is a numpy array of 4 intergers specifying the nodes that make up that face.
+    """
+    nodes_by_face = {}
+    mo_class = self.__MO_class_data.get(class_name, None)
+    class_labels = self.__labels.get(class_name, [])
+
+    if mo_class is None:
+      self.__return_code = (ReturnCode.ERROR, f"The element class ({class_name}) does not exist.")
+    elif mo_class.sclass != Superclass.M_HEX:
+      self.__return_code = (ReturnCode.ERROR, "This function only supports HEX element classes.")
+    elif label not in class_labels:
+      self.__return_code = (ReturnCode.ERROR, f"The label ({label}) does not exist for the class ({class_name})")
+    else:
+      elem_idx = np.where(label == class_labels)[0]
+      elem_conn = self.__conns_labels[class_name][elem_idx][0,:-1]
+      face_to_nodes = {
+        1 : [1, 2, 6, 5],
+        2 : [2, 3, 7, 6],
+        3 : [0, 4, 7, 3],
+        4 : [1, 5, 4, 0],
+        5 : [4, 5, 6, 7],
+        6 : [0, 3, 2, 1],
+      }
+      nodes_by_face = { face : elem_conn[face_nodes] for face, face_nodes in face_to_nodes.items() }
+
+    return nodes_by_face
+
+
   def __valid_material_type(self, mat: Any ) -> bool:
     """Check if type is valid for material number input."""
     return isinstance(mat, (str, int, np.integer))
@@ -980,7 +1019,7 @@ class _MiliInternal:
       del kwargs["source"]
 
     # Check that no unexpected keyword arguments were passed
-    expected_keywords = set(["output_object_labels", "subrec", "source", "reference_state"])
+    expected_keywords = set(["output_object_labels", "subrec", "source", "reference_state", "face"])
     unexpected_keywords = set(kwargs.keys()) - expected_keywords
     if len(unexpected_keywords) != 0:
       self.__return_code = (ReturnCode.ERROR, f"The following unexpected keywords were provided to the query method: {unexpected_keywords}")

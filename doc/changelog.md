@@ -6,15 +6,23 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Added
 
+### Fixed
+
+### Changed
+
+### Removed
+
+## [v0.8.1] - 2025-1-31
+
+### Added
+
+- Added the derived variables `surfstrainx`, `surfstrainy`, `surfstrainz`, `surfstrainxy`, `surfstrainyz`, `surfstrainzx` for calculating the strains for faces of a hex element.
+- Added the function `MiliDatabase.faces` to get the faces of a hex element.
 - Added improved type hinting to the dictionary returned by the `MiliDatabase.query` method.
 
 ### Fixed
 
 - Fixed import error with the `adjacency` module.
-
-### Changed
-
-### Removed
 
 ## [v0.8.0] - 2024-12-12
 

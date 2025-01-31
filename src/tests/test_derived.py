@@ -9,6 +9,7 @@ import re
 import os
 import unittest
 from mili.reader import open_database, combine
+from mili.milidatabase import MiliPythonError
 import numpy as np
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -31,7 +32,8 @@ class SerialDerivedExpressions(unittest.TestCase):
                     'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure',
                     'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress',
                     'triaxiality', 'eps_rate', 'nodtangmag', 'mat_cog_disp_x', 'mat_cog_disp_y',
-                    'mat_cog_disp_z', 'element_volume', 'area',
+                    'mat_cog_disp_z', 'element_volume', 'area', 'surfstrainx', 'surfstrainy',
+                    'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx',
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
@@ -41,7 +43,7 @@ class SerialDerivedExpressions(unittest.TestCase):
                          'prin_dev_strain3', 'prin_strain1_alt', 'prin_strain2_alt', 'prin_strain3_alt', 'prin_dev_strain1_alt',
                          'prin_dev_strain2_alt', 'prin_dev_strain3_alt', 'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress',
                          'pressure', 'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress', 'triaxiality',
-                         'element_volume',]
+                         'element_volume', 'surfstrainx', 'surfstrainy', 'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx']
         BEAM_DERIVED = ['prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure', 'prin_dev_stress1', 'prin_dev_stress2',
                         'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'eps_rate']
         SHELL_DERIVED = ['vol_strain', 'prin_strain1', 'prin_strain2', 'prin_strain3', 'prin_dev_strain1', 'prin_dev_strain2', 'prin_dev_strain3',
@@ -955,6 +957,53 @@ class SerialDerivedExpressions(unittest.TestCase):
         self.assertAlmostEqual(result["area"]["data"][2,1,0], 0.17187445)
         self.assertAlmostEqual(result["area"]["data"][2,2,0], 0.17187496)
 
+    def test_surfstrain(self):
+        """Test derived result surfstrain."""
+        file_name = os.path.join(dir_path,'data','serial','dbl_nodtang','dblplt')
+        db = open_database( file_name, suppress_parallel=True )
+
+        with self.assertRaises(MiliPythonError):
+            # Missing face number
+            result = db.query("surfstrainx", "brick", labels=[71,72,90], states=[21,22,23])
+        with self.assertRaises(MiliPythonError):
+            # Face number is invalid
+            result = db.query("surfstrainx", "brick", labels=[71,72,90], states=[21,22,23], face=7)
+
+        result = db.query("surfstrainx", "brick", labels=[71,72,90], states=[21,22,23], face=1)
+        # State 21
+        self.assertAlmostEqual(result["surfstrainx"]["data"][0,0,0], 7.01262428e-06)
+        self.assertAlmostEqual(result["surfstrainx"]["data"][0,1,0], 1.16926170e-05)
+        self.assertAlmostEqual(result["surfstrainx"]["data"][0,2,0], 5.40478068e-06)
+        # State 22
+        self.assertAlmostEqual(result["surfstrainx"]["data"][1,0,0], 7.61965573e-06)
+        self.assertAlmostEqual(result["surfstrainx"]["data"][1,1,0], 1.35642446e-05)
+        self.assertAlmostEqual(result["surfstrainx"]["data"][1,2,0], 6.20267215e-06)
+        # State 23
+        self.assertAlmostEqual(result["surfstrainx"]["data"][2,0,0], 9.98206399e-06)
+        self.assertAlmostEqual(result["surfstrainx"]["data"][2,1,0], 1.77060717e-05)
+        self.assertAlmostEqual(result["surfstrainx"]["data"][2,2,0], 6.20345624e-06)
+
+        with self.assertRaises(MiliPythonError):
+            # Missing face number
+            result = db.query("surfstrainy", "brick", labels=[71,72,90], states=[21,22,23])
+        with self.assertRaises(MiliPythonError):
+            # Face number is invalid
+            result = db.query("surfstrainy", "brick", labels=[71,72,90], states=[21,22,23], face=7)
+
+        result = db.query("surfstrainy", "brick", labels=[71,72,90], states=[21,22,23], face=3)
+        # State 21
+        self.assertAlmostEqual(result["surfstrainy"]["data"][0,0,0], 0.00028667)
+        self.assertAlmostEqual(result["surfstrainy"]["data"][0,1,0], 0.00028984)
+        self.assertAlmostEqual(result["surfstrainy"]["data"][0,2,0], 0.00014372)
+        # State 22
+        self.assertAlmostEqual(result["surfstrainy"]["data"][1,0,0], 0.00027829)
+        self.assertAlmostEqual(result["surfstrainy"]["data"][1,1,0], 0.00034462)
+        self.assertAlmostEqual(result["surfstrainy"]["data"][1,2,0], 0.00024833)
+        # State 23
+        self.assertAlmostEqual(result["surfstrainy"]["data"][2,0,0], 0.00040497)
+        self.assertAlmostEqual(result["surfstrainy"]["data"][2,1,0], 0.00053024)
+        self.assertAlmostEqual(result["surfstrainy"]["data"][2,2,0], 0.00036156)
+
 
 class ParallelDerivedExpressions(unittest.TestCase):
     """Test Parallel implementation of Derived Expressions Wrapper class."""
@@ -1510,3 +1559,46 @@ class ParallelDerivedExpressions(unittest.TestCase):
         self.assertAlmostEqual(result["area"]["data"][2,0,0], 0.17187445)
         self.assertAlmostEqual(result["area"]["data"][2,1,0], 0.17187496)
         self.assertAlmostEqual(result["area"]["data"][2,2,0], 0.07812706)
+
+    def test_surfstrain(self):
+        """Test derived result surfstrain."""
+        file_name = os.path.join(dir_path,'data','parallel','basic1','basic1.plt')
+        db = open_database( file_name, suppress_parallel=True )
+
+        with self.assertRaises(MiliPythonError):
+            # Missing face number
+            result = db.query("surfstrainz", "brick", labels=[151,229], states=[2,20,40])
+        with self.assertRaises(MiliPythonError):
+            # Face number is invalid
+            result = db.query("surfstrainz", "brick", labels=[151,229], states=[2,20,40], face=7)
+
+        result = db.query("surfstrainz", "brick", labels=[151,229], states=[2,20,40], face=2)
+        # State 21
+        self.assertAlmostEqual(result["surfstrainz"]["data"][0,0,0], -1.1443692e-05)
+        self.assertAlmostEqual(result["surfstrainz"]["data"][0,1,0], 1.4395356e-06)
+        # State 22
+        self.assertAlmostEqual(result["surfstrainz"]["data"][1,0,0], -3.4624312e-04)
+        self.assertAlmostEqual(result["surfstrainz"]["data"][1,1,0], 1.6831054e-05)
+        # State 23
+        self.assertAlmostEqual(result["surfstrainz"]["data"][2,0,0], -4.2545883e-04)
+        self.assertAlmostEqual(result["surfstrainz"]["data"][2,1,0], -4.0996027e-05)
+
+        with self.assertRaises(MiliPythonError):
+            # Missing face number
+            result = db.query("surfstrainxy", "brick", labels=[151,229], states=[2,20,40])
+        with self.assertRaises(MiliPythonError):
+            # Face number is invalid
+            result = db.query("surfstrainxy", "brick", labels=[151,229], states=[2,20,40], face=7)
+
+        result = db.query("surfstrainxy", "brick", labels=[151,229], states=[2,20,40], face=5)
+        # State 21
+        self.assertAlmostEqual(result["surfstrainxy"]["data"][0,0,0], -1.1861324e-05)
+        self.assertAlmostEqual(result["surfstrainxy"]["data"][0,1,0], -1.0636501e-06)
+        # State 22
+        self.assertAlmostEqual(result["surfstrainxy"]["data"][1,0,0], -2.0110358e-04)
+        self.assertAlmostEqual(result["surfstrainxy"]["data"][1,1,0], -4.2742749e-06)
+        # State 23
+        self.assertAlmostEqual(result["surfstrainxy"]["data"][2,0,0], -2.1373070e-04)
+        self.assertAlmostEqual(result["surfstrainxy"]["data"][2,1,0], -4.2441879e-06)
+
+        db.close()

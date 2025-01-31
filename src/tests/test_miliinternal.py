@@ -322,7 +322,8 @@ class TestMiliInternal(unittest.TestCase):
                     'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure',
                     'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress',
                     'triaxiality', 'eps_rate', 'nodtangmag', 'mat_cog_disp_x', 'mat_cog_disp_y',
-                    'mat_cog_disp_z', 'element_volume', 'area'
+                    'mat_cog_disp_z', 'element_volume', 'area', 'surfstrainx', 'surfstrainy',
+                    'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx',
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
@@ -333,7 +334,7 @@ class TestMiliInternal(unittest.TestCase):
                          'prin_dev_strain3', 'prin_strain1_alt', 'prin_strain2_alt', 'prin_strain3_alt', 'prin_dev_strain1_alt',
                          'prin_dev_strain2_alt', 'prin_dev_strain3_alt', 'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress',
                          'pressure', 'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress', 'triaxiality',
-                         'element_volume'
+                         'element_volume', 'surfstrainx', 'surfstrainy', 'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx',
                          ]
         BEAM_DERIVED = ['prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure', 'prin_dev_stress1', 'prin_dev_stress2',
                         'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'eps_rate'
@@ -561,6 +562,32 @@ class TestMiliInternal(unittest.TestCase):
 
         brick_conn = self.mili.connectivity("brick")
         np.testing.assert_equal(brick_conn, expected_conn["brick"])
+
+    #==============================================================================
+    def test_faces(self):
+        faces = self.mili.faces("brick", 1)
+        np.testing.assert_equal(faces[1], [81, 85, 86, 82])
+        np.testing.assert_equal(faces[2], [85, 69, 70, 86])
+        np.testing.assert_equal(faces[3], [65, 66, 70, 69])
+        np.testing.assert_equal(faces[4], [81, 82, 66, 65])
+        np.testing.assert_equal(faces[5], [66, 82, 86, 70])
+        np.testing.assert_equal(faces[6], [65, 69, 85, 81])
+
+        faces = self.mili.faces("brick", 20)
+        np.testing.assert_equal(faces[1], [129, 133, 134, 130])
+        np.testing.assert_equal(faces[2], [133, 117, 118, 134])
+        np.testing.assert_equal(faces[3], [113, 114, 118, 117])
+        np.testing.assert_equal(faces[4], [129, 130, 114, 113])
+        np.testing.assert_equal(faces[5], [114, 130, 134, 118])
+        np.testing.assert_equal(faces[6], [113, 117, 133, 129])
+
+        faces = self.mili.faces("brick", 32)
+        np.testing.assert_equal(faces[1], [131, 135, 136, 132])
+        np.testing.assert_equal(faces[2], [135, 119, 120, 136])
+        np.testing.assert_equal(faces[3], [115, 116, 120, 119])
+        np.testing.assert_equal(faces[4], [131, 132, 116, 115])
+        np.testing.assert_equal(faces[5], [116, 132, 136, 120])
+        np.testing.assert_equal(faces[6], [115, 119, 135, 131])
 
     #==============================================================================
     def test_material_classes(self):

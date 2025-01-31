@@ -184,6 +184,39 @@ class SharedSerialTests:
             self.assertTrue( all( all_conn['cseg'][12:24,-1] == 5) )  # Csegs 12-24 are material 5
 
         #==============================================================================
+        def test_faces(self):
+            with self.assertRaises(MiliPythonError):
+                self.mili.faces("brickkkkk", 1)
+            with self.assertRaises(MiliPythonError):
+                self.mili.faces("shell", 1)
+            with self.assertRaises(MiliPythonError):
+                self.mili.faces("brick", 100)
+
+            faces = self.mili.faces("brick", 1)
+            np.testing.assert_equal(faces[1], [81, 85, 86, 82])
+            np.testing.assert_equal(faces[2], [85, 69, 70, 86])
+            np.testing.assert_equal(faces[3], [65, 66, 70, 69])
+            np.testing.assert_equal(faces[4], [81, 82, 66, 65])
+            np.testing.assert_equal(faces[5], [66, 82, 86, 70])
+            np.testing.assert_equal(faces[6], [65, 69, 85, 81])
+
+            faces = self.mili.faces("brick", 20)
+            np.testing.assert_equal(faces[1], [129, 133, 134, 130])
+            np.testing.assert_equal(faces[2], [133, 117, 118, 134])
+            np.testing.assert_equal(faces[3], [113, 114, 118, 117])
+            np.testing.assert_equal(faces[4], [129, 130, 114, 113])
+            np.testing.assert_equal(faces[5], [114, 130, 134, 118])
+            np.testing.assert_equal(faces[6], [113, 117, 133, 129])
+
+            faces = self.mili.faces("brick", 32)
+            np.testing.assert_equal(faces[1], [131, 135, 136, 132])
+            np.testing.assert_equal(faces[2], [135, 119, 120, 136])
+            np.testing.assert_equal(faces[3], [115, 116, 120, 119])
+            np.testing.assert_equal(faces[4], [131, 132, 116, 115])
+            np.testing.assert_equal(faces[5], [116, 132, 136, 120])
+            np.testing.assert_equal(faces[6], [115, 119, 135, 131])
+
+        #==============================================================================
         def test_components_of_vector_svar(self):
             comps = self.mili.components_of_vector_svar("stress")
             self.assertEqual(comps, ["sx", "sy", "sz", "sxy", "syz", "szx"])
@@ -1128,6 +1161,39 @@ class ParallelTests:
                 self.assertEqual(len(state_map), STATE_COUNT)
                 self.assertEqual(state_map[0].time, FIRST_STATE)
                 self.assertEqual(state_map[-1].time, LAST_STATE)
+
+        #==============================================================================
+        def test_faces(self):
+            with self.assertRaises(MiliPythonError):
+                self.mili.faces("brickkkkk", 1)
+            with self.assertRaises(MiliPythonError):
+                self.mili.faces("shell", 1)
+            with self.assertRaises(MiliPythonError):
+                self.mili.faces("brick", 100)
+
+            faces = self.mili.faces("brick", 1)
+            np.testing.assert_equal(faces[3][1], [81, 85, 86, 82])
+            np.testing.assert_equal(faces[3][2], [85, 69, 70, 86])
+            np.testing.assert_equal(faces[3][3], [65, 66, 70, 69])
+            np.testing.assert_equal(faces[3][4], [81, 82, 66, 65])
+            np.testing.assert_equal(faces[3][5], [66, 82, 86, 70])
+            np.testing.assert_equal(faces[3][6], [65, 69, 85, 81])
+
+            faces = self.mili.faces("brick", 20)
+            np.testing.assert_equal(faces[5][1], [129, 133, 134, 130])
+            np.testing.assert_equal(faces[5][2], [133, 117, 118, 134])
+            np.testing.assert_equal(faces[5][3], [113, 114, 118, 117])
+            np.testing.assert_equal(faces[5][4], [129, 130, 114, 113])
+            np.testing.assert_equal(faces[5][5], [114, 130, 134, 118])
+            np.testing.assert_equal(faces[5][6], [113, 117, 133, 129])
+
+            faces = self.mili.faces("brick", 32)
+            np.testing.assert_equal(faces[1][1], [131, 135, 136, 132])
+            np.testing.assert_equal(faces[1][2], [135, 119, 120, 136])
+            np.testing.assert_equal(faces[1][3], [115, 116, 120, 119])
+            np.testing.assert_equal(faces[1][4], [131, 132, 116, 115])
+            np.testing.assert_equal(faces[1][5], [116, 132, 136, 120])
+            np.testing.assert_equal(faces[1][6], [115, 119, 135, 131])
 
         #==============================================================================
         def test_material_numbers(self):

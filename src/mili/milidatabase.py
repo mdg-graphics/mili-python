@@ -295,8 +295,8 @@ class MiliDatabase:
 
     Returns:
       Union[Dict[str,np.ndarray],np.ndarray]: If class_name is None the a dictionary containing
-        the labels for each element class is returned. If class_name is not None, then a numpy array
-        is returned containing the labels for the specified element class.
+      the labels for each element class is returned. If class_name is not None, then a numpy array
+      is returned containing the labels for the specified element class.
     """
     return self.__postprocess(
       results = self._mili.labels(class_name),
@@ -342,6 +342,23 @@ class MiliDatabase:
     return self.__postprocess(
       results = self._mili.connectivity(class_name),
       reduce_function = reductions.reduce_connectivity)
+
+  def faces(self, class_name: str, label: int) -> Dict[int,np.array]:
+    """Getter for the faces of an element of a specified class.
+
+    NOTE: Currently only supports HEX elements.
+
+    Args:
+      class_name (str): The element class.
+      label (int): The element label.
+
+    Returns:
+      Dict[int,np.array]: A dictionary with the keys 1-6 for each face of the hex element. The value for
+      each key is a numpy array of 4 intergers specifying the nodes that make up that face.
+    """
+    return self.__postprocess(
+      results = self._mili.faces(class_name, label),
+      reduce_function = reductions.dictionary_merge_no_concat)
 
   def material_classes(self, mat: Union[str,int]) -> List[str]:
     """Get list of classes of a specified material.

@@ -317,6 +317,54 @@ class DerivedExpressions:
         "compute_function": self.__compute_quad_area,
         "only_sclasses": [Superclass.M_QUAD],
       },
+      "surfstrainx": {
+        "title": "Surface Strain X",
+        "primals": ["ux", "uy", "uz"],
+        "primals_class": ["node", "node", "node"],
+        "supports_batching": False,
+        "compute_function": self.__compute_surface_strain,
+        "only_sclasses": [Superclass.M_HEX],
+      },
+      "surfstrainy": {
+        "title": "Surface Strain Y",
+        "primals": ["ux", "uy", "uz"],
+        "primals_class": ["node", "node", "node"],
+        "supports_batching": False,
+        "compute_function": self.__compute_surface_strain,
+        "only_sclasses": [Superclass.M_HEX],
+      },
+      "surfstrainz": {
+        "title": "Surface Strain Z",
+        "primals": ["ux", "uy", "uz"],
+        "primals_class": ["node", "node", "node"],
+        "supports_batching": False,
+        "compute_function": self.__compute_surface_strain,
+        "only_sclasses": [Superclass.M_HEX],
+      },
+      "surfstrainxy": {
+        "title": "Surface Strain XY",
+        "primals": ["ux", "uy", "uz"],
+        "primals_class": ["node", "node", "node"],
+        "supports_batching": False,
+        "compute_function": self.__compute_surface_strain,
+        "only_sclasses": [Superclass.M_HEX],
+      },
+      "surfstrainyz": {
+        "title": "Surface Strain YZ",
+        "primals": ["ux", "uy", "uz"],
+        "primals_class": ["node", "node", "node"],
+        "supports_batching": False,
+        "compute_function": self.__compute_surface_strain,
+        "only_sclasses": [Superclass.M_HEX],
+      },
+      "surfstrainzx": {
+        "title": "Surface Strain ZX",
+        "primals": ["ux", "uy", "uz"],
+        "primals_class": ["node", "node", "node"],
+        "supports_batching": False,
+        "compute_function": self.__compute_surface_strain,
+        "only_sclasses": [Superclass.M_HEX],
+      },
       # TODO: Add more primals here
     }
 
@@ -805,8 +853,7 @@ class DerivedExpressions:
   def __compute_node_acceleration(self,
                                   result_name: str,
                                   primal_data: dict,
-                                  query_args: dict,
-                                  reference_state: int = 0):
+                                  query_args: dict):
     """Calculate the derived result 'acc_x', 'acc_y', or 'acc_z'."""
     # TODO: Finish up
     labels = query_args['labels']
@@ -1654,4 +1701,261 @@ class DerivedExpressions:
 
     area = np.reshape( area, area.shape + (1,) )
     derived_result[result_name]["data"] = area
+    return derived_result
+
+  def __compute_surface_strain(self,
+                               result_name: str,
+                               primal_data: dict,
+                               query_args: dict,
+                               reference_state: int = 0,
+                               face: int = -1):
+    """Compute the Surface Strain for each face of a Hex element."""
+    labels = query_args['labels']
+    states = query_args['states']
+    num_labels = len(labels)
+    num_states = len(states)
+    times = self.db.times(states)
+    class_name = query_args['result_class_name']
+
+    # Validate the specified face number.
+    if face == -1:
+      raise ValueError("A valid face number (1-6) must be specified. Use the keyword argument 'face'.")
+
+    face_to_nodes = {
+      1 : [1, 2, 6, 5],
+      2 : [2, 3, 7, 6],
+      3 : [0, 4, 7, 3],
+      4 : [1, 5, 4, 0],
+      5 : [4, 5, 6, 7],
+      6 : [0, 3, 2, 1],
+    }
+    face_nodes = face_to_nodes.get(face, None)
+    if face_nodes is None:
+      raise ValueError(f"The provided face ({face}) is invalid. Valid face numbers include 1-6")
+
+    # Manually construct derived result dictionary since result element class
+    # does not match primal data element class.
+    derived_result = {
+      result_name: QueryDict(
+        class_name=class_name,
+        source='derived',
+        title=self.__derived_expressions[result_name]["title"],
+        data=np.empty( (num_states, num_labels, 1), dtype=np.float32 ),
+        layout=QueryLayout(
+          states=states,
+          labels=labels,
+          components=[result_name],
+          times=times,
+        )
+      )
+    }
+
+    # Get reference nodal positions
+    node_labels = primal_data["ux"]["layout"]["labels"]
+    reference_data = self.__get_nodal_reference_positions( ["ux", "uy", "uz"], reference_state, node_labels )
+
+    elem_node_map = query_args["elem_node_map"]
+    node_ux = primal_data["ux"]["data"]
+    node_uy = primal_data["uy"]["data"]
+    node_uz = primal_data["uz"]["data"]
+
+    ux = node_ux[:, elem_node_map[:,face_nodes], :]
+    uy = node_uy[:, elem_node_map[:,face_nodes], :]
+    uz = node_uz[:, elem_node_map[:,face_nodes], :]
+
+    ref_ux = reference_data[elem_node_map[:,face_nodes], 0]
+    ref_uy = reference_data[elem_node_map[:,face_nodes], 1]
+    ref_uz = reference_data[elem_node_map[:,face_nodes], 2]
+    ref_ux = np.reshape( ref_ux, ref_ux.shape + (1,) )
+    ref_uy = np.reshape( ref_uy, ref_uy.shape + (1,) )
+    ref_uz = np.reshape( ref_uz, ref_uz.shape + (1,) )
+
+    # Calculate nodal displacements
+    disp_x = ux - ref_ux
+    disp_y = uy - ref_uy
+    disp_z = uz - ref_uz
+
+    # Input Local Direction 1
+    dt1 = np.empty( (num_states,num_labels,3), dtype=np.float32)
+    dt1[:,:,0] = ux[:,:,1,0] - ux[:,:,0,0]
+    dt1[:,:,1] = uy[:,:,1,0] - uy[:,:,0,0]
+    dt1[:,:,2] = uz[:,:,1,0] - uz[:,:,0,0]
+
+    # Tangent to the plane at the centroid in the reference coordinate sytem
+    t1O = np.empty( (num_states,num_labels,3), dtype=np.float32)
+    t2O = np.empty( (num_states,num_labels,3), dtype=np.float32)
+    t1O[:,:,0] = 0.25 * (ux[:,:,1,0] + ux[:,:,2,0] - ux[:,:,0,0] - ux[:,:,3,0])
+    t1O[:,:,1] = 0.25 * (uy[:,:,1,0] + uy[:,:,2,0] - uy[:,:,0,0] - uy[:,:,3,0])
+    t1O[:,:,2] = 0.25 * (uz[:,:,1,0] + uz[:,:,2,0] - uz[:,:,0,0] - uz[:,:,3,0])
+    t2O[:,:,0] = 0.25 * (ux[:,:,3,0] + ux[:,:,2,0] - ux[:,:,0,0] - ux[:,:,1,0])
+    t2O[:,:,1] = 0.25 * (uy[:,:,3,0] + uy[:,:,2,0] - uy[:,:,0,0] - uy[:,:,1,0])
+    t2O[:,:,2] = 0.25 * (uz[:,:,3,0] + uz[:,:,2,0] - uz[:,:,0,0] - uz[:,:,1,0])
+
+    # Normal to plane at the centroid in reference coordinate system
+    nnO = np.empty( (num_states,num_labels,3), dtype=np.float32)
+    nnO[:,:,0] = t1O[:,:,1] * t2O[:,:,2] - t1O[:,:,2] * t2O[:,:,1]
+    nnO[:,:,1] = t1O[:,:,2] * t2O[:,:,0] - t1O[:,:,0] * t2O[:,:,2]
+    nnO[:,:,2] = t1O[:,:,0] * t2O[:,:,1] - t1O[:,:,1] * t2O[:,:,0]
+
+    temp = np.empty( (num_states,num_labels,1), dtype=np.float32)
+    temp[:,:,0] = 1.0 / np.sqrt((nnO[:,:,0] * nnO[:,:,0]) + (nnO[:,:,1] * nnO[:,:,1]) + (nnO[:,:,2] * nnO[:,:,2]))
+    nnO = temp * nnO
+
+    # Normalized and Orthogonal
+    t1Oh = np.empty( (num_states,num_labels,3), dtype=np.float32)
+    t2Oh = np.empty( (num_states,num_labels,3), dtype=np.float32)
+    temp[:,:,0] = 1.0 / np.sqrt((t1O[:,:,0] * t1O[:,:,0]) + (t1O[:,:,1] * t1O[:,:,1]) + (t1O[:,:,2] * t1O[:,:,2]))
+    t1Oh = temp * t1O
+
+    t2Oh[:,:,0] = nnO[:,:,1] * t1Oh[:,:,2] - nnO[:,:,2] * t1Oh[:,:,1]
+    t2Oh[:,:,1] = nnO[:,:,2] * t1Oh[:,:,0] - nnO[:,:,0] * t1Oh[:,:,2]
+    t2Oh[:,:,2] = nnO[:,:,0] * t1Oh[:,:,1] - nnO[:,:,1] * t1Oh[:,:,0]
+
+    # Now we have been given a defined direction 1 (it is not normalized)
+    # and it is not necesarily orthogonal to nnO, so make it orthogonal to nnO
+    dt1h = np.empty( (num_states,num_labels,3), dtype=np.float32)
+    dt2h = np.empty( (num_states,num_labels,3), dtype=np.float32)
+
+    temp[:,:,0] = dt1[:,:,0] * nnO[:,:,0] + dt1[:,:,1] * nnO[:,:,1] + dt1[:,:,2] * nnO[:,:,2]
+    dt1h = dt1 - nnO * temp
+    temp[:,:,0] = 1.0 / np.sqrt((dt1h[:,:,0] * dt1h[:,:,0]) + (dt1h[:,:,1] * dt1h[:,:,1]) + (dt1h[:,:,2] * dt1h[:,:,2]))
+    dt1h = temp * dt1h
+
+    # Now we need to calculate dt2h as orthogonal to both
+    dt2h[:,:,0] = nnO[:,:,1] * dt1h[:,:,2] - nnO[:,:,2] * dt1h[:,:,1]
+    dt2h[:,:,1] = nnO[:,:,2] * dt1h[:,:,0] - nnO[:,:,0] * dt1h[:,:,2]
+    dt2h[:,:,2] = nnO[:,:,0] * dt1h[:,:,1] - nnO[:,:,1] * dt1h[:,:,0]
+
+    # Calculate the coordinates in the local coordinate system of the reference coordinate system
+    dispOL = np.zeros( (num_states,num_labels,4,3), dtype=np.float32 )
+    for j in range(0,4):
+      dispOL[:,:,j,0] = dispOL[:,:,j,0] + dt1h[:,:,0] * disp_x[:,:,j,0]
+      dispOL[:,:,j,0] = dispOL[:,:,j,0] + dt1h[:,:,1] * disp_y[:,:,j,0]
+      dispOL[:,:,j,0] = dispOL[:,:,j,0] + dt1h[:,:,2] * disp_z[:,:,j,0]
+
+      dispOL[:,:,j,1] = dispOL[:,:,j,1] + dt2h[:,:,0] * disp_x[:,:,j,0]
+      dispOL[:,:,j,1] = dispOL[:,:,j,1] + dt2h[:,:,1] * disp_y[:,:,j,0]
+      dispOL[:,:,j,1] = dispOL[:,:,j,1] + dt2h[:,:,2] * disp_z[:,:,j,0]
+
+      dispOL[:,:,j,2] = dispOL[:,:,j,2] + nnO[:,:,0] * disp_x[:,:,j,0]
+      dispOL[:,:,j,2] = dispOL[:,:,j,2] + nnO[:,:,1] * disp_y[:,:,j,0]
+      dispOL[:,:,j,2] = dispOL[:,:,j,2] + nnO[:,:,2] * disp_z[:,:,j,0]
+
+    # Calculate the shape function derivative at the centroid
+    Nd = np.empty((4,2), dtype=np.float32)
+    Nd[0][0] = -0.25
+    Nd[0][1] = -0.25
+
+    Nd[1][0] = 0.25
+    Nd[1][1] = -0.25
+
+    Nd[2][0] = 0.25
+    Nd[2][1] = 0.25
+
+    Nd[3][0] = -0.25
+    Nd[3][1] = 0.25
+
+    # Calculate the jacobian of transformation in the reference configuration at the centroid
+    # in the local "hat" coordinate system.
+    dxdxi = np.empty((num_states,num_labels,3,3), dtype=np.float32)
+    dxdxi[:,:,0,0] = dt1h[:,:,0] * t1O[:,:,0] + dt1h[:,:,1] * t1O[:,:,1] + dt1h[:,:,2] * t1O[:,:,2]
+    dxdxi[:,:,0,1] = dt1h[:,:,0] * t2O[:,:,0] + dt1h[:,:,1] * t2O[:,:,1] + dt1h[:,:,2] * t2O[:,:,2]
+    dxdxi[:,:,0,2] = 0.0
+    dxdxi[:,:,1,0] = dt2h[:,:,0] * t1O[:,:,0] + dt2h[:,:,1] * t1O[:,:,1] + dt2h[:,:,2] * t1O[:,:,2]
+    dxdxi[:,:,1,1] = dt2h[:,:,0] * t2O[:,:,0] + dt2h[:,:,1] * t2O[:,:,1] + dt2h[:,:,2] * t2O[:,:,2]
+    dxdxi[:,:,1,2] = 0.0
+    dxdxi[:,:,2,0] = 0.0
+    dxdxi[:,:,2,1] = 0.0
+    dxdxi[:,:,2,2] = 1.0
+
+    # Calculate the inverse
+    dxidx = np.empty((num_states,num_labels,3,3), dtype=np.float32)
+    onedet = np.empty((num_states,num_labels,1), dtype=np.float32)
+    onedet[:,:,0] = 1.0 / (dxdxi[:,:,0,0] * dxdxi[:,:,1,1] - dxdxi[:,:,0,1] * dxdxi[:,:,1,0])
+    dxidx[:,:,0,0] = onedet[:,:,0] * dxdxi[:,:,1,1]
+    dxidx[:,:,0,1] = -onedet[:,:,0] * dxdxi[:,:,0,1]
+    dxidx[:,:,0,2] = 0.0
+    dxidx[:,:,1,0] = -onedet[:,:,0] * dxdxi[:,:,1,0]
+    dxidx[:,:,1,1] = onedet[:,:,0] * dxdxi[:,:,0,0]
+    dxidx[:,:,1,2] = 0.0
+    dxidx[:,:,2,0] = 0.0
+    dxidx[:,:,2,1] = 0.0
+    dxidx[:,:,2,2] = 1.0
+
+    # Now calculate the displacement gradient du/dxi
+    dudxi = np.zeros((num_states,num_labels,3,2), dtype=np.float32)
+    dudxi[:,:,:,0] = dudxi[:,:,:,0] + dispOL[:,:,0,:] * Nd[0,0]
+    dudxi[:,:,:,0] = dudxi[:,:,:,0] + dispOL[:,:,1,:] * Nd[1,0]
+    dudxi[:,:,:,0] = dudxi[:,:,:,0] + dispOL[:,:,2,:] * Nd[2,0]
+    dudxi[:,:,:,0] = dudxi[:,:,:,0] + dispOL[:,:,3,:] * Nd[3,0]
+    dudxi[:,:,:,1] = dudxi[:,:,:,1] + dispOL[:,:,0,:] * Nd[0,1]
+    dudxi[:,:,:,1] = dudxi[:,:,:,1] + dispOL[:,:,1,:] * Nd[1,1]
+    dudxi[:,:,:,1] = dudxi[:,:,:,1] + dispOL[:,:,2,:] * Nd[2,1]
+    dudxi[:,:,:,1] = dudxi[:,:,:,1] + dispOL[:,:,3,:] * Nd[3,1]
+
+    # Now calculate the displacement gradient du/dx
+    dudx = np.zeros((num_states,num_labels,3,3), dtype=np.float32)
+    dudx[:,:,:,0] = dudx[:,:,:,0] + dudxi[:,:,:,0] * dxidx[:,:,0,0:1]
+    dudx[:,:,:,0] = dudx[:,:,:,0] + dudxi[:,:,:,1] * dxidx[:,:,1,0:1]
+    dudx[:,:,:,1] = dudx[:,:,:,1] + dudxi[:,:,:,0] * dxidx[:,:,0,1:2]
+    dudx[:,:,:,1] = dudx[:,:,:,1] + dudxi[:,:,:,1] * dxidx[:,:,1,1:2]
+    dudx[:,:,:,2] = dudx[:,:,:,2] + dudxi[:,:,:,0] * dxidx[:,:,0,2:3]
+    dudx[:,:,:,2] = dudx[:,:,:,2] + dudxi[:,:,:,1] * dxidx[:,:,1,2:3]
+
+    # Construct 3d strain matrix in the local system t1h,t2h,nn
+    e3dl = np.empty((num_states,num_labels,3,3), dtype=np.float32)
+    e3dl[:,:,0,0] = dudx[:,:,0,0]
+    e3dl[:,:,0,1] = 0.5 * (dudx[:,:,0,1] + dudx[:,:,1,0])
+    e3dl[:,:,0,2] = 0.0
+    e3dl[:,:,1,0] = 0.5 * (dudx[:,:,0,1] + dudx[:,:,1,0])
+    e3dl[:,:,1,1] = dudx[:,:,1,1]
+    e3dl[:,:,1,2] = 0.0
+    e3dl[:,:,2,0] = 0.0
+    e3dl[:,:,2,1] = 0.0
+    e3dl[:,:,2,2] = 0.0
+
+    # Construct the 3d rotation matrix r3d
+    r3d = np.empty((num_states,num_labels,3,3), dtype=np.float32)
+    r3d[:,:,0,0] = dt1h[:,:,0]
+    r3d[:,:,0,1] = dt2h[:,:,0]
+    r3d[:,:,0,2] = nnO[:,:,0]
+    r3d[:,:,1,0] = dt1h[:,:,1]
+    r3d[:,:,1,1] = dt2h[:,:,1]
+    r3d[:,:,1,2] = nnO[:,:,1]
+    r3d[:,:,2,0] = dt1h[:,:,2]
+    r3d[:,:,2,1] = dt2h[:,:,2]
+    r3d[:,:,2,2] = nnO[:,:,2]
+
+    # Rotate the strain tensor from the local to the current system
+    e3dg = np.zeros((num_states,num_labels,3,3), dtype=np.float32)
+    for j in range(0,3):
+      e3dg[:,:,j,:] = e3dg[:,:,j,:] + r3d[:,:,j,0:1] * r3d[:,:,:,0] * e3dl[:,:,0,0:1]
+      e3dg[:,:,j,:] = e3dg[:,:,j,:] + r3d[:,:,j,0:1] * r3d[:,:,:,1] * e3dl[:,:,0,1:2]
+      e3dg[:,:,j,:] = e3dg[:,:,j,:] + r3d[:,:,j,0:1] * r3d[:,:,:,2] * e3dl[:,:,0,2:3]
+
+      e3dg[:,:,j,:] = e3dg[:,:,j,:] + r3d[:,:,j,1:2] * r3d[:,:,:,0] * e3dl[:,:,1,0:1]
+      e3dg[:,:,j,:] = e3dg[:,:,j,:] + r3d[:,:,j,1:2] * r3d[:,:,:,1] * e3dl[:,:,1,1:2]
+      e3dg[:,:,j,:] = e3dg[:,:,j,:] + r3d[:,:,j,1:2] * r3d[:,:,:,2] * e3dl[:,:,1,2:3]
+
+      e3dg[:,:,j,:] = e3dg[:,:,j,:] + r3d[:,:,j,2:3] * r3d[:,:,:,0] * e3dl[:,:,2,0:1]
+      e3dg[:,:,j,:] = e3dg[:,:,j,:] + r3d[:,:,j,2:3] * r3d[:,:,:,1] * e3dl[:,:,2,1:2]
+      e3dg[:,:,j,:] = e3dg[:,:,j,:] + r3d[:,:,j,2:3] * r3d[:,:,:,2] * e3dl[:,:,2,2:3]
+
+    # Extract desired component
+    if result_name == "surfstrainx":
+      derived_result[result_name]["data"][:,:,0] = e3dg[:,:,0,0]
+    elif result_name == "surfstrainy":
+      derived_result[result_name]["data"][:,:,0] = e3dg[:,:,1,1]
+    elif result_name == "surfstrainz":
+      derived_result[result_name]["data"][:,:,0] = e3dg[:,:,2,2]
+    elif result_name == "surfstrainxy":
+      derived_result[result_name]["data"][:,:,0] = e3dg[:,:,1,0]
+    elif result_name == "surfstrainyz":
+      derived_result[result_name]["data"][:,:,0] = e3dg[:,:,2,1]
+    elif result_name == "surfstrainzx":
+      derived_result[result_name]["data"][:,:,0] = e3dg[:,:,2,0]
+    else:
+      # This should never happen, but just in case.
+      raise ValueError(f"Invalid value for result_name ({result_name})")
+
     return derived_result
