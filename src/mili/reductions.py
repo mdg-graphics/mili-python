@@ -97,7 +97,7 @@ def combine( parallel_results: List[Union[Dict,pd.DataFrame]] ) -> Union[Dict,pd
 def list_concatenate_unique_str(l: List[List[str]]) -> List[str]:
   """Concatenate list and remove duplicate values"""
   l = [i for i in l if i is not None]
-  return list(pd.unique(np.concatenate(l)))
+  return [str(i) for i in pd.unique(np.concatenate(l))]
 
 def list_concatenate_unique(l: List[List[Any]]) -> np.ndarray:
   """Concatenate list and remove duplicate values"""

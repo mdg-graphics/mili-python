@@ -7,6 +7,7 @@ All notable changes to Mili-python will be documented in this file.
 ### Added
 
 ### Fixed
+- Fixed issue where some functions would return List[np._str] for uncombined databases. Now return List[str].
 
 ### Changed
 
