@@ -4,6 +4,7 @@ SPDX-License-Identifier: (MIT)
 from __future__ import annotations
 from typing import List, Dict, Union, Any
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
 def dictionary_merge_no_concat(dictionaries: List[dict]) -> dict:
@@ -99,15 +100,21 @@ def list_concatenate_unique_str(l: List[List[str]]) -> List[str]:
   l = [i for i in l if i is not None]
   return [str(i) for i in pd.unique(np.concatenate(l))]
 
-def list_concatenate_unique(l: List[List[Any]]) -> np.ndarray:
+def list_concatenate_unique(l: List[List[Any]]) -> npt.NDArray:
   """Concatenate list and remove duplicate values"""
-  l = [i for i in l if i is not None]
-  return pd.unique(np.concatenate(l))
+  l = [i for i in l if i is not None and len(i) > 0]
+  if len(l) == 0:
+    return np.empty([0])
+  else:
+    return pd.unique(np.concatenate(l))
 
-def list_concatenate(l: List[List[Any]]) -> np.ndarray:
+def list_concatenate(l: List[List[Any]]) -> npt.NDArray:
   """Concatenate list"""
-  l = [i for i in l if i is not None]
-  return np.concatenate(l)
+  l = [i for i in l if i is not None and len(i) > 0]
+  if len(l) == 0:
+    return np.empty([0])
+  else:
+    return np.concatenate(l)
 
 def zeroth_entry(l: List[Any]) -> Any:
   """Every value in the list is the same, just return the zero-th entry"""
@@ -126,14 +133,14 @@ def reduce_nodes_of_elems(parallel_results):
   combined_elems = np.concatenate(combined_elems)
   return combined_nodes, combined_elems
 
-def reduce_labels(parallel_results) -> Union[np.ndarray,Dict[str,np.ndarray]]:
+def reduce_labels(parallel_results) -> Union[npt.NDArray,Dict[str,npt.NDArray]]:
   """Merge the results of the labels method into the serial format"""
   if isinstance(parallel_results[0], dict):
     return dictionary_merge_concat_unique(parallel_results)
   else:
     return list_concatenate_unique(parallel_results)
 
-def reduce_connectivity(parallel_results) -> Union[np.ndarray,Dict[str,np.ndarray]]:
+def reduce_connectivity(parallel_results) -> Union[npt.NDArray,Dict[str,npt.NDArray]]:
   """Merge the results of the connectivity method into the serial format"""
   if isinstance(parallel_results[0], dict):
     return dictionary_merge_concat(parallel_results, axis=0)

@@ -7,6 +7,7 @@ from __future__ import annotations
 import itertools
 import numpy as np
 import numpy.typing as npt
+from numpy.typing import NDArray
 import os
 import re
 import io
@@ -300,11 +301,11 @@ class _MiliInternal:
     else:
       self.__smaps = afile.smaps
 
-  def nodes(self) -> np.ndarray:
+  def nodes(self) -> NDArray[np.floating]:
     """Getter for initial nodal coordinates.
 
     Returns:
-      np.ndarray: A numpy array (num_nodes by mesh_dimensions) containing the initial coordinates for each node.
+      NDArray[np.floating]: A numpy array (num_nodes by mesh_dimensions) containing the initial coordinates for each node.
     """
     return self.__nodes
 
@@ -380,7 +381,7 @@ class _MiliInternal:
     """Getter for internal integration point dictionary."""
     return self.__int_points
 
-  def int_points_of_state_variable(self, svar_name: str, class_name: str) -> np.ndarray:
+  def int_points_of_state_variable(self, svar_name: str, class_name: str) -> NDArray[np.int32]:
     """Get the available integration points for a state variable + class_name.
 
     Args:
@@ -388,13 +389,13 @@ class _MiliInternal:
       class_name (str): The element class name.
 
     Returns:
-      np.ndarray: Array of integration points.
+      NDArray[np.int32]: Array of integration points.
     """
     int_points = []
     if svar_name in self.__int_points:
       for es_name in self.__int_points[svar_name]:
         if class_name in self.classes_of_state_variable(es_name):
-          int_points = np.array(self.__int_points[svar_name][es_name][:-1])
+          int_points = np.array(self.__int_points[svar_name][es_name][:-1], dtype=np.int32)
     return int_points
 
   def element_sets(self) -> Dict[str,List[int]]:
@@ -418,7 +419,7 @@ class _MiliInternal:
       mat_int_points[mat] = int_points[:-1]
     return mat_int_points
 
-  def times( self, states : Optional[Union[List[int],int]] = None ) -> np.ndarray:
+  def times( self, states : Optional[Union[List[int],int]] = None ) -> NDArray[np.float64]:
     """Get the times for each state in the database.
 
     Args:
@@ -426,7 +427,7 @@ class _MiliInternal:
         specified state numbers.
 
     Returns:
-      np.ndarray: numpy array of times.
+      NDArray[np.float64]: numpy array of times.
     """
     if isinstance(states, (int, np.integer)):
       states = np.array( [ states ], dtype = np.int32 )
@@ -436,9 +437,9 @@ class _MiliInternal:
       self.return_code = (ReturnCode.ERROR, f"'states' must be None, an integer, or a list of integers")
       states = np_empty(np.int32)
     if states is None:
-      result = np.array( [ smap.time for smap in self.__smaps ] )
+      result = np.array( [ smap.time for smap in self.__smaps ], dtype=np.float64 )
     else:
-      result = np.array( [ self.__smaps[state-1].time for state in states ] )
+      result = np.array( [ self.__smaps[state-1].time for state in states ], dtype=np.float64 )
     return result
 
   def state_variables(self) -> Dict[str,StateVariable]:
@@ -505,14 +506,14 @@ class _MiliInternal:
     """
     return self.__derived.classes_of_derived_variable(var_name)
 
-  def labels(self, class_name: Optional[str] = None) -> Union[Dict[str,np.ndarray],np.ndarray]:
+  def labels(self, class_name: Optional[str] = None) -> Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]:
     """Getter for the element labels.
 
     Args:
       class_name (Optional[str]): If provided, only return labels for specifid element class.
 
     Returns:
-      Union[Dict[str,np.ndarray],np.ndarray]: If class_name is None the a dictionary containing
+      Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]: If class_name is None the a dictionary containing
         the labels for each element class is returned. If class_name is not None, then a numpy array
         is returned containing the labels for the specified element class.
     """
@@ -528,22 +529,22 @@ class _MiliInternal:
     """
     return self.__mats
 
-  def material_numbers(self) -> np.ndarray:
+  def material_numbers(self) -> NDArray[np.int32]:
     """Get a List of material numbers in the database.
 
     Returns:
-      np.ndarray: A numpy array of the material numbers.
+      NDArray[np.int32]: A numpy array of the material numbers.
     """
     return np.array(list(self.__elems_of_mat.keys()))
 
-  def connectivity( self, class_name : Optional[str] = None ) -> Union[Dict[str,np.ndarray],np.ndarray]:
+  def connectivity( self, class_name : Optional[str] = None ) -> Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]:
     """Getter for the element connectivity as element LABELS.
 
     Args:
       class_name (str): An element class name. If provided only return connectivty for the specified class.
 
     Returns:
-      Union[Dict[str,np.ndarray],np.ndarray]: If class_name is None the a dictionary containing
+      Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]: If class_name is None the a dictionary containing
         the connectivity for each element class is returned. If class_name is not None, then a numpy array
         is returned containing the connectivity for the specified element class. If the specified element
         class does not exists then None is returned.
@@ -552,14 +553,14 @@ class _MiliInternal:
       return self.__conns_labels.get(class_name, None)
     return self.__conns_labels
 
-  def connectivity_ids( self, class_name : Optional[str] = None ) -> Union[Dict[str,np.ndarray],np.ndarray]:
+  def connectivity_ids( self, class_name : Optional[str] = None ) -> Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]:
     """Getter for the element connectivity as element IDS.
 
     Args:
       class_name (str): An element class name. If provided only return connectivty for the specified class.
 
     Returns:
-      Union[Dict[str,np.ndarray],np.ndarray]: If class_name is None the a dictionary containing
+      Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]: If class_name is None the a dictionary containing
         the connectivity for each element class is returned. If class_name is not None, then a numpy array
         is returned containing the connectivity for the specified element class. If the specified element
         class does not exists then None is returned.
@@ -568,7 +569,7 @@ class _MiliInternal:
       return self.__conns_ids.get(class_name, None)
     return self.__conns_ids
 
-  def faces(self, class_name: str, label: int) -> Dict[int,np.array]:
+  def faces(self, class_name: str, label: int) -> Dict[int,NDArray[np.int32]]:
     """Getter for the faces of an element of a specified class.
 
     NOTE: Currently only supports HEX elements.
@@ -578,7 +579,7 @@ class _MiliInternal:
       label (int): The element label.
 
     Returns:
-      Dict[int,np.array]: A dictionary with the keys 1-6 for each face of the hex element. The value for
+      Dict[int,NDArray[np.int32]]: A dictionary with the keys 1-6 for each face of the hex element. The value for
         each key is a numpy array of 4 intergers specifying the nodes that make up that face.
     """
     nodes_by_face = {}
@@ -716,14 +717,14 @@ class _MiliInternal:
       comp_names = svar_spec.comp_names
     return comp_names
 
-  def parts_of_class_name( self, class_name: str ) -> np.ndarray:
+  def parts_of_class_name( self, class_name: str ) -> NDArray[np.int32]:
     """Get List of part numbers for all elements of a given class name.
 
     Args:
       class_name (str): The element class name.
 
     Returns:
-      np.ndarray: array of part numbers for each element of the class name.
+      NDArray[np.int32]: array of part numbers for each element of the class name.
     """
     elem_parts = np.zeros( self.__labels.get( class_name, np_empty(np.int32) ).shape, dtype=np.int32 )
     elem_parts[:] = -1
@@ -732,14 +733,14 @@ class _MiliInternal:
       elem_parts[ idxs ] = part
     return elem_parts
 
-  def materials_of_class_name( self, class_name: str ) -> np.ndarray:
+  def materials_of_class_name( self, class_name: str ) -> NDArray[np.int32]:
     """Get List of materials for all elements of a given class name.
 
     Args:
       class_name (str): The element class name.
 
     Returns:
-      np.ndarray: array of material numbers for each element of the class name.
+      NDArray[np.int32]: array of material numbers for each element of the class name.
     """
     elem_mats = np.zeros( self.__labels.get( class_name, np_empty(np.int32) ).shape, dtype=np.int32 )
     elem_mats[:] = -1
@@ -748,7 +749,7 @@ class _MiliInternal:
       elem_mats[ idxs ] = mat
     return elem_mats
 
-  def class_labels_of_material( self, mat: Union[str,int], class_name: str ) -> np.ndarray:
+  def class_labels_of_material( self, mat: Union[str,int], class_name: str ) -> NDArray[np.int32]:
     """Convert a material name into labels of the specified class (if any).
 
     Args:
@@ -756,7 +757,7 @@ class _MiliInternal:
       class_name (str): The element class name.
 
     Returns:
-      np.ndarray: array of labels of the specified class name and material.
+      NDArray[np.int32]: array of labels of the specified class name and material.
     """
     if class_name not in self.__labels.keys():
       return np_empty(np.int32)
@@ -781,14 +782,14 @@ class _MiliInternal:
     labels = self.__labels[ class_name ][ elem_idxs ]
     return labels
 
-  def all_labels_of_material( self, mat: Union[str,int] ) -> Dict[str,np.ndarray]:
+  def all_labels_of_material( self, mat: Union[str,int] ) -> Dict[str,NDArray[np.int32]]:
     """Given a specific material. Find all labels with that material and return their values.
 
     Args:
       mat (Union[str,int]): The material name or number.
 
     Returns:
-      Dict[str,np.ndarray]: Keys are element class names. Values are numpy arrays of element labels.
+      Dict[str,NDArray[np.int32]]: Keys are element class names. Values are numpy arrays of element labels.
     """
     if not self.__valid_material_type(mat):
       self.__return_code = (ReturnCode.ERROR, 'material must be string or int')
@@ -806,7 +807,7 @@ class _MiliInternal:
         labels[class_name] = self.class_labels_of_material( mat_num, class_name )
     return labels
 
-  def nodes_of_elems(self, class_sname: str, elem_labels: Union[int,List[int]]) -> Tuple[np.ndarray,np.ndarray]:
+  def nodes_of_elems(self, class_sname: str, elem_labels: Union[int,List[int]]) -> Tuple[NDArray[np.int32],NDArray[np.int32]]:
     """Find nodes associated with elements by label.
 
     Args:
@@ -814,7 +815,7 @@ class _MiliInternal:
       elem_labels (List[int]): List of element labels.
 
     Returns:
-      Tuple[np.ndarray,np.ndarray]: (The nodal connectivity, The element labels)
+      Tuple[NDArray[np.int32],NDArray[np.int32]]: (The nodal connectivity, The element labels)
     """
     if type(elem_labels) is not list:
       if iterable(elem_labels):
@@ -836,14 +837,14 @@ class _MiliInternal:
     elem_conn = self.__conns_ids[class_sname][indices][:,:-1]
     return self.__labels['node'][elem_conn], self.__labels[class_sname][indices,None]
 
-  def nodes_of_material(self, mat: Union[str,int] ) -> np.ndarray:
+  def nodes_of_material(self, mat: Union[str,int] ) -> NDArray[np.int32]:
     """Find nodes associated with a material number.
 
     Args:
       mat (Union[str,int]): The material name or number.
 
     Returns:
-      numpy.array: A list of all nodes associated with the material number.
+      NDArray[np.int32]: A list of all nodes associated with the material number.
     """
     if not self.__valid_material_type(mat):
       self.__return_code = (ReturnCode.ERROR, 'material must be string or int')

@@ -9,6 +9,7 @@ import copy
 import dataclasses
 import numpy as np
 import numpy.typing as npt
+from numpy.typing import NDArray
 import reprlib
 import sys
 import warnings
@@ -503,14 +504,14 @@ class AFile:
     return new_afile
 
 class QueryLayout(TypedDict):
-  states: np.ndarray[np.int32]
-  labels: np.ndarray[np.int32]
+  states: NDArray[np.int32]
+  labels: NDArray[np.int32]
   components: List[str]
-  times: np.ndarray[np.float32]
+  times: NDArray[np.floating]
 
 class QueryDict(TypedDict):
   class_name: str
   source: str
   title: str
-  data: np.ndarray[np.float]
+  data: NDArray[np.floating]
   layout: QueryLayout

@@ -5,7 +5,7 @@ SPDX-License-Identifier: (MIT)
 from __future__ import annotations
 
 import numpy as np
-import numpy.typing as npt
+from numpy.typing import NDArray
 from numpy import iterable
 import os
 
@@ -125,11 +125,11 @@ class MiliDatabase:
       results = self._mili.reload_state_maps(),
       reduce_function = reductions.zeroth_entry)
 
-  def nodes(self) -> np.ndarray:
+  def nodes(self) -> NDArray[np.floating]:
     """Getter for initial nodal coordinates.
 
     Returns:
-      np.ndarray: A numpy array (num_nodes by mesh_dimensions) containing the initial coordinates for each node.
+      NDArray[np.floating]: A numpy array (num_nodes by mesh_dimensions) containing the initial coordinates for each node.
     """
     if self.serial or not self.merge_results:
       return self._mili.nodes()
@@ -184,7 +184,7 @@ class MiliDatabase:
       results = self._mili.class_names(),
       reduce_function = reductions.list_concatenate_unique_str)
 
-  def int_points_of_state_variable(self, svar_name: str, class_name: str) -> np.ndarray:
+  def int_points_of_state_variable(self, svar_name: str, class_name: str) -> NDArray[np.int32]:
     """Get the available integration points for a state variable + class_name.
 
     Args:
@@ -192,7 +192,7 @@ class MiliDatabase:
       class_name (str): The element class name.
 
     Returns:
-      np.ndarray: Array of integration points.
+      NDArray[np.int32]: Array of integration points.
     """
     return self.__postprocess(
       results = self._mili.int_points_of_state_variable(svar_name, class_name),
@@ -218,7 +218,7 @@ class MiliDatabase:
       results = self._mili.integration_points(),
       reduce_function = reductions.dictionary_merge_no_concat)
 
-  def times( self, states : Optional[Union[List[int],int]] = None ) -> np.ndarray:
+  def times( self, states : Optional[Union[List[int],int]] = None ) -> NDArray[np.float64]:
     """Get the times for each state in the database.
 
     Args:
@@ -226,7 +226,7 @@ class MiliDatabase:
         specified state numbers.
 
     Returns:
-      np.ndarray: numpy array of times.
+      NDArray[np.floating]: numpy array of times.
     """
     return self.__postprocess(
       results = self._mili.times(states),
@@ -283,18 +283,18 @@ class MiliDatabase:
       reduce_function = reductions.list_concatenate_unique_str)
 
   @overload
-  def labels(self, class_name : str) -> np.ndarray: ...
+  def labels(self, class_name : str) -> NDArray[np.int32]: ...
   @overload
-  def labels(self, class_name : None = ...) -> Dict[str,np.ndarray]: ...
+  def labels(self, class_name : None = ...) -> Dict[str,NDArray[np.int32]]: ...
 
-  def labels(self, class_name: Optional[str] = None) -> Union[Dict[str,np.ndarray],np.ndarray]:
+  def labels(self, class_name: Optional[str] = None) -> Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]:
     """Getter for the element labels.
 
     Args:
       class_name (Optional[str]): If provided, only return labels for specifid element class.
 
     Returns:
-      Union[Dict[str,np.ndarray],np.ndarray]: If class_name is None the a dictionary containing
+      Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]: If class_name is None the a dictionary containing
       the labels for each element class is returned. If class_name is not None, then a numpy array
       is returned containing the labels for the specified element class.
     """
@@ -312,29 +312,29 @@ class MiliDatabase:
       results = self._mili.materials(),
       reduce_function = reductions.zeroth_entry)
 
-  def material_numbers(self) -> np.ndarray:
+  def material_numbers(self) -> NDArray[np.int32]:
     """Get a List of material numbers in the database.
 
     Returns:
-      np.ndarray: A numpy array of the material numbers.
+      NDArray[np.int32]: A numpy array of the material numbers.
     """
     return self.__postprocess(
       results = self._mili.material_numbers(),
       reduce_function = reductions.list_concatenate_unique)
 
   @overload
-  def connectivity(self, class_name : str) -> np.ndarray: ...
+  def connectivity(self, class_name : str) -> NDArray[np.int32]: ...
   @overload
-  def connectivity(self, class_name : None = ...) -> Dict[str,np.ndarray]: ...
+  def connectivity(self, class_name : None = ...) -> Dict[str,NDArray[np.int32]]: ...
 
-  def connectivity(self, class_name : Optional[str] = None) -> Union[Dict[str,np.ndarray],np.ndarray]:
+  def connectivity(self, class_name : Optional[str] = None) -> Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]:
     """Getter for the element connectivity as element LABELS.
 
     Args:
       class_name (str): An element class name. If provided only return connectivty for the specified class.
 
     Returns:
-      Union[Dict[str,np.ndarray],np.ndarray]: If class_name is None the a dictionary containing
+      Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]: If class_name is None the a dictionary containing
         the connectivity for each element class is returned. If class_name is not None, then a numpy array
         is returned containing the connectivity for the specified element class. If the specified element
         class does not exists then None is returned.
@@ -343,7 +343,7 @@ class MiliDatabase:
       results = self._mili.connectivity(class_name),
       reduce_function = reductions.reduce_connectivity)
 
-  def faces(self, class_name: str, label: int) -> Dict[int,np.array]:
+  def faces(self, class_name: str, label: int) -> Dict[int,NDArray[np.int32]]:
     """Getter for the faces of an element of a specified class.
 
     NOTE: Currently only supports HEX elements.
@@ -353,7 +353,7 @@ class MiliDatabase:
       label (int): The element label.
 
     Returns:
-      Dict[int,np.array]: A dictionary with the keys 1-6 for each face of the hex element. The value for
+      Dict[int,NDArray[np.int32]]: A dictionary with the keys 1-6 for each face of the hex element. The value for
       each key is a numpy array of 4 intergers specifying the nodes that make up that face.
     """
     return self.__postprocess(
@@ -437,33 +437,33 @@ class MiliDatabase:
       results = self._mili.components_of_vector_svar(svar),
       reduce_function = reductions.list_concatenate_unique_str)
 
-  def parts_of_class_name( self, class_name: str ) -> np.ndarray:
+  def parts_of_class_name( self, class_name: str ) -> NDArray[np.int32]:
     """Get List of part numbers for all elements of a given class name.
 
     Args:
       class_name (str): The element class name.
 
     Returns:
-      np.ndarray: array of part numbers for each element of the class name.
+      NDArray[np.int32]: array of part numbers for each element of the class name.
     """
     return self.__postprocess(
       results = self._mili.parts_of_class_name(class_name),
       reduce_function = reductions.list_concatenate)
 
-  def materials_of_class_name( self, class_name: str ) -> np.ndarray:
+  def materials_of_class_name( self, class_name: str ) -> NDArray[np.int32]:
     """Get List of materials for all elements of a given class name.
 
     Args:
       class_name (str): The element class name.
 
     Returns:
-      np.ndarray: array of material numbers for each element of the class name.
+      NDArray[np.int32]: array of material numbers for each element of the class name.
     """
     return self.__postprocess(
       results = self._mili.materials_of_class_name(class_name),
       reduce_function = reductions.list_concatenate)
 
-  def class_labels_of_material( self, mat: Union[str,int], class_name: str ) -> np.ndarray:
+  def class_labels_of_material( self, mat: Union[str,int], class_name: str ) -> NDArray[np.int32]:
     """Convert a material name into labels of the specified class (if any).
 
     Args:
@@ -471,26 +471,26 @@ class MiliDatabase:
       class_name (str): The element class name.
 
     Returns:
-      np.ndarray: array of labels of the specified class name and material.
+      NDArray[np.int32]: array of labels of the specified class name and material.
     """
     return self.__postprocess(
       results = self._mili.class_labels_of_material(mat, class_name),
       reduce_function = reductions.list_concatenate)
 
-  def all_labels_of_material( self, mat: Union[str,int] ) -> Dict[str,np.ndarray]:
+  def all_labels_of_material( self, mat: Union[str,int] ) -> Dict[str,NDArray[np.int32]]:
     """Given a specific material. Find all labels with that material and return their values.
 
     Args:
       mat (Union[str,int]): The material name or number.
 
     Returns:
-      Dict[str,np.ndarray]: Keys are element class names. Values are numpy arrays of element labels.
+      Dict[str,NDArray[np.int32]]: Keys are element class names. Values are numpy arrays of element labels.
     """
     return self.__postprocess(
       results = self._mili.all_labels_of_material(mat),
       reduce_function = reductions.dictionary_merge_concat)
 
-  def nodes_of_elems(self, class_sname: str, elem_labels: Union[int,List[int]]) -> Tuple[np.ndarray,np.ndarray]:
+  def nodes_of_elems(self, class_sname: str, elem_labels: Union[int,List[int]]) -> Tuple[NDArray[np.int32],NDArray[np.int32]]:
     """Find nodes associated with elements by label.
 
     Args:
@@ -498,20 +498,20 @@ class MiliDatabase:
       elem_labels (List[int]): List of element labels.
 
     Returns:
-      Tuple[np.ndarray,np.ndarray]: (The nodal connectivity, The element labels)
+      Tuple[NDArray[np.int32],NDArray[np.int32]]: (The nodal connectivity, The element labels)
     """
     return self.__postprocess(
       results = self._mili.nodes_of_elems(class_sname, elem_labels),
       reduce_function = reductions.reduce_nodes_of_elems)
 
-  def nodes_of_material(self, mat: Union[str,int] ) -> np.ndarray:
+  def nodes_of_material(self, mat: Union[str,int] ) -> NDArray[np.int32]:
     """Find nodes associated with a material number.
 
     Args:
       mat (Union[str,int]): The material name or number.
 
     Returns:
-      numpy.array: A list of all nodes associated with the material number.
+      NDArray[np.int32]: A list of all nodes associated with the material number.
     """
     return self.__postprocess(
       results = self._mili.nodes_of_material(mat),
