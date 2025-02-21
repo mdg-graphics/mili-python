@@ -43,15 +43,11 @@ def parse_return_codes(return_codes: Union[Tuple[ReturnCode,str], List[Tuple[Ret
 
 class ResultModifier(Enum):
   """Functions available for modifying results from the query method."""
-  CUMMIN = 0
-  CUMMAX = 1
-  MIN = 2
-  MAX = 3
-  AVERAGE = 4
-
-  def string_repr(self):
-    """Get string representation of enum value."""
-    return ["cummin", "cummax", "min", "max", "average"][self.value]
+  CUMMIN = "cummin"
+  CUMMAX = "cummax"
+  MIN = "min"
+  MAX = "max"
+  AVERAGE = "average"
 
 
 class MiliDatabase:
@@ -520,7 +516,7 @@ class MiliDatabase:
   def __process_query_modifier(self, modifier: ResultModifier, results: dict, as_dataframe: bool ):
     results = reductions.combine(results)
     for svar in results:
-      results[svar]["modifier"] = modifier.string_repr()
+      results[svar]["modifier"] = modifier.value
 
     ##### Minimum #####
     if modifier == ResultModifier.MIN:

@@ -7,11 +7,19 @@ All notable changes to Mili-python will be documented in this file.
 ### Added
 
 ### Fixed
-- Fixed issue where some functions would return List[np._str] for uncombined databases. Now return List[str].
 
 ### Changed
 
 ### Removed
+
+## [v0.8.2] - 2025-2-21
+
+### Fixed
+- Fixed issue where some functions would return List[np._str] for uncombined databases. Now return List[str].
+- Fixed typing of numpy arrays in `QueryLayout` and `QueryDict`
+
+### Changed
+- Updated the values of the `ResultModifer` enum to be strings instead of integers and removed the `string_repr` function. The string versions of each modifier can now be accessed with `ResultModifier.[MAX|MIN|AVERAGE|CUMMIN|CUMMAX].value`
 
 ## [v0.8.1] - 2025-1-31
 
