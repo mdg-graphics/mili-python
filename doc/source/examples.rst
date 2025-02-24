@@ -298,8 +298,8 @@ Result Modifiers.
 
 Mili-python also provides the option to modify the query results in various ways. These are specified using the :code:`ResultModifier` enum:
 
-* :code:`ResultModifier.CUMMIN`: Calculates the cumulative min for the result across the queried states.
-* :code:`ResultModifier.CUMMAX`: Calculates the cumulative max for the result across the queried states.
+* :code:`ResultModifier.CUMMIN`: Calculates the cumulative min for each element across the queried states.
+* :code:`ResultModifier.CUMMAX`: Calculates the cumulative max for each element across the queried states.
 * :code:`ResultModifier.MIN`: Gets the minimum value at each state and the element it is associated with.
 * :code:`ResultModifier.MAX`: Gets the maximum value at each state and the element it is associated with.
 * :code:`ResultModifier.AVERAGE`: Get the average value at each state.
@@ -365,7 +365,7 @@ The main differences are:
     print(result["sx"])
     """
     {
-        'source': 'derived',
+        'source': 'primal',
         'data': array([[[-6.095456e-09]],
                        [[-6.852576e-09]],
                        [[-7.327380e-09]]], dtype=float32),
@@ -391,7 +391,7 @@ The main differences are:
     print(result["sx"])
     """
     {
-        'source': 'derived',
+        'source': 'primal',
         'data': array([[[4.2604040e-09]],
                        [[5.1201843e-09]],
                        [[5.4794955e-09]]], dtype=float32),
@@ -436,7 +436,7 @@ average
     print(result["sx"])
     """
     {
-        'source': 'derived',
+        'source': 'primal',
         'data': array([[[1.2160362e-10]],
                        [[1.7721129e-10]],
                        [[1.6010111e-10]]], dtype=float32),
