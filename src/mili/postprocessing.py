@@ -1,6 +1,7 @@
 """
 SPDX-License-Identifier: (MIT)
 """
+# mypy: ignore-errors
 
 from typing import *
 from collections import defaultdict

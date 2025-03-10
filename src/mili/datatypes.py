@@ -4,23 +4,24 @@ SPDX-License-Identifier: (MIT)
 
 # defer evaluation of type-annotations until after the module is processed, allowing class members to refer to the class
 from __future__ import annotations
+
 # standard imports
+import sys
 import copy
 import dataclasses
 import numpy as np
-import numpy.typing as npt
-from numpy.typing import NDArray
-import reprlib
-import sys
+import pandas as pd
 import warnings
+
 # from imports
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum, IntEnum
-# * imports
-from typing import *
+from typing import List, Any, DefaultDict, Optional, Tuple, Iterable, Dict, Union
+from typing_extensions import NotRequired, TypedDict, TypeAlias
+from numpy.typing import ArrayLike, NDArray
 
-def flatten( iterable ):
+def flatten( iterable: Iterable[Any] ) -> List[Any]:
   """Helper function to flatten lists and tuples.
 
   NOTE: Will not flatten a dictionary. Only list, tuple, and set.
@@ -35,7 +36,7 @@ def flatten( iterable ):
     else:
       try:
         iterator = iter(item)
-        result.extend(flatten(iter))
+        result.extend(flatten(iterator))
       except TypeError:
         result.append(item)
   return result
@@ -49,11 +50,11 @@ class MiliType(IntEnum):
   M_INT = 5
   M_INT4 = 6
   M_INT8 = 7
-  def byte_size(self):
+  def byte_size(self) -> int:
     return [ -1, 1, 4, 4, 8, 4, 4, 8 ][self.value]
-  def numpy_dtype(self):
+  def numpy_dtype(self) -> Any:
     return [ None, object, np.float32, np.float32, np.float64, np.int32, np.int32, np.int64 ][self.value]
-  def struct_repr(self):
+  def struct_repr(self) -> str:
     return 'sffdiiq '[self.value-1]
 
 class ParameterType(IntEnum):
@@ -83,7 +84,7 @@ class Superclass(IntEnum):
   M_ALL = 200
   M_INVALID_LABEL = -1
 
-  def node_count(self):
+  def node_count(self) -> int:
     return [ 0, 0, 2, 3, 3, 4, 4, 5, 6, 8, 0, 0, 0, 1, 10, 1 ][self.value]
 
 @dataclass
@@ -98,8 +99,8 @@ class Param:
   file_index : int = -1
   entry_index : int = -1
   rank : int = 0
-  dims : np.ndarray = field(default_factory=lambda: np.empty([0],dtype = np.int32))
-  data : np.ndarray = field(default_factory=lambda: np.empty([0],dtype = np.float64))
+  dims : NDArray[np.int32] = field(default_factory=lambda: np.empty([0],dtype = np.int32))
+  data : NDArray[np.float64] = field(default_factory=lambda: np.empty([0],dtype = np.float64))
 
 @dataclass(eq=False)
 class DirectoryDecl:
@@ -169,7 +170,7 @@ class StateVariable:
   #   r.maxlevel = 1
   #   return r.repr(self)
 
-  def __eq__(self, other: object):
+  def __eq__(self, other: object) -> bool:
     if isinstance(other, StateVariable):
       same = True
       same = same and (self.name == other.name)
@@ -185,19 +186,19 @@ class StateVariable:
     return False
 
   @property
-  def recursive_names(self):
+  def recursive_names(self) -> List[str]:
     """Recusively gather the names of all svars all the way down"""
     return [self.name] + flatten([sv.recursive_names for sv in self.svars])
 
   @property
-  def recursive_svars(self):
+  def recursive_svars(self) -> List[StateVariable]:
     """Recusively gather the nested svars all the way down"""
     return [self] + flatten([sv.recursive_svars for sv in self.svars])
 
   @property
-  def comp_layout(self):
+  def comp_layout(self) -> List[List[str]]:
     """Get layout of component state variables for this svar."""
-    comp_layout = []
+    comp_layout: List[List[str]] = []
     if self.agg_type == StateVariable.Aggregation.SCALAR:
       comp_layout.append( [self.name] )
     elif self.agg_type == StateVariable.Aggregation.ARRAY:
@@ -209,11 +210,11 @@ class StateVariable:
     return comp_layout
 
   @property
-  def comp_titles( self ):
+  def comp_titles(self) -> List[str]:
     return [ ssvar.title for ssvar in self.svars ]
 
   @property
-  def atom_qty( self ):
+  def atom_qty( self ) -> int:
     ''' Returns the quantity of atoms (scalars of the contained type) based on the aggregate type. '''
     if self.agg_type == StateVariable.Aggregation.VECTOR:
       return sum( svar.atom_qty for svar in self.svars )
@@ -244,22 +245,22 @@ class Subrecord:
   # Everything after this is calculated by the reader to make queries easier
   # TODO: break this information out into a seperate class as much as possible
   svars : List[StateVariable] = dataclasses.field(default_factory=list)
-  svar_atom_lengths : np.ndarray = field(default_factory=lambda: np.empty([0],dtype = np.int64))
-  svar_atom_offsets : np.ndarray = field(default_factory=lambda: np.empty([0],dtype = np.int64))
-  svar_comp_layout : np.ndarray = field(default_factory=lambda: np.empty([0],dtype = object ))
-  svar_comp_offsets : np.ndarray = field(default_factory=lambda: np.empty([0], dtype = np.int64))
-  ordinal_blocks : np.ndarray = field(default_factory=lambda: np.empty([0], dtype = np.int64))
-  ordinal_block_counts : np.ndarray = field(default_factory=lambda: np.empty([0], dtype = np.int64))
-  ordinal_block_offsets : np.ndarray = field(default_factory=lambda: np.empty([0], dtype = np.int64))
+  svar_atom_lengths : NDArray[np.int64] = field(default_factory=lambda: np.empty([0],dtype = np.int64))
+  svar_atom_offsets : NDArray[np.int64] = field(default_factory=lambda: np.empty([0],dtype = np.int64))
+  svar_comp_layout : List[str] = field(default_factory=list)
+  svar_comp_offsets : List[NDArray[np.integer]] = field(default_factory=list)
+  ordinal_blocks : NDArray[np.int64] = field(default_factory=lambda: np.empty([0], dtype = np.int64))
+  ordinal_block_counts : NDArray[np.int64] = field(default_factory=lambda: np.empty([0], dtype = np.int64))
+  ordinal_block_offsets : NDArray[np.int64] = field(default_factory=lambda: np.empty([0], dtype = np.int64))
   state_byte_offset : int = -1
   atoms_per_label : int = -1
   byte_size : int = 0
   # for each svar in the srec, the offset
-  svar_ordinal_offsets : np.ndarray = field(default_factory=lambda: np.empty([0], dtype = np.int64))
-  svar_byte_offsets : np.ndarray = field(default_factory=lambda: np.empty([0], dtype = np.int64))
+  svar_ordinal_offsets : NDArray[np.int64] = field(default_factory=lambda: np.empty([0], dtype = np.int64))
+  svar_byte_offsets : NDArray[np.int64] = field(default_factory=lambda: np.empty([0], dtype = np.int64))
   srec_fmt_id: int = 0
 
-  def __eq__(self, other: object):
+  def __eq__(self, other: object) -> bool:
     if isinstance(other, Subrecord):
       same = True
       same = same and (self.name == other.name)
@@ -272,12 +273,7 @@ class Subrecord:
       return same
     return False
 
-  # def __repr__( self ) -> str:
-  #   r = reprlib.Repr()
-  #   r.maxlevel = 1
-  #   return r.repr(self)
-
-  def scalar_svar_coords( self, aggregate_match, scalar_svar_name ):
+  def scalar_svar_coords(self, aggregate_match: str, scalar_svar_name: str) -> NDArray[np.integer]:
     coords = []
     for idx, (svar_name, svar_comps) in enumerate( zip(self.svar_names, self.svar_comp_layout) ):
       matches = [ ( idx, self.svar_comp_offsets[idx][jdx] ) for jdx, svar in enumerate(svar_comps) if svar == scalar_svar_name ]
@@ -287,13 +283,15 @@ class Subrecord:
     coords = [[item for sublist in coords for item in sublist]]
     return np.array( *coords )
 
-  def calculate_memory_offsets( self, match_aggregate_svar: str, svars_to_query: List[str], ordinals: npt.ArrayLike, matching_int_points: dict ):
+  def calculate_memory_offsets(self, match_aggregate_svar: str, svars_to_query: List[StateVariable],
+                               ordinals: NDArray[np.integer], matching_int_points: Dict[str,Dict[str,List[int]]]) -> Tuple[NDArray[np.int64],NDArray[np.int32]]:
     """Calculate the memory offsets into the subrecord for the passed in ordinals"""
     #  determine if any of the queried svar components are in the StateRecord.. and extract only the comps we're querying for
     # col 0 is supposed to be the svar, col 2 is supposed to be the comp in the svar for agg svars
     qd_svar_comps = np.empty([0,2],dtype=np.int64)
     # TODO : remove special stress/strain handling when dyna/diablo aggregate them appropriately
     match_aggregate_svar = '' if match_aggregate_svar in ('stress','strain') else match_aggregate_svar
+    svar: StateVariable
     for svar in svars_to_query:
       svar_coords = self.scalar_svar_coords( match_aggregate_svar, svar.name )
       ipts = matching_int_points.get( svar.name, {} ).get( self.name, [] )
@@ -321,7 +319,7 @@ class Subrecord:
     # each ordinal for queried labels that is in the subrecord, using these
     #  to index the label set for the class should give the correct set of labels, in the correct order
     #  for the result
-    ordinals_in_srec = ordinals[ in_srec ]
+    ordinals_in_srec: NDArray[np.int32] = ordinals[ in_srec ]
 
     # for each ordinal that is in the subrecord, which block is it in
     # this gives the index into the list of blocks (for the current srec) that the lower bound of the block range is located at
@@ -355,16 +353,17 @@ class Subrecord:
     # we work from the last column / svar to the first the first contains the ordinal info needed to compute the rest (in the RESULT organization case.. so we just do the same in both cases)
     if self.organization == Subrecord.Org.OBJECT:
       for idx_col, comp in zip( srec_memory_offsets.T[::-1,:], qd_svar_comps[::-1,:]):
-        idx_col[:] = srec_memory_offsets[:,0] * self.atoms_per_label + self.svar_atom_offsets[ comp[0] ] + comp[1]
+        idx_col[:] = srec_memory_offsets[:,0] * self.atoms_per_label + self.svar_atom_offsets[ comp[0] ] + comp[1]  # type: ignore
     elif self.organization == Subrecord.Org.RESULT:
       for idx_col, comp in zip( srec_memory_offsets.T[::-1,:], qd_svar_comps[::-1,:]):
-        idx_col[:] = self.svar_atom_offsets[ comp[0] ] * self.total_ordinal_count + self.svar_atom_lengths[ comp[0] ] * srec_memory_offsets[:,0] + comp[1]
+        idx_col[:] = self.svar_atom_offsets[ comp[0] ] * self.total_ordinal_count + self.svar_atom_lengths[ comp[0] ] * srec_memory_offsets[:,0] + comp[1]  # type: ignore
 
     return srec_memory_offsets, ordinals_in_srec
 
   # right now we're assuming we have the ordinals, we could add bounds checking as a debug version, or auto-filter for parallel versions
   # we're also assuming the write_data is filtered appropriately so that only the data being written out to this procs database is included
-  def extract_ordinals( self, buffer : bytes, ordinals : npt.ArrayLike, write_data : npt.ArrayLike = None ):
+  def extract_ordinals(self, buffer: bytes, ordinals: NDArray[np.integer],
+                       write_data: Optional[ArrayLike] = None ) -> Tuple[NDArray[Any],bytes]:
     # TODO(wrt): check that buffer is appropriately sized
     all_same = self.organization == Subrecord.Org.OBJECT or all( svar.data_type == self.svars[0].data_type for svar in self.svars )
     if all_same:
@@ -375,12 +374,12 @@ class Subrecord:
       svar_idxs = np.digitize( ordinals, self.svar_ordinal_offsets )
       # assert all labels are from the same svar
       assert( np.min(svar_idxs) == np.max(svar_idxs) )
-      svar_idx = np.min(svar_idxs) - 1
+      svar_idx = int(np.min(svar_idxs) - 1)
       # modify the ordinals to offset in the svar for this srec
-      ordinals -= self.svar_ordinal_offsets[svar_idx]
+      ordinals = ordinals - self.svar_ordinal_offsets[svar_idx]
       # only read the portion of the subrecord related to this svar
       buffer_slice = (self.svar_byte_offsets[svar_idx], self.svar_byte_offsets[svar_idx+1])
-    var_data = np.frombuffer( buffer[ buffer_slice[0] : buffer_slice[1] ], dtype = self.svars[svar_idx].data_type.numpy_dtype() )
+    var_data: NDArray[Any] = np.frombuffer( buffer[ buffer_slice[0] : buffer_slice[1] ], dtype = self.svars[svar_idx].data_type.numpy_dtype() )
     if write_data is not None:
       var_data = var_data.copy( )
       var_data[ ordinals ] = write_data
@@ -390,10 +389,10 @@ class Subrecord:
     return var_data[ ordinals ], buffer
 
   @property
-  def total_ordinal_count( self ):
-    return max( 1, np.sum( self.ordinal_block_counts ) )
+  def total_ordinal_count( self ) -> int:
+    return max( 1, int(np.sum( self.ordinal_block_counts )) )
 
-  def struct_repr( self ):
+  def struct_repr(self) -> Tuple[Union[str,List[str]],bool]:
     '''
     This function returns the string representation of a Subrecord, to be used when interpreting the bytes during reading of state.
     '''
@@ -463,7 +462,7 @@ class AFile:
   smaps : List[StateMap] = dataclasses.field(default_factory=list)
   dir_decls_list : List[DirectoryDecl] = dataclasses.field(default_factory=list)
   dir_decls : DefaultDict[DirectoryDecl.Type,List[DirectoryDecl]] = dataclasses.field(default_factory=lambda : defaultdict(list))
-  dirs : DefaultDict[DirectoryDecl.Type,DefaultDict[str,List]] = dataclasses.field(default_factory=lambda : defaultdict(lambda : defaultdict(list)))
+  dirs : DefaultDict[DirectoryDecl.Type,DefaultDict[str,Any]] = dataclasses.field(default_factory=lambda : defaultdict(lambda : defaultdict(list)))
 
 
   def __eq__(self, other: object) -> bool:
@@ -515,3 +514,16 @@ class QueryDict(TypedDict):
   title: str
   data: NDArray[np.floating]
   layout: QueryLayout
+  modifier: NotRequired[str]
+
+class ReturnCode(Enum):
+  """Return code enum for _MiliInternal."""
+  OK = 0
+  ERROR = 1
+  CRITICAL = 2
+
+  def str_repr(self) -> str:
+    """Get string representation of ReturnCode."""
+    return ["Success", "Error", "Critical"][self.value]
+
+ReturnCodeTuple: TypeAlias = Tuple[ReturnCode,str]

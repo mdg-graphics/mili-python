@@ -2,26 +2,26 @@
 SPDX-License-Identifier: (MIT)
 """
 import multiprocessing
-import dill
-import pathos.multiprocessing as mp
-from functools import partial
-from multiprocessing import Process, shared_memory
+import dill  # type: ignore
 import numpy as np
 import atexit
 import psutil
 import uuid
-from enum import Enum
-from typing import *
+
+from multiprocessing import Process, shared_memory
+from multiprocessing.connection import Connection
+from typing import List, Dict, Tuple, Optional, Any, Type, Union
+from numpy.typing import NDArray
 from functools import reduce
 
 # TODO: probably just create a wrapper/dispatch superclass, and implement loop/pool/client-server versions instead of loop/pool in one and client/server in another
 
 class LoopWrapper:
-  def __init__( self,
-                cls_obj : Type,
-                proc_pargs : List[List[Any]] = [],
-                proc_kwargs : List[Mapping[Any,Any]] = [],
-                objects : List[Any] = None ):
+  def __init__(self,
+               cls_obj: Type[Any],
+               proc_pargs: List[List[Any]] = [],
+               proc_kwargs: List[Dict[str,Any]] = [],
+               objects: Optional[List[Any]] = None ) -> None:
     num_pargs = len(proc_pargs)
     num_kwargs = len(proc_kwargs)
     if num_pargs > 0 and num_kwargs == 0:
@@ -48,14 +48,15 @@ class LoopWrapper:
     for func in ( func for func in dir(cls_obj) if not func.startswith('__') ):
       # Class Methods
       if callable(getattr(cls_obj,func)):
-        setattr( self, func, call_lambda(func,cls_obj,objs) )
+        setattr( self, func, call_lambda(func,cls_obj,objs) )  # type: ignore  # Error because we don't type call_lambda
       # Support for properties
       elif isinstance(getattr(cls_obj, func), property):
         prop_objs = [ getattr(obj, func) for obj in objs ]
         prop_objs_type = type(prop_objs[0])
         setattr( self, func, LoopWrapper(prop_objs_type, objects=prop_objs))
 
-  def __loop_caller(self,attr,cls_obj,objs,*pargs,**kwargs):
+  def __loop_caller(self, attr: str, cls_obj: Type[Any], objs: List[Any], *pargs: Any, **kwargs: Any) -> Any:
+    """Helper function to call a specified method for all wrapped objects."""
     if callable(getattr(cls_obj, attr)):
       try:
         result = [ getattr(cls_obj,attr)( obj, *pargs, **kwargs ) for obj in objs ]
@@ -68,56 +69,63 @@ class LoopWrapper:
         result = [e]
     return result
 
-class SharedMemKey(dict):
+class SharedMemKey(dict):  # type: ignore  # mypy expects a type for dict
   """This is just here so we can compare using ininstance. Not sure if there is a better way to do this."""
   pass
 
 class Shmallocate:
-  def __init__( self ):
-    self.__shmem = {}
-    self.__metadata = {}
-    self.__all_shmem = {}
+  def __init__(self) -> None:
+    self.__shmem: Dict[str,shared_memory.SharedMemory] = {}
+    self.__all_shmem: Dict[str,shared_memory.SharedMemory] = {}
+    self.__metadata: Dict[str,Dict[str,Any]] = {}
 
-  def active_keys( self ):
+  def active_keys(self) -> List[str]:
+    """Get list of keys to active shared memory."""
     return list( self.__shmem.keys() )
 
-  def metadata( self, ukey ):
+  def metadata(self, ukey: str) -> Dict[str,Any]:
+    """Get metadata for a specified piece of shared memory."""
     return self.__metadata.get(ukey,{})
 
-  def alloc( self, name : str, create : bool, **kwargs ):
+  def alloc(self, name: str, create: bool, size: int) -> Tuple[shared_memory.SharedMemory,str]:
+    """Allocate a new piece of shared memory."""
     ukey = name
     if create:
       alloc_uuid = uuid.uuid4()
       # if alloc_uuid.is_safe != uuid.SafeUUID.safe:
         # raise SystemError("Cannot generate a multiprocessing-safe UUID for shared memory usage! Please revert to a different parallel operation mode.")
       ukey =  f"{name}-{alloc_uuid.hex}"
-    shmem = shared_memory.SharedMemory( name = ukey, create = create, **kwargs )
+    shmem = shared_memory.SharedMemory( name = ukey, create = create, size = size )
     self.__shmem[ ukey ] = shmem
     self.__all_shmem[ ukey ] = shmem
     self.__metadata[ ukey ] = { }
     return shmem, ukey
 
-  def ndarray( self, name : str, create : bool, shape : Any, dtype : np.dtype, **kwargs ):
-    if 'buffer' in kwargs.keys():
-      raise ValueError("Do not attempt to specify a buffer for shared-memory ndarray creation.")
+  def ndarray(self, name: str, create: bool, shape: Any, dtype: Any) -> Tuple[NDArray[Any],str]:
+    """Allocate a shared memory Numpy array."""
     shmem, ukey = self.alloc( name = name, create = create, size = reduce( lambda x, y : x * y, shape ) * np.dtype(dtype).itemsize )
     self.__metadata[ ukey ][ 'shape' ] = shape
     self.__metadata[ ukey ][ 'dtype' ] = dtype
-    return np.ndarray( shape = shape, dtype = dtype, buffer = shmem.buf, **kwargs ), ukey
+    return np.ndarray( shape = shape, dtype = dtype, buffer = shmem.buf ), ukey
 
-  def close( self ):
+  def close(self) -> None:
+    """Close all active shared memory."""
     for shmem in self.__shmem.values():
       shmem.close()
     self.__metadata = {}
     self.__shmem = {}
 
-  # this removes responsiblity for managing the allocated shared memory
-  #  from this shmallocate object and places the responsibility on the user
-  def relinquish( self, ukey ):
+  def relinquish(self, ukey: str) -> Optional[shared_memory.SharedMemory]:
+    """Reliquish a specified piece of shared memory.
+
+    NOTE: This removes responsiblity for managing the allocated shared memory
+          from this shmallocate object and places the responsibility on the user.
+    """
     shmem = self.__all_shmem.pop( ukey, None )
     return shmem
 
-  def unlink( self ):
+  def unlink(self) -> None:
+    """Close and Unlink all active shared memory."""
     for shmem in self.__all_shmem.values():
       shmem.close()
       shmem.unlink()
@@ -132,11 +140,11 @@ class ServerWrapper:
   """
   class _ClientWrapper(Process):
     def __init__( self,
-                  conn,
-                  cls_obj: Type,
+                  conn: Connection,
+                  cls_obj: Type[Any],
                   use_shared_memory: bool,
                   proc_pargs: List[List[Any]] = [],
-                  proc_kwargs: List[Mapping[Any,Any]] = [] ):
+                  proc_kwargs: List[Dict[Any,Any]] = [] ):
       super(Process,self).__init__()
 
       num_pargs = len(proc_pargs)
@@ -155,7 +163,8 @@ class ServerWrapper:
       self.__use_shared_memory = use_shared_memory
       self.__shmalloc = Shmallocate()
 
-    def __from_shared_mem(self, item):
+    def __from_shared_mem(self, item: Any) -> Any:
+      """Convert item back from shared memory."""
       if not self.__use_shared_memory:
         return item
       elif isinstance(item, SharedMemKey):
@@ -168,7 +177,8 @@ class ServerWrapper:
       else:
         return item
 
-    def run( self ):
+    def run(self) -> None:
+      """TODO: document"""
       self.__wrapped = [ self.__cls_obj(*pargs, **kwargs) for pargs, kwargs in zip(self.__proc_pargs, self.__proc_kwargs) ]
 
       # ensure all contained objects are the same exact type (no instances, subclasses are not valid)
@@ -197,7 +207,8 @@ class ServerWrapper:
 
       return
 
-  def __to_shared_mem(self, item):
+  def __to_shared_mem(self, item: Any) -> Any:
+    """Convert item to shared memory."""
     if not self.__use_shared_memory:
       return item
     elif isinstance(item, np.ndarray):
@@ -217,7 +228,8 @@ class ServerWrapper:
     else:
       return item
 
-  def __divide_into_sequential_groups( self, values, n_groups ):
+  def __divide_into_sequential_groups(self, values: List[Any], n_groups: int) -> Any:
+    """Divide a list into sublists."""
     if n_groups > len(values):
       n_groups = len(values)
     d, r = divmod( len(values), n_groups )
@@ -226,10 +238,10 @@ class ServerWrapper:
       yield values[si:si+(d+1 if i < r else d)]
 
   def __init__( self,
-               cls_obj : Type,
-               proc_pargs : List[List[Any]] = [],
-               proc_kwargs : List[Mapping[Any,Any]] = [],
-               use_shared_memory: Optional[bool] = True ):
+               cls_obj: Type[Any],
+               proc_pargs: List[List[Any]] = [],
+               proc_kwargs: List[Dict[Any,Any]] = [],
+               use_shared_memory: bool = True ):
     # validate parameters
     num_pargs = len(proc_pargs)
     num_kwargs = len(proc_kwargs)
@@ -246,10 +258,12 @@ class ServerWrapper:
     for func in ( func for func in dir(cls_obj) if not func.startswith('__') ):
       # Class Methods and Properties
       if callable(getattr(cls_obj,func)) or isinstance(getattr(cls_obj, func), property):
-        setattr( self, func, mem_maker(func) )
+        setattr( self, func, mem_maker(func) )  # type: ignore   # Ignore error that mem_maker is untyped.
 
     # Get the number of processors that are available
-    n_cores = int( psutil.cpu_count(logical=False) )
+    n_cores = psutil.cpu_count(logical=False)
+    if n_cores is None:
+      raise ValueError(f"psutil.cpu_count returned None")
 
     self.__use_shared_memory = use_shared_memory
     self.__shmalloc = Shmallocate()
@@ -266,13 +280,13 @@ class ServerWrapper:
       shmem.unlink()
 
     # Break out into groups for each processor available
-    proc_pargs = self.__divide_into_sequential_groups( proc_pargs, n_cores )
-    proc_kwargs = self.__divide_into_sequential_groups( proc_kwargs, n_cores )
+    grouped_pargs: List[List[List[Any]]] = self.__divide_into_sequential_groups( proc_pargs, n_cores )
+    grouped_kwargs: List[List[Dict[Any,Any]]] = self.__divide_into_sequential_groups( proc_kwargs, n_cores )
 
     # create a pool of worker processes and supply the constructor arguments to each one
     self.__pool = []
     self.__conns = []
-    for pargs, kwargs in zip( proc_pargs, proc_kwargs ):
+    for pargs, kwargs in zip( grouped_pargs, grouped_kwargs ):
       c0, c1 = multiprocessing.Pipe()
       self.__pool.append( ServerWrapper._ClientWrapper( c1, cls_obj, self.__use_shared_memory, pargs, kwargs ) )
       self.__conns.append( c0 )
@@ -290,30 +304,32 @@ class ServerWrapper:
         prop_objs_type = type(prop_objs[0])
         setattr( self, func, LoopWrapper(prop_objs_type, objects=prop_objs))
 
-  def close(self):
+  def close(self) -> None:
     """Close the database and end all subprocesses."""
     atexit.unregister(self.__cleanup_processes)
     self.__cleanup_processes()
 
-  # Need this so processes don't hang and close properly
-  def __cleanup_processes(self):
-    if hasattr( self, f'_{__class__.__name__}__conns' ):
+  def __cleanup_processes(self) -> None:
+    """Needed so processes don't hand and close properly."""
+    if hasattr( self, f'_{__class__.__name__}__conns' ):  # type: ignore  # Ignore error that __class__ is undefined
       for conn in self.__conns:
         conn.send( dill.dumps( ('__exit', [], {} ) ) )
     self.__conns = []
-    if hasattr( self, f'_{__class__.__name__}__pool'):
+    if hasattr( self, f'_{__class__.__name__}__pool'):  # type: ignore  # Ignore error that __class__ is undefined
       for proc in self.__pool:
         proc.join( )
     self.__pool = []
 
-  def __flatten( self, alist: List[Any] ):
+  def __flatten( self, alist: List[List[Any]] ) -> List[Any]:
+    """Flatten a list of lists."""
     return [item for sublist in alist for item in sublist]
 
-  # called by the generated member functions to send the command (attr name) and function arguments to
-  #  each of the processes managed by this server. All arguments are sent to all processes, sending specific
-  #  arguments to individual processes is not supported currently.
-  def __worker_call(self,attr,*pargs,**kwargs):
-    results = [None] * len(self.__conns)
+  def __worker_call(self, attr: str, *pargs: Any, **kwargs: Any) -> List[Any]:
+    """Called by the generated member functions to send the command (attr name) and function arguments to
+    each of the processes managed by this server. All arguments are sent to all processes, sending specific
+    arguments to individual processes is not supported currently.
+    """
+    results: List[Any] = [None] * len(self.__conns)
 
     pargs = self.__to_shared_mem( pargs )
     kwargs = self.__to_shared_mem( kwargs )
@@ -330,8 +346,8 @@ class ServerWrapper:
 
     return self.__flatten(results)
 
-def get_wrapper( suppress_parallel = False, experimental = False ):
-  Wrapper = None
+def get_wrapper( suppress_parallel: bool = False, experimental: bool = False ) -> Union[Type[LoopWrapper],Type[ServerWrapper]]:
+  Wrapper: Union[Type[LoopWrapper],Type[ServerWrapper]]
   if suppress_parallel:
     Wrapper = LoopWrapper
   else:

@@ -53,9 +53,13 @@ source .venv.sh
 ```
 This will create a virtual environment called `.venv-mili-python-3.10.8` on Toss4 with all the required dependencies for mili-python and activate it. To deactivate the virtual environment, run the command `deactivate` and to activate the environment run `source .venv-mili-python-3.10.8/bin/activate`.
 
+# Mypy
+
+Mili-python uses mypy to perform type checking as a part of its CI. To run mypy locally, run: `mypy src/mili`.
+
 ### Testing
 
-To run the test suite locally, cd into the directory `mili-python/src` and run: `python3 -m unittest discover tests`
+To run the test suite locally, cd into the directory `mili-python/src` and run: `python3 -m unittest discover tests`.
 
 ### Deployment
 

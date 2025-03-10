@@ -32,10 +32,10 @@ dynamic = ["version"]
 dependencies = [
   "dill~=0.3",
   "numpy>=1.20.0",
-  "pathos",
   "pandas",
   "psutil",
   "matplotlib",
+  "typing_extensions",
 ]
 
 # The `optional-dependencies` target is used here to separate dev from user
@@ -61,7 +61,10 @@ dev = [
   "sphinx==7.3.7",
   "sphinx-rtd-theme==2.0.0",
   "pydocstyle==6.3.0",
-  "tox>=4"
+  "tox>=4",
+  "mypy",
+  "types-psutil",
+  "pandas-stubs",
 ]
 
 # When used with a pyproject.toml file, setuptools must use a minimum
@@ -94,3 +97,9 @@ version = {attr = "mili.__init__.__version__"}
 
 [project.scripts]
 mili-append = "scripts.append_states:main"
+
+[tools.mypy]
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_untyped_calls = true
+disallow_incomplete_defs = true

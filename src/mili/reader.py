@@ -16,26 +16,26 @@ from mili.utils import *
 from mili.reductions import *
 
 
-def open_database(base : Union[str,bytes,os.PathLike],
-                  procs: Optional[List[int]] = [],
-                  suppress_parallel: Optional[bool] = False,
-                  experimental: Optional[bool] = False,
-                  merge_results: Optional[bool] = True,
-                  **kwargs ) -> MiliDatabase:
+def open_database(base : Union[str,os.PathLike],
+                  procs: List[int] = [],
+                  suppress_parallel: bool = False,
+                  experimental: bool = False,
+                  merge_results: bool = True,
+                  **kwargs: Any) -> MiliDatabase:
   """Open a database for querying.
 
   This opens the database metadata files and does additional processing to optimize query
   construction and execution. Don't use this to perform database verification, instead prefer AFileIO.parse_database().
 
   Args:
-   base (Union[str,bytes,os.PathLike]): the base filename of the mili database (e.g. for 'pltA', just 'plt', for parallel
+   base (Union[str,os.PathLike]): the base filename of the mili database (e.g. for 'pltA', just 'plt', for parallel
       databases like 'dblplt00A', also exclude the rank-digits, giving 'dblplt').
-   procs (Optional[List[int]], default=[]) : optionally a list of process-files to open in parallel, default is all
-   suppress_parallel (Optional[Bool], default=False) : optionally return a serial database reader object if possible (for serial databases).
+   procs ([List[int], default=[]) : optionally a list of process-files to open in parallel, default is all
+   suppress_parallel (Bool, default=False) : optionally return a serial database reader object if possible (for serial databases).
       Note: if the database is parallel, suppress_parallel==True will return a reader that will
       query each processes database files in series.
-   experimental (Optional[Bool], default=False) : optional developer-only argument to try experimental parallel features
-   merge_results (Optional[Bool], default=True): Merge parallel results into the serial format.
+   experimental (Bool, default=False) : optional developer-only argument to try experimental parallel features
+   merge_results (Bool, default=True): Merge parallel results into the serial format.
 
   WARNING: Reading a database in parallel on LLNL machines should not be done on Login nodes as this can use a lot of resources and negatively
   affect machine performance for other users.
@@ -56,6 +56,7 @@ def open_database(base : Union[str,bytes,os.PathLike],
 
   proc_bases = [ afile[:-1] for afile in afiles ] # drop the A to get each processes base filename for A,T, and S files
 
+  parallel_handler: Union[type[_MiliInternal],type[LoopWrapper],type[ServerWrapper]]
   if suppress_parallel or len(proc_bases) == 1:
     if len(proc_bases) == 1:
       parallel_handler = _MiliInternal

@@ -2,9 +2,13 @@
 
 SPDX-License-Identifier: (MIT)
 """
-from typing import *
+from typing import TYPE_CHECKING, Union, List, Tuple, Dict, Optional
 import numpy as np
-from numpy import iterable
+from numpy.typing import NDArray, ArrayLike
+from mili.utils import argument_to_ndarray
+
+if TYPE_CHECKING:
+    from mili.miliinternal import _MiliInternal
 
 class GeometricMeshInfo:
   """A wrapper around _MiliInternal objects that handles Geometric mesh info and queries.
@@ -12,15 +16,15 @@ class GeometricMeshInfo:
   Args:
       db (_MiliInternal): The _MiliInternal object.
   """
-  def __init__(self, db):
+  def __init__(self, db: '_MiliInternal'):
     self.db: _MiliInternal = db
 
-  def nearest_node(self, point: List[float], state: int,
+  def nearest_node(self, point: Union[List[float],NDArray[np.floating]], state: int,
                    material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Tuple[int,float]:
     """Get the nearest node to a specified point.
 
     Args:
-      point (List[float]): The coordinates of the point.
+      point (Union[List[float],NDArray[np.floating]]): The coordinates of the point.
       state (int): The state number.
       material (Optional[Union[Union[str,int],List[Union[str,int]]]], default=None): Limit search to specific material(s).
 
@@ -32,21 +36,22 @@ class GeometricMeshInfo:
     if isinstance(material, (str,int)):
       material = [material]
 
-    node_labels = None
     if material:
       node_labels = np.empty([0], dtype=np.int32)
       for mat in material:
         node_labels = np.concatenate((node_labels, self.db.nodes_of_material(mat)))
+    else:
+      node_labels = None
 
     nodal_coordinates = self.db.query("nodpos", "node", labels=node_labels, states=[state])
     if nodal_coordinates["nodpos"]["data"].size == 0:
-      return -1, np.finfo(np.float32).max
+      return -1, float(np.finfo(np.float32).max)
     nodpos_data = nodal_coordinates["nodpos"]["data"][0]
     distances_from_point = np.linalg.norm(nodpos_data - point, axis=1)
     node_index = np.argmin(distances_from_point)
     return nodal_coordinates['nodpos']['layout']['labels'][node_index], distances_from_point[node_index]
 
-  def nearest_element(self, point: List[float], state: int,
+  def nearest_element(self, point: Union[List[float],NDArray[np.floating]], state: int,
                       material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Tuple[str,int,float]:
     """Get the nearest element to a specified point.
 
@@ -65,7 +70,7 @@ class GeometricMeshInfo:
     # Need to convert any material names to numbers as that is how they are stored in the connectivity
     if material:
       material_dict = self.db.materials()
-      material = [ material_dict.get(mat, mat) for mat in material ]
+      material = [ material_dict.get(str(mat), mat) for mat in material ]  # type: ignore  # mypy thinks material could still be str|int, but can't be.
 
     nodal_coordinates = self.db.query("nodpos", "node", states=[state], output_object_labels=False)
     nodpos_data = nodal_coordinates['nodpos']['data']
@@ -89,13 +94,13 @@ class GeometricMeshInfo:
     nearest_element[1] = self.db.labels(nearest_element[0])[nearest_element[1]]
     return tuple(nearest_element)
 
-  def compute_centroid(self, class_name: str, label: int, state: int):
+  def compute_centroid(self, class_name: str, label: int, state: int) -> Optional[NDArray[np.float32]]:
     """Compute the centroid of a given mesh entity at a given state."""
     labels = self.db.labels(class_name)
     if labels is None or label not in labels:
       return None
 
-    elem_conns = []
+    elem_conns = np.empty([0], dtype=np.int32)
     if class_name == "node":
       elem_conns = np.array([label], dtype = np.int32)
     else:
@@ -114,12 +119,12 @@ class GeometricMeshInfo:
 
     return None
 
-  def nodes_within_radius(self, center: List[float], radius: float, state: int,
-                          material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> np.ndarray:
+  def nodes_within_radius(self, center: Union[List[float],NDArray[np.floating]], radius: float, state: int,
+                          material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> NDArray[np.int32]:
     """Get all nodes within a radius of a given point at the specified state.
 
     Args:
-      center (List[float]): The center coordinate.
+      center (Union[List[float],NDArray[np.floating]]): The center coordinate.
       radius (float): The radius within which to search.
       state (int): The state number.
       material (Optional[Union[Union[str,int],List[Union[str,int]]]], default=None): Limit search to specific material(s).
@@ -140,7 +145,7 @@ class GeometricMeshInfo:
     # Get nodes that are actually within radius
     distances_from_center = np.linalg.norm(nodpos_data[nodes_in_bounding_box] - center, axis=1)
     node_ids = nodes_in_bounding_box[distances_from_center <= radius]
-    nodes_in_radius = nodal_coordinates["nodpos"]["layout"]["labels"][node_ids]
+    nodes_in_radius: NDArray[np.int32] = nodal_coordinates["nodpos"]["layout"]["labels"][node_ids]
 
     if material:
       nodes_of_material = np.empty([0], dtype=np.int32)
@@ -150,22 +155,21 @@ class GeometricMeshInfo:
 
     return nodes_in_radius
 
-  def elems_of_nodes(self, node_labels,
-                     material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Dict[str,np.ndarray]:
+  def elems_of_nodes(self, node_labels: ArrayLike,
+                     material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Dict[str,NDArray[np.int32]]:
     """Find elements associated with the specified nodes."""
     if isinstance(material, (str,int)):
       material = [material]
-    if type(node_labels) is not list:
-      if iterable(node_labels):
-        node_labels = list(node_labels)
-      else:
-        node_labels = [ node_labels ]
+    requested_labels = argument_to_ndarray(node_labels, np.int32)
+    if requested_labels is None:
+      return {}
+
     nodes = self.db.labels("node")
-    if all( label not in nodes for label in node_labels ):
+    if all( label not in nodes for label in requested_labels ):
       return {}
 
     # Connectivity stores nodes by index, not label. So convert labels to indexes
-    nlabels = np.where(np.isin(nodes, node_labels))[0]
+    nlabels = np.where(np.isin(nodes, requested_labels))[0]
 
     elems_of_nodes = {}
     elem_conns = self.db.connectivity_ids()

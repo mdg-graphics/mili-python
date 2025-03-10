@@ -223,7 +223,8 @@ class Bugfixes0_2_5(unittest.TestCase):
                         },
                       'source': 'primal',
                       'class_name': 'shell',
-                      'title': 'Strain Tensor'
+                      'title': 'Strain Tensor',
+                      'modifier': ''
                     }
                   }
         answer = self.mili.query('strain','shell',labels=1,states=1)

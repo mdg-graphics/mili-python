@@ -9,6 +9,7 @@ All notable changes to Mili-python will be documented in this file.
 ### Fixed
 
 ### Changed
+- Started using `mypy` type checking. Many type hints throughout Mili-python have been updated/changed to more accurately reflect the argument or return types.
 
 ### Removed
 

@@ -6,6 +6,8 @@ SPDX-License-Identifier: (MIT)
 from __future__ import annotations
 from typing import *
 import numpy as np
+from numpy.typing import NDArray, ArrayLike
+
 from mili.reductions import dictionary_merge_concat_unique
 from mili.milidatabase import MiliDatabase
 
@@ -19,7 +21,7 @@ class AdjacencyMapping:
     self.mili: MiliDatabase = mili
     self.serial = mili.serial
 
-  def compute_centroid(self, class_name: str, label: int, state: int) -> np.array:
+  def compute_centroid(self, class_name: str, label: int, state: int) -> NDArray[np.float32]:
     """Compute the centroid of a given mesh entity at a given state.
 
     Args:
@@ -28,11 +30,11 @@ class AdjacencyMapping:
       state (int): The state at which to calculate the centroid
 
     Returns:
-      np.array of float32. The coordinates of the centroid.
+      NDArray[np.float32]. The coordinates of the centroid.
     """
     centroid = self.mili.geometry.compute_centroid(class_name, label, state)
     if not self.serial:
-      centroid = np.unique(list(filter(lambda x : x is not None, centroid)), axis=0)
+      centroid = np.unique([c for c in centroid if c is not None], axis=0)  # type: ignore   # mypy error caused by different results for serial vs parallel.
       centroid = centroid[0] if len(centroid) == 1 else None
     if centroid is None:
       raise ValueError((f"Could not calculate centroid for class_name={class_name}, label={label} at state {state}.\n"
@@ -44,7 +46,7 @@ class AdjacencyMapping:
                                   label: int,
                                   state: int,
                                   radius: float,
-                                  material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None):
+                                  material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Dict[str,NDArray[np.int32]]:
     """Get all mesh entities within a specified radius from a specified mesh entity at a specified state.
 
     Args:
@@ -58,10 +60,10 @@ class AdjacencyMapping:
     return self.mesh_entities_near_coordinate(centroid, state, radius, material)
 
   def mesh_entities_near_coordinate(self,
-                                    coordinate: List[float],
+                                    coordinate: Union[List[float],NDArray[np.floating]],
                                     state: int,
                                     radius: float,
-                                    material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None):
+                                    material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Dict[str,NDArray[np.int32]]:
     """Get all mesh entities within a specified radius from a specified coordinate at a given state.
 
     Args:
@@ -77,23 +79,23 @@ class AdjacencyMapping:
     elems_in_radius["node"] = nodes_in_radius
     return elems_in_radius
 
-  def elems_of_nodes(self, node_labels: List[int],
-                     material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Dict[str,np.ndarray]:
+  def elems_of_nodes(self, node_labels: ArrayLike,
+                     material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Dict[str,NDArray[np.int32]]:
     """Find elements associated with the specified nodes.
 
     Args:
-      node_labels (List[int]): List of node labels.
+      node_labels (ArrayLike): List of node labels.
       material (Optional[Union[Union[str,int],List[Union[str,int]]]], default=None): Limit search to specific material(s).
 
     Returns:
-      Dict[str,np.ndarray]: Keys are element class names. Values are numpy arrays of element labels.
+      Dict[str,NDArray[np.int32]]: Keys are element class names. Values are numpy arrays of element labels.
     """
     elems = self.mili.geometry.elems_of_nodes(node_labels, material)
     if not self.serial:
-      elems = dictionary_merge_concat_unique(elems)
+      elems = dictionary_merge_concat_unique(elems)  # type: ignore   # mypy error caused by different results for serial vs parallel.
     return elems
 
-  def nearest_node(self, point: List[float], state: int,
+  def nearest_node(self, point: Union[List[float],NDArray[np.floating]], state: int,
                    material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Tuple[int,float]:
     """Get the nearest node to a specified point.
 
@@ -112,10 +114,10 @@ class AdjacencyMapping:
 
     nearest_node = self.mili.geometry.nearest_node(point, state, material)
     if not self.serial:
-      nearest_node = min(nearest_node, key=lambda x: x[1])
+      nearest_node = min(nearest_node, key=lambda x: x[1])  # type: ignore   # mypy error caused by different results for serial vs parallel.
     return nearest_node
 
-  def nearest_element(self, point: List[float], state: int,
+  def nearest_element(self, point: Union[List[float],NDArray[np.floating]], state: int,
                       material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Tuple[str,int,float]:
     """Get the nearest element to a specified point.
 
@@ -134,22 +136,22 @@ class AdjacencyMapping:
 
     nearest_per_proc = self.mili.geometry.nearest_element(point, state, material)
     if not self.serial:
-      nearest_per_proc = min(nearest_per_proc, key=lambda x: x[2])
+      nearest_per_proc = min(nearest_per_proc, key=lambda x: x[2])  # type: ignore   # mypy error caused by different results for serial vs parallel.
     return nearest_per_proc
 
   def neighbor_elements(self, class_name: str, label: int,
                         material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None,
-                        neighbor_radius: int = 1) -> Dict[str,np.ndarray]:
+                        neighbor_radius: int = 1) -> Dict[str,NDArray[np.int32]]:
     """Gather all neighbor elements to a specified element.
 
     Args:
       class_name (str): The element class name.
-      labels (int): The element label.
+      label (int): The element label.
       material (Optional[Union[Union[str,int],List[Union[str,int]]]] = None): Limit gathered elements to a specific material(s).
       neighbor_radius (int, default=1): The number of neighbors to go out from the specified element.
 
     Returns:
-      Dict[str,np.ndarray]: Keys are element class names. Values are numpy arrays of element labels.
+      Dict[str,NDArray[np.int32]]: Keys are element class names. Values are numpy arrays of element labels.
     """
     labels = self.mili.labels(class_name)
     if labels is None:
@@ -159,16 +161,16 @@ class AdjacencyMapping:
     if label not in labels:
       raise ValueError(f"The label '{label}' was not found for the class '{class_name}'")
 
-    def nodes_of_elems(element_class, element_labels):
+    def nodes_of_elems(element_class: str, element_labels: ArrayLike) -> NDArray[np.int32]:
       """Wrap call to MiliDatabase.nodes_of_elems to handle serial vs parallel."""
-      nodes = self.mili.nodes_of_elems(element_class, element_labels)
+      nodes_of_elems = self.mili.nodes_of_elems(element_class, element_labels)
       if not self.serial and not self.mili.merge_results:
-        nodes = np.concatenate([n[0] for n in nodes if n[0].size > 0]).ravel()
+        nodes = np.concatenate([n[0] for n in nodes_of_elems if n[0].size > 0], dtype=np.int32).ravel()
       else:
-        nodes = nodes[0].ravel()
+        nodes = nodes_of_elems[0].ravel()
       return nodes
 
-    def material_classes(material: Optional[Union[Union[str,int],List[Union[str,int]]]]) -> List[str]:
+    def material_classes(material: Union[Union[str,int],List[Union[str,int]]]) -> List[str]:
       """Wrap call to MiliDatabase.material_classes to handle serial vs parallel."""
       if isinstance(material, (str,int)):
         material = [material]
@@ -181,7 +183,7 @@ class AdjacencyMapping:
       class_names = list(set(class_names))
       return class_names
 
-    def class_labels_of_material(material: Optional[Union[Union[str,int],List[Union[str,int]]]], elem_class: str) -> np.ndarray:
+    def class_labels_of_material(material: Union[Union[str,int],List[Union[str,int]]], elem_class: str) -> NDArray[np.int32]:
       """Wrap call to MiliDatabase.class_labels_of_material to handle serial vs parallel."""
       if isinstance(material, (str,int)):
         material = [material]
@@ -193,7 +195,7 @@ class AdjacencyMapping:
         class_labels = np.unique(np.concatenate((class_labels, elems_of_material)))
       return class_labels
 
-    elements = {}
+    elements: Dict[str,NDArray[np.int32]] = {}
     nodes = nodes_of_elems(class_name, label)
     nodes_processed = set()
     nodes_to_process = set(nodes)
@@ -201,7 +203,7 @@ class AdjacencyMapping:
     while len(nodes_to_process) > 0 and steps_from_elem < neighbor_radius:
       # Get all elements associated with the nodes we are currently processing
       nodes_processed.update(nodes_to_process)
-      elems = self.elems_of_nodes(nodes_to_process)
+      elems = self.elems_of_nodes(list(nodes_to_process))
       elements = dictionary_merge_concat_unique([elements, elems])
 
       nodes_to_process.clear()

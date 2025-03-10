@@ -426,7 +426,7 @@ class SharedSerialTests:
             np.testing.assert_equal( answer, np.arange(1, 49, dtype = np.int32) )
 
         #==============================================================================
-        def test_nodes_label(self):
+        def test_nodes_of_elems(self):
             nodes, elem_labels = self.mili.nodes_of_elems('brick', 1)
             self.assertEqual( elem_labels[0], 1 )
             self.assertEqual(nodes.size, 8)

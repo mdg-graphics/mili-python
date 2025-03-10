@@ -7,6 +7,9 @@ import numpy as np
 from mili import reader, datatypes
 from typing import *
 
+from mili.datatypes import StateVariable
+from mili.milidatabase import MiliDatabase
+
 class AppendStatesTool:
   """Tool to append additional states + data to an existing Mili database.
 
@@ -16,11 +19,11 @@ class AppendStatesTool:
   VALID_OUTPUT_TYPES = ["mili"]
   VALID_OUTPUT_MODES = ["write", "append"]
 
-  def __init__(self, input_dictionary: Dict):
+  def __init__(self, input_dictionary: Dict[str,Any]) -> None:
     self.append_states_spec = input_dictionary
     self.database = self.__check_append_states_spec()
 
-  def __get_spec_var(self, key, type_ok, required=False, err_msg="" ):
+  def __get_spec_var(self, key: str, type_ok: Type[Any], required: bool = False, err_msg: str = "" ) -> Any:
     # Check key exists
     variable = self.append_states_spec.get( key, None )
     if variable is None:
@@ -28,13 +31,13 @@ class AppendStatesTool:
         raise KeyError( f"Key '{key}' is missing from append_states_spec dictionary. {err_msg}" )
     # Check values valid
     if variable is not None:
-      variable = self.__check_valid_type(key,variable,type_ok,required,err_msg)
+      variable = self.__check_valid_type(key, variable, type_ok, required, err_msg)
     return variable
 
-  def __check_valid_type( self, key, variable, type_ok, required, err_msg ):
+  def __check_valid_type( self, key: str, variable: Any, type_ok: Type[Any], required: bool, err_msg: str ) -> Any:
     # Try to accept and check both single value or array of values
     if isinstance(variable,(list,np.ndarray)):
-      variable = [ self.__check_valid_type(key,var,type_ok,required,err_msg) for var in variable ]
+      variable = [ self.__check_valid_type(key, var, type_ok, required, err_msg) for var in variable ]
       if len(variable) == 0:
         variable = None
         if required:
@@ -57,7 +60,7 @@ class AppendStatesTool:
 
     return variable
 
-  def __parse_svar_name( self, svar_query_input ):
+  def __parse_svar_name( self, svar_query_input: str ) -> Tuple[str,Optional[str]]:
     """Handle svar names of form vector[component]."""
     comp_start_idx = svar_query_input.find('[')
     if comp_start_idx != -1:
@@ -68,7 +71,7 @@ class AppendStatesTool:
       vector = None
     return svar, vector
 
-  def __check_append_states_spec(self):
+  def __check_append_states_spec(self) -> MiliDatabase:
     """Check append_states_spec dictionary has required info and info is compatible with original database."""
     # Check database_basename specified (required)
     in_database_name = self.__get_spec_var("database_basename", str, True)
@@ -116,7 +119,7 @@ class AppendStatesTool:
       raise KeyError( f"Could not find state_times or time_inc in append_states_spec. At least one is required." )
 
     # Try to open original mili database from database_basename from user input
-    orig_database = reader.open_database( in_database_name, suppress_parallel=False, merge_results=True )
+    orig_database: MiliDatabase = reader.open_database( in_database_name, suppress_parallel=False, merge_results=True )
     self.serial_database = orig_database.serial
 
     orig_state_times = orig_database.times()
@@ -166,12 +169,12 @@ class AppendStatesTool:
         # Look up svar component quantity to allow overwriting arrays
         all_svars = orig_database._mili.state_variables()
         if self.serial_database:
-          svar_def = all_svars.get(svar, None)
+          svar_def = all_svars.get(svar, None)  # type: ignore  # mypy error caused by serial vs. parallel results.
           if svar_def is None:
             raise ValueError(f"Unable to find {svar} state variable in original database.")
         else:
           for proc_svars in all_svars:
-            svar_def = proc_svars.get(svar, None)
+            svar_def = proc_svars.get(svar, None)  # type: ignore  # mypy error caused by serial vs. parallel results.
             if svar_def is None:
               continue
           if svar_def is None:
@@ -179,12 +182,12 @@ class AppendStatesTool:
 
         if svar_vector_name is not None:
           if self.serial_database:
-            vector_def = all_svars.get(svar_vector_name, None)
+            vector_def = all_svars.get(svar_vector_name, None)  # type: ignore  # mypy error caused by serial vs. parallel results.
             if vector_def is None:
               raise ValueError(f"Unable to find {svar_vector_name} state variable in original database.")
           else:
             for proc_svars in all_svars:
-              vector_def = proc_svars.get(svar_vector_name, None)
+              vector_def = proc_svars.get(svar_vector_name, None)  # type: ignore  # mypy error caused by serial vs. parallel results.
               if vector_def is None:
                 continue
             if vector_def is None:
@@ -308,15 +311,15 @@ class AppendStatesTool:
 
     return orig_database
 
-  def write_states(self):
+  def write_states(self) -> None:
     """Write out the new states to the database."""
     if "mili" in self.append_states_spec['output_type']:
       self.__write_mili_output()
 
-  def __get_new_state_times(self, database):
+  def __get_new_state_times(self, database: MiliDatabase) -> Tuple[List[float],List[int]]:
     """Generate new state times and numbers to add to the database."""
-    new_state_times = []
-    new_state_numbers = []
+    new_state_times: List[float] = []
+    new_state_numbers: List[int] = []
     state_times = database.times()
     if "state_times" in self.append_states_spec:
       new_state_times = self.append_states_spec['state_times']
@@ -332,14 +335,16 @@ class AppendStatesTool:
 
     return new_state_times, new_state_numbers
 
-  def __write_mili_output(self):
+  def __write_mili_output(self) -> None:
     """Write out new states when output_type is mili."""
-    output_database = None
+    output_database: MiliDatabase
     if self.append_states_spec['output_mode'] == "append":
       output_database = self.database
     elif self.append_states_spec['output_mode'] == "write":
       self.database.copy_non_state_data( self.append_states_spec['output_basename'] )
       output_database = reader.open_database( self.append_states_spec['output_basename'], experimental=True, merge_results=True )
+    else:
+      raise ValueError(f"Invalid output_mode ({self.append_states_spec['output_mode']})")
 
     new_state_times, new_state_numbers = self.__get_new_state_times(output_database)
 

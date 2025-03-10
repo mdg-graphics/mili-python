@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import itertools
 import numpy as np
-import numpy.typing as npt
-from numpy.typing import NDArray
+from numpy.typing import NDArray, ArrayLike
 import os
 import re
 import io
+import struct
 
 from collections import defaultdict
 from numpy import iterable
@@ -22,98 +22,96 @@ from mili.parallel import *
 from mili.derived import DerivedExpressions
 from mili.geometric_mesh_info import GeometricMeshInfo
 from mili.reductions import *
+from mili.utils import argument_to_ndarray
 
-def np_empty(dtype):
+
+def np_empty(dtype: Any) -> NDArray[Any]:
   """Create empty array of specified data type."""
   return np.empty([0],dtype=dtype)
-
-
-class ReturnCode(Enum):
-  """Return code enum for _MiliInternal."""
-  OK = 0
-  ERROR = 1
-  CRITICAL = 2
-
-  def str_repr(self) -> str:
-    """Get string representation of ReturnCode."""
-    return ["Success", "Error", "Critical"][self.value]
 
 
 class _MiliInternal:
   """The internal Mili object representing a single A-file and its associated state files.
 
   Args:
-    dir_name (os.PathLike) : an os.PathLike denoting the file sytem directory to search for all state files described by the A-file
-    base_filename (os.PathLike) : the base of the files for this database (usually for one process):
+    dir_name (Union[str,os.PathLike]) : The file sytem directory to search for all state files described by the A-file
+    base_filename (Union[str,os.PathLike]) : The base of the files for this database (usually for one process):
                                     - {base_filename}A is the A-file
                                     - {base_filename}T is the T-file in mili format >= v3
                                     - {base_filename}### are state file(s) containing state data for this database
   """
-  def __init__( self, dir_name : Union[str,bytes,os.PathLike], base_filename : Union[str,bytes,os.PathLike], **kwargs ):
+  def __init__( self, dir_name : Union[str,os.PathLike], base_filename : Union[str,os.PathLike], **kwargs: Any ) -> None:
     self.__return_code = (ReturnCode.OK, "")
-    self.__state_files = []
-    self.__smaps = []
+    self.__state_files: List[str] = []
+    self.__smaps: List[StateMap] = []
 
-    self.__svars : Mapping[ str, StateVariable ] = {}
-    self.__srec_fmt_qty = 0
-    self.__srecs : List[ Subrecord ] = []
+    self.__svars: Dict[ str, StateVariable ] = {}
+    self.__srec_fmt_qty: int = 0
+    self.__srecs: List[ Subrecord ] = []
 
     # indexing / index discovery
-    self.__labels = {}
-    self.__mats = defaultdict(list)
-    self.__int_points = defaultdict( lambda : defaultdict( list ) )
+    self.__labels: Dict[str,NDArray[np.int32]] = {}
+    self.__mats: Dict[str,List[int]] = defaultdict(list)
+    self.__int_points: Dict[str,Dict[str,List[int]]] = {}
+    self.__element_sets: Dict[str,List[int]] = {}
 
     # mostly used for input validation
-    self.__class_to_sclass = {}
+    self.__class_to_sclass: MutableMapping[str,Superclass] = {}
 
     # allow query by material
-    self.__elems_of_mat = defaultdict(lambda : defaultdict( lambda : np_empty(np.int32)) )  # map from material number to dict of class to elems
-    self.__elems_of_part = defaultdict(lambda : defaultdict( lambda : np_empty(np.int32)) )  # map from part number to dict of class to elems
+    self.__elems_of_mat: Dict[int,Dict[str,NDArray[np.int32]]] = defaultdict(lambda : defaultdict( lambda : np_empty(np.int32)) )  # map from material number to dict of class to elems
+    self.__elems_of_part: Dict[int,Dict[str,NDArray[np.int32]]]= defaultdict(lambda : defaultdict( lambda : np_empty(np.int32)) )  # map from part number to dict of class to elems
 
     # mesh data
-    self.__MO_class_data = {}
-    self.__conns_ids = {}
-    self.__conns_labels = {}
-    self.__nodes = None
-    self.__mesh_dim = 0
+    self.__MO_class_data: Dict[str,MeshObjectClass] = {}
+    self.__conns_ids: Dict[str,NDArray[np.int32]] = {}
+    self.__conns_labels: Dict[str,NDArray[np.int32]] = {}
+    self.__nodes: NDArray[np.float32]
+    self.__mesh_dim: int = 0
 
-    self.__params = defaultdict( lambda : defaultdict( list ) )
+    self.__params: Dict[str,Any] = {}
 
     self.__afile = AFile()
     self.__base_filename = base_filename
     self.__dir_name = dir_name
-    log_validator = kwargs.get("log_validator", False)
-    parse_success = AFileParser(log_validator=log_validator).parse( self.__afile, os.path.join( dir_name, base_filename ) )
+    log_validator: bool = kwargs.get("log_validator", False)
+    afile_parser = AFileParser(log_validator=log_validator)
+    parse_success = afile_parser.parse( self.__afile, os.path.join( self.__dir_name, self.__base_filename ) )
     if not parse_success:
       raise MiliAParseError("AFile parsing validation failure!")
 
     self.__sfile_suf_len = self.__afile.sfile_suffix_length
-    sfile_re = re.compile(re.escape(base_filename) + f"(\d{{{self.__sfile_suf_len},}})$")
+    sfile_re = re.compile(re.escape(str(self.__base_filename)) + f"(\d{{{self.__sfile_suf_len},}})$")
 
     # load and sort the state files numerically (NOT alphabetically)
-    self.__state_files = list(map(sfile_re.match,os.listdir(dir_name)))
-    self.__state_files = list(filter(lambda match: match != None,self.__state_files))
-    self.__state_files = list(sorted(self.__state_files, key = lambda match: int(match.group(1))))
-    self.__state_files = [ os.path.join(dir_name,match.group(0)) for match in self.__state_files ]
+    state_file_matches = list(map(sfile_re.match,os.listdir(dir_name)))
+    state_file_matches = [match for match in state_file_matches if match is not None]
+    state_file_matches = list(sorted(state_file_matches, key = lambda match: int(match.group(1))))  # type: ignore
+    self.__state_files = [ os.path.join(dir_name,match.group(0)) for match in state_file_matches ]  # type: ignore
 
     # pull values out of the afile and compute utility values/arrays to speed up query operations
     self.__smaps = self.__afile.smaps
     self.__mesh_dim = self.__afile.dirs[DirectoryDecl.Type.MILI_PARAM].get( "mesh dimensions", 3 )
+    sname: str
     for sname, param in self.__afile.dirs[DirectoryDecl.Type.TI_PARAM].items():
       if sname.startswith("Node Labels"):
         self.__labels[ "node" ] = param
       elif sname.startswith("Element Labels") and not "ElemIds" in sname:
-        class_sname = re.search( r'Sname-(\w*)', sname ).group(1)
-        if class_sname not in self.__labels.keys():
-          self.__labels[ class_sname ] = np_empty( np.int32 )
-        self.__labels[ class_sname ] = np.concatenate( ( self.__labels[ class_sname ], param ) )
+        class_sname_match = re.search( r'Sname-(\w*)', sname )
+        if class_sname_match is not None:
+          class_sname = class_sname_match.group(1)
+          if class_sname not in self.__labels.keys():
+            self.__labels[ class_sname ] = np_empty( np.int32 )
+          self.__labels[ class_sname ] = np.concatenate( ( self.__labels[ class_sname ], param ) )
       elif sname.startswith("MAT_NAME"):
-        mat_num = int( re.match(r"MAT_NAME_(\d+)", sname).group(1) )
-        self.__mats[ param ].append( mat_num )
-        self.__params[f"MAT_NAME_{mat_num}"] = param
+        mat_num_match = re.match(r"MAT_NAME_(\d+)", sname)
+        if mat_num_match is not None:
+          mat_num = int( mat_num_match.group(1) )
+          self.__mats[ param ].append( mat_num )
+          self.__params[f"MAT_NAME_{mat_num}"] = param
       elif sname.startswith('IntLabel_es_'):
         ip_name = sname[ sname.find('es_'): ]
-        self.__int_points[ip_name] = param.tolist()
+        self.__element_sets[ip_name] = param.tolist()
       elif sname.startswith("SetRGB"):
         self.__params[sname] = param
       elif sname == "particles_on":
@@ -127,7 +125,7 @@ class _MiliInternal:
 
     # setup svar.svars for easier VECTOR svar traversal
     self.__svars = self.__afile.dirs[DirectoryDecl.Type.STATE_VAR_DICT]
-    def addComps( svar ):
+    def addComps(svar: StateVariable) -> None:
       """Small recursive function to populate svar.svars[] all the way down."""
       if svar.agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ] and len(svar.svars) == 0:
         for comp_name in svar.comp_names:
@@ -135,7 +133,7 @@ class _MiliInternal:
           svar.svars.append( comp )
           addComps( comp )
 
-    def addContaining( svar ):
+    def addContaining(svar: StateVariable) -> None:
       """Small recursive function to populate svar.containing_svars[] all the way down."""
       if svar.agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:
         for comp_name in svar.comp_names:
@@ -143,12 +141,12 @@ class _MiliInternal:
           comp.containing_svar_names.append( svar.name )
           addContaining( comp )
 
-    def addIntPoints( es_name, svar_comp_names ):
+    def addIntPoints(es_name: str, svar_comp_names: List[str]) -> None:
       """Small recursive function to populate self.__int_points all the way down."""
       for svar_comp_name in svar_comp_names:
         if not svar_comp_name in self.__int_points.keys():
           self.__int_points[svar_comp_name] = {}
-        self.__int_points[svar_comp_name][es_name] = self.__int_points[es_name[:-1]]
+        self.__int_points[svar_comp_name][es_name] = self.__element_sets[es_name[:-1]]
         comp = self.__svars[svar_comp_name]
         if comp.agg_type in [StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:
           addIntPoints( es_name, comp.comp_names )
@@ -158,7 +156,8 @@ class _MiliInternal:
       addComps( svar )
       addContaining( svar )
 
-      if svar.name[:-1] in self.__int_points.keys():
+      if svar.name[:-1] in self.__element_sets.keys():
+        eset_name = svar.name[:-1]
         svar_comp_names = svar.comp_names
         stress = self.__svars.get('stress')
         stress_comps = [ svar.name for svar in stress.svars ] if stress is not None else []
@@ -168,16 +167,17 @@ class _MiliInternal:
         if len( list(set(svar_comp_names) & set(stress_comps)) ) == 6:
           if 'stress' not in self.__int_points.keys():
             self.__int_points['stress'] = {}
-          self.__int_points['stress'][svar.name] = self.__int_points[svar.name[:-1]]
+          self.__int_points['stress'][svar.name] = self.__element_sets[eset_name]
 
         if len( list(set(svar_comp_names) & set(strain_comps)) ) == 6:
           if 'strain' not in self.__int_points.keys():
             self.__int_points['strain'] = {}
-            self.__int_points['strain'][svar.name] = self.__int_points[svar.name[:-1]]
+            self.__int_points['strain'][svar.name] = self.__element_sets[eset_name]
 
         addIntPoints( svar.name, svar_comp_names )
         # This allows us to query by element set name
-        self.__int_points[svar.name][svar.name] = self.__int_points[svar.name[:-1]]
+        self.__int_points[svar.name] = {}
+        self.__int_points[svar.name][svar.name] = self.__element_sets[eset_name]
 
     # the class def info is stored in the DirectoryDecl, not in a parsed directory data structure
     for class_def in self.__afile.dir_decls[DirectoryDecl.Type.CLASS_DEF]:
@@ -222,8 +222,8 @@ class _MiliInternal:
 
     offset = 0
     self.__srec_fmt_qty = 1
+    srec: Subrecord
     for sname, srec in self.__afile.dirs[DirectoryDecl.Type.SREC_DATA].get('subrecords',{}).items():
-      srec : Subrecord
       # add all svars to srec
       srec.svars = [ self.__afile.dirs[DirectoryDecl.Type.STATE_VAR_DICT][svar_name] for svar_name in srec.svar_names ]
 
@@ -245,8 +245,7 @@ class _MiliInternal:
       srec.svar_comp_offsets = []
       for svar_comp in srec.svar_comp_layout:
         svar_length = [ self.__svars[svar].list_size if self.__svars[svar].agg_type != StateVariable.Aggregation.SCALAR.value else 1 for svar in svar_comp ]
-        svar_length = np.insert( svar_length, 0, 0 )
-        srec.svar_comp_offsets.append( np.cumsum( svar_length ) )
+        srec.svar_comp_offsets.append( np.cumsum( np.insert( svar_length, 0, 0 ) ) )
 
       # the ordinal blocks are set during the parse, these are only precomputed to make the query easier so we don't deal with them during the parse, only the query setup
       srec.ordinal_block_counts = np.concatenate( ( [0], np.diff( srec.ordinal_blocks.reshape(-1,2), axis=1).flatten( ) ) )
@@ -280,7 +279,7 @@ class _MiliInternal:
   def geometry(self) -> GeometricMeshInfo:
     return self.__geometry
 
-  def clear_return_code(self):
+  def clear_return_code(self) -> None:
     """Reset the value of the internal return code."""
     self.__return_code = (ReturnCode.OK, "")
 
@@ -292,20 +291,23 @@ class _MiliInternal:
     """
     return self.__return_code
 
-  def reload_state_maps(self) -> None:
+  def reload_state_maps(self) -> bool:
     """Reload the state maps."""
     afile = AFile()
     parse_success = AFileParser().parse( afile, os.path.join( self.__dir_name, self.__base_filename ) )
     if not parse_success:
       self.__return_code = (ReturnCode.ERROR, "AFile parsing validation failure!")
+      success = False
     else:
       self.__smaps = afile.smaps
+      success = True
+    return success
 
-  def nodes(self) -> NDArray[np.floating]:
+  def nodes(self) -> NDArray[np.float32]:
     """Getter for initial nodal coordinates.
 
     Returns:
-      NDArray[np.floating]: A numpy array (num_nodes by mesh_dimensions) containing the initial coordinates for each node.
+      NDArray[np.float32]: A numpy array (num_nodes by mesh_dimensions) containing the initial coordinates for each node.
     """
     return self.__nodes
 
@@ -377,7 +379,7 @@ class _MiliInternal:
     """
     return self.__MO_class_data
 
-  def int_points(self) -> Dict[str,Union[List[int],Dict[str,List[int]]]]:
+  def int_points(self) -> Dict[str,Dict[str,List[int]]]:
     """Getter for internal integration point dictionary."""
     return self.__int_points
 
@@ -391,7 +393,7 @@ class _MiliInternal:
     Returns:
       NDArray[np.int32]: Array of integration points.
     """
-    int_points = []
+    int_points = np_empty(np.int32)
     if svar_name in self.__int_points:
       for es_name in self.__int_points[svar_name]:
         if class_name in self.classes_of_state_variable(es_name):
@@ -404,7 +406,7 @@ class _MiliInternal:
     Returns:
       Dict[str,List[int]]: Keys are element set names, values are list of integers
     """
-    return {k:v for k,v in self.__int_points.items() if k.startswith("es_") and k[-1].isdigit()}
+    return self.__element_sets
 
   def integration_points(self) -> Dict[str,List[int]]:
     """Get the available integration points for each material.
@@ -419,30 +421,28 @@ class _MiliInternal:
       mat_int_points[mat] = int_points[:-1]
     return mat_int_points
 
-  def times( self, states : Optional[Union[List[int],int]] = None ) -> NDArray[np.float64]:
+  def times( self, states: Optional[ArrayLike] = None ) -> NDArray[np.float64]:
     """Get the times for each state in the database.
 
     Args:
-      states (Optional[Union[List[int],int]]): If provided, only return the times for the
+      states (Optional[ArrayLike]): Optional state number(s). If provided, only return the times for the
         specified state numbers.
 
     Returns:
       NDArray[np.float64]: numpy array of times.
     """
-    if isinstance(states, (int, np.integer)):
-      states = np.array( [ states ], dtype = np.int32 )
-    elif iterable( states ) and not type( states ) == str:
-      states = np.array( states, dtype = np.int32 )
-    if not isinstance( states, np.ndarray ) and states is not None :
-      self.return_code = (ReturnCode.ERROR, f"'states' must be None, an integer, or a list of integers")
-      states = np_empty(np.int32)
+    result = np_empty(dtype=np.float64)
     if states is None:
       result = np.array( [ smap.time for smap in self.__smaps ], dtype=np.float64 )
     else:
-      result = np.array( [ self.__smaps[state-1].time for state in states ], dtype=np.float64 )
+      states = argument_to_ndarray(states, dtype=np.int32)
+      if not isinstance( states, np.ndarray ):
+        self.return_code = (ReturnCode.ERROR, f"'states' must be None, an integer, or a list of integers")
+      else:
+        result = np.array( [ self.__smaps[state-1].time for state in states ], dtype=np.float64 )
     return result
 
-  def state_variables(self) -> Dict[str,StateVariable]:
+  def state_variables(self) -> Union[Dict[str,StateVariable],List[Dict[str,StateVariable]]]:
     """Getter for internal dictionary of StateVariable objects.
 
     Returns:
@@ -450,7 +450,7 @@ class _MiliInternal:
     """
     return self.__svars
 
-  def queriable_svars(self, vector_only = False, show_ips = False) -> List[str]:
+  def queriable_svars(self, vector_only: bool = False, show_ips: bool = False) -> List[str]:
     """Get a list of state variable names that can be queried.
 
     Args:
@@ -506,6 +506,11 @@ class _MiliInternal:
     """
     return self.__derived.classes_of_derived_variable(var_name)
 
+  @overload
+  def labels(self, class_name: str) -> NDArray[np.int32]: ...
+  @overload
+  def labels(self, class_name: None = ...) -> Dict[str,NDArray[np.int32]]: ...
+
   def labels(self, class_name: Optional[str] = None) -> Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]:
     """Getter for the element labels.
 
@@ -518,7 +523,7 @@ class _MiliInternal:
         is returned containing the labels for the specified element class.
     """
     if class_name is not None:
-      return self.__labels.get(class_name, np_empty(np.int32))
+      return self.__labels.get(class_name, np.empty([0], np.int32))
     return self.__labels
 
   def materials(self) -> Dict[str,List[int]]:
@@ -537,36 +542,46 @@ class _MiliInternal:
     """
     return np.array(list(self.__elems_of_mat.keys()))
 
-  def connectivity( self, class_name : Optional[str] = None ) -> Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]:
+  @overload
+  def connectivity(self, class_name: str) -> NDArray[np.int32]: ...
+  @overload
+  def connectivity(self, class_name: None = ...) -> Dict[str,NDArray[np.int32]]: ...
+
+  def connectivity( self, class_name: Optional[str] = None ) -> Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]:
     """Getter for the element connectivity as element LABELS.
 
     Args:
-      class_name (str): An element class name. If provided only return connectivty for the specified class.
+      class_name (Optional[str], default=None): An element class name. If provided only return connectivty for the specified class.
 
     Returns:
       Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]: If class_name is None the a dictionary containing
         the connectivity for each element class is returned. If class_name is not None, then a numpy array
         is returned containing the connectivity for the specified element class. If the specified element
-        class does not exists then None is returned.
+        class does not exists then an empty array is returned.
     """
     if class_name is not None:
-      return self.__conns_labels.get(class_name, None)
+      return self.__conns_labels.get(class_name, np.empty([0], np.int32))
     return self.__conns_labels
 
-  def connectivity_ids( self, class_name : Optional[str] = None ) -> Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]:
+  @overload
+  def connectivity_ids(self, class_name: str) -> NDArray[np.int32]: ...
+  @overload
+  def connectivity_ids(self, class_name: None = ...) -> Dict[str,NDArray[np.int32]]: ...
+
+  def connectivity_ids( self, class_name: Optional[str] = None ) -> Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]:
     """Getter for the element connectivity as element IDS.
 
     Args:
-      class_name (str): An element class name. If provided only return connectivty for the specified class.
+      class_name (Optional[str], default=None): An element class name. If provided only return connectivty for the specified class.
 
     Returns:
-      Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]: If class_name is None the a dictionary containing
+      Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]]: If class_name is None the a dictionary containing
         the connectivity for each element class is returned. If class_name is not None, then a numpy array
         is returned containing the connectivity for the specified element class. If the specified element
-        class does not exists then None is returned.
+        class does not exists then an empty array is returned.
     """
     if class_name is not None:
-      return self.__conns_ids.get(class_name, None)
+      return self.__conns_ids.get(class_name, np.empty([0], np.int32))
     return self.__conns_ids
 
   def faces(self, class_name: str, label: int) -> Dict[int,NDArray[np.int32]]:
@@ -582,9 +597,9 @@ class _MiliInternal:
       Dict[int,NDArray[np.int32]]: A dictionary with the keys 1-6 for each face of the hex element. The value for
         each key is a numpy array of 4 intergers specifying the nodes that make up that face.
     """
-    nodes_by_face = {}
-    mo_class = self.__MO_class_data.get(class_name, None)
-    class_labels = self.__labels.get(class_name, [])
+    nodes_by_face: Dict[int,NDArray[np.int32]] = {}
+    mo_class: Optional[MeshObjectClass] = self.__MO_class_data.get(class_name, None)
+    class_labels: NDArray[np.int32] = self.__labels.get(class_name, np_empty(np.int32))
 
     if mo_class is None:
       self.__return_code = (ReturnCode.ERROR, f"The element class ({class_name}) does not exist.")
@@ -612,18 +627,18 @@ class _MiliInternal:
     """Check if type is valid for material number input."""
     return isinstance(mat, (str, int, np.integer))
 
-  def material_classes(self, mat: Union[str,int]) -> List[str]:
+  def material_classes(self, mat: Union[str,int,np.integer]) -> List[str]:
     """Get list of classes of a specified material.
 
     Args:
-      mat (Union[str,int]): A material name or number.
+      mat (Union[str,int,np.integer]): A material name or number.
 
     Returns:
       List[str]: List of element classes associated with the material.
     """
+    classes: List[str] = []
     if not self.__valid_material_type(mat):
       self.__return_code = (ReturnCode.ERROR, 'material must be string or int')
-      classes = []
     else:
       mat_nums = []
       if type(mat) is str and mat in self.__mats.keys():
@@ -631,8 +646,7 @@ class _MiliInternal:
       elif type(mat) is str and mat.isdigit():
         mat = int(mat)
       if isinstance(mat, (int, np.integer)) and mat in self.__elems_of_mat.keys():
-        mat_nums = [ mat ]
-      classes = []
+        mat_nums = [ int(mat) ]
       for mat in mat_nums:
         for class_name in self.__elems_of_mat.get(mat,{}).keys():
           classes.append(class_name)
@@ -647,9 +661,9 @@ class _MiliInternal:
     Returns:
       List[str]: List of element classes the state variable exists for.
     """
-    classes = []
-    state_variable = self.__svars.get(svar, None)
-    if state_variable:
+    classes: List[str] = []
+    state_variable: Optional[StateVariable] = self.__svars.get(svar, None)
+    if state_variable is not None:
       classes = list(set([ srec.class_name for srec in state_variable.srecs ]))
     return classes
 
@@ -691,10 +705,10 @@ class _MiliInternal:
     Returns:
       List[str]: List of containing state variables.
     """
-    containing_svars = []
+    containing_svars: List[str] = []
     if svar in self.__svars:
       potential_containing_svars = np.array(self.__svars[svar].containing_svar_names)
-      of_same_class = [class_name in self.classes_of_state_variable(containing_svar) for containing_svar in potential_containing_svars]
+      of_same_class = np.array([class_name in self.classes_of_state_variable(containing_svar) for containing_svar in potential_containing_svars])
       containing_svars = list(potential_containing_svars[np.nonzero(of_same_class)[0]])
     return containing_svars
 
@@ -717,7 +731,7 @@ class _MiliInternal:
       comp_names = svar_spec.comp_names
     return comp_names
 
-  def parts_of_class_name( self, class_name: str ) -> NDArray[np.int32]:
+  def parts_of_class_name(self, class_name: str) -> NDArray[np.int32]:
     """Get List of part numbers for all elements of a given class name.
 
     Args:
@@ -733,7 +747,7 @@ class _MiliInternal:
       elem_parts[ idxs ] = part
     return elem_parts
 
-  def materials_of_class_name( self, class_name: str ) -> NDArray[np.int32]:
+  def materials_of_class_name(self, class_name: str) -> NDArray[np.int32]:
     """Get List of materials for all elements of a given class name.
 
     Args:
@@ -749,11 +763,11 @@ class _MiliInternal:
       elem_mats[ idxs ] = mat
     return elem_mats
 
-  def class_labels_of_material( self, mat: Union[str,int], class_name: str ) -> NDArray[np.int32]:
+  def class_labels_of_material(self, material: Union[str,int,np.integer], class_name: str) -> NDArray[np.int32]:
     """Convert a material name into labels of the specified class (if any).
 
     Args:
-      mat (Union[str,int]): The material name or number.
+      material (Union[str,int,np.integer]): The material name or number.
       class_name (str): The element class name.
 
     Returns:
@@ -761,32 +775,35 @@ class _MiliInternal:
     """
     if class_name not in self.__labels.keys():
       return np_empty(np.int32)
-    if not self.__valid_material_type(mat):
+
+    if not self.__valid_material_type(material):
       self.__return_code = (ReturnCode.ERROR, 'material must be string or int')
       return np_empty(np.int32)
-    if type(mat) is str:
-      all_reps = set( self.__mats.keys() )
-      # Check if mat is an integer passed in as a string
-      if mat not in all_reps and mat.isdigit():
-        mat = int(mat)
-    if isinstance(mat, (int, np.integer)):
-      all_reps = list( itertools.chain.from_iterable(self.__mats.values()) )
-    if mat not in all_reps and mat not in self.__elems_of_mat.keys():
+
+    # Check if mat is an integer passed in as a string
+    string_reps = self.__mats.keys()
+    if type(material) is str:
+      if material not in string_reps and material.isdigit():
+        material = int(material)
+
+    integer_reps = list( itertools.chain.from_iterable(self.__mats.values()) )
+    if material not in integer_reps and material not in string_reps and material not in self.__elems_of_mat.keys():
       return np_empty(np.int32)
-    elem_idxs = np_empty(np.int32)
-    if mat in self.__mats.keys():
-      for mat in self.__mats[mat]:
+
+    elem_idxs: NDArray[np.int32] = np_empty(np.int32)
+    if material in self.__mats.keys():
+      for mat in self.__mats[str(material)]:
         elem_idxs = np.concatenate( ( elem_idxs, self.__elems_of_mat[mat].get( class_name, np_empty(np.int32) ) ) )
     else:
-      elem_idxs = self.__elems_of_mat[mat].get( class_name, np_empty(np.int32) )
-    labels = self.__labels[ class_name ][ elem_idxs ]
-    return labels
+      elem_idxs = self.__elems_of_mat[int(material)].get( class_name, np_empty(np.int32) )
 
-  def all_labels_of_material( self, mat: Union[str,int] ) -> Dict[str,NDArray[np.int32]]:
+    return self.__labels[class_name][elem_idxs]
+
+  def all_labels_of_material(self, mat: Union[str,int,np.integer]) -> Dict[str,NDArray[np.int32]]:
     """Given a specific material. Find all labels with that material and return their values.
 
     Args:
-      mat (Union[str,int]): The material name or number.
+      mat (Union[str,int,np.integer]): The material name or number.
 
     Returns:
       Dict[str,NDArray[np.int32]]: Keys are element class names. Values are numpy arrays of element labels.
@@ -800,48 +817,47 @@ class _MiliInternal:
     elif type(mat) is str and mat.isdigit():
       mat = int(mat)
     if isinstance(mat, (int, np.integer)) and mat in self.__elems_of_mat.keys():
-      mat_nums = [ mat ]
+      mat_nums = [ int(mat) ]
     labels = {}
     for mat_num in mat_nums:
       for class_name in self.__elems_of_mat.get( mat_num , {} ).keys():
         labels[class_name] = self.class_labels_of_material( mat_num, class_name )
     return labels
 
-  def nodes_of_elems(self, class_sname: str, elem_labels: Union[int,List[int]]) -> Tuple[NDArray[np.int32],NDArray[np.int32]]:
+  def nodes_of_elems(self, class_sname: str, elem_labels: ArrayLike) -> Tuple[NDArray[np.int32],NDArray[np.int32]]:
     """Find nodes associated with elements by label.
 
     Args:
       class_sname (str): The element class name.
-      elem_labels (List[int]): List of element labels.
+      elem_labels (ArrayLike): List of element labels.
 
     Returns:
       Tuple[NDArray[np.int32],NDArray[np.int32]]: (The nodal connectivity, The element labels)
     """
-    if type(elem_labels) is not list:
-      if iterable(elem_labels):
-        elem_labels = list(elem_labels)
-      else:
-        elem_labels = [ elem_labels ]
+    labels_array = argument_to_ndarray(elem_labels, dtype=np.int32)
+    if labels_array is None:
+      return np.empty([1,0],dtype=np.int32), np.empty([1,0],dtype=np.int32)
+
     if class_sname not in self.__class_to_sclass:
       return np.empty([1,0],dtype=np.int32), np.empty([1,0],dtype=np.int32)
-    if all( label not in self.__labels[class_sname] for label in elem_labels ):
+    if all( label not in self.__labels[class_sname] for label in labels_array ):
       return np.empty([1,0],dtype=np.int32), np.empty([1,0],dtype=np.int32)
     if class_sname not in self.__conns_labels:
       return np.empty([1,0],dtype=np.int32), np.empty([1,0],dtype=np.int32)
 
     # Only search for labels that actually exist for this processor/database
-    elem_labels = [label for label in elem_labels if label in self.__labels[class_sname]]
+    labels_list = np.intersect1d(labels_array, self.__labels[class_sname])
 
     # get the indices of the labels we're querying in the list of local labels of the element class, so we can retrieve their connectivity
-    indices = (self.__labels[class_sname][:,None] == elem_labels).argmax(axis=0)
+    indices = (self.__labels[class_sname][:,None] == labels_list).argmax(axis=0)
     elem_conn = self.__conns_ids[class_sname][indices][:,:-1]
     return self.__labels['node'][elem_conn], self.__labels[class_sname][indices,None]
 
-  def nodes_of_material(self, mat: Union[str,int] ) -> NDArray[np.int32]:
+  def nodes_of_material(self, mat: Union[str,int,np.integer]) -> NDArray[np.int32]:
     """Find nodes associated with a material number.
 
     Args:
-      mat (Union[str,int]): The material name or number.
+      mat (Union[str,int,np.integer]): The material name or number.
 
     Returns:
       NDArray[np.int32]: A list of all nodes associated with the material number.
@@ -850,12 +866,13 @@ class _MiliInternal:
       self.__return_code = (ReturnCode.ERROR, 'material must be string or int')
       return np_empty(np.int32)
     element_labels = self.all_labels_of_material( mat )
-    node_labels = np_empty(np.int32)
+    node_labels: NDArray[np.int32] = np_empty(np.int32)
     for class_name, class_labels in element_labels.items():
       node_labels = np.append( node_labels, self.nodes_of_elems( class_name, class_labels )[0] )
     return np.unique( node_labels )
 
-  def __parse_query_name_and_source( self, svar_query_input, requested_result_source ):
+  def __parse_query_name_and_source(self, svar_query_input: str,
+                                    requested_result_source: Literal['primal', 'derived']) -> Tuple[str,str,List[str],Literal['primal','derived','']]:
     """Parse the svar name from a query input into a base svar, component svar list, and result source."""
     comp_start_idx = svar_query_input.find('[')
     if comp_start_idx != -1:
@@ -876,7 +893,7 @@ class _MiliInternal:
       derived_exists = True
 
     # Get the result source we are goint to return
-    actual_result_source = ''
+    actual_result_source: Literal['','primal','derived'] = ''
     # Preferred result source is primals
     if requested_result_source == 'primal':
       if primal_exists:
@@ -895,31 +912,29 @@ class _MiliInternal:
 
     return svar_query_input, svar_name, svar_comps, actual_result_source
 
-  def __init_query_parameters( self,
-                               svar_names : Union[List[str],str],
-                               class_sname : str,
-                               material : Optional[Union[str,int]] = None,
-                               labels : Optional[Union[List[int],int]] = None,
-                               states : Optional[Union[List[int],int]] = None,
-                               ips : Optional[Union[List[int],int]] = None,
-                               write_data : Optional[Mapping[int, Mapping[str, Mapping[str, npt.ArrayLike]]]] = None ):
+  def __init_query_parameters(self,
+                              svar_names : Union[List[str],str],
+                              class_sname : str,
+                              material : Optional[Union[str,int,np.integer]],
+                              labels : Optional[ArrayLike],
+                              states : Optional[ArrayLike],
+                              ips : Optional[ArrayLike],
+                              write_data : Optional[Mapping[str,QueryDict]]) -> Tuple[bool,List[str],str,NDArray[np.int32],NDArray[np.int32],NDArray[np.int32]]:
     """Parse the query parameters and normalize them to the types expected by the rest of the query operation."""
     any_invalid = False
-
-    if isinstance(states, (int, np.integer)):
-      states = np.array( [ states ], dtype = np.int32 )
-    elif iterable( states ) and not isinstance(states, str):
-      states = np.unique( np.array( states, dtype = np.int32 ) )
 
     min_st = 1
     max_st = len(self.__smaps)
     if states is None:
       states = np.arange( min_st, max_st+1, dtype = np.int32 )
+    else:
+      states = argument_to_ndarray(states, dtype=np.int32)
 
     if not isinstance( states, np.ndarray ):
       self.__return_code = (ReturnCode.ERROR, f"'states' must be None, an integer, or a list of integers" )
       any_invalid = True
     else:
+      states = np.unique(states)
       # Support negative indexing
       if np.any( states < 0 ):
         where = np.where( states < 0 )[0]
@@ -934,21 +949,18 @@ class _MiliInternal:
         self.__return_code = (ReturnCode.ERROR, f"Query failed because no states exist")
         any_invalid = True
 
-    if isinstance(labels, (int, np.integer)):
-      labels = np.array( [ labels ], dtype = np.int32 )
-    if iterable( labels ) and not isinstance(labels, str):
-      labels = np.unique( np.array( labels, dtype = np.int32 ) )
-
-    # Filter labels queried by material if provided, or select all labels of given material if no other labels are given
-    if material is not None:
-      mat_labels = self.class_labels_of_material(material, class_sname)
-      if labels is not None:
-        labels = np.intersect1d( labels, mat_labels )
-      else:
-        labels = mat_labels
-
     if labels is None:
       labels = self.__labels.get( class_sname, np.empty([0],np.int32) )
+    else:
+      labels = argument_to_ndarray(labels, np.int32)
+      if labels is not None:
+        # Filter labels queried by material if provided, or select all labels of given material if no other labels are given
+        if material is not None:
+          mat_labels = self.class_labels_of_material(material, class_sname)
+          if labels is not None:
+            labels = np.intersect1d( labels, mat_labels )
+          else:
+            labels = mat_labels
 
     if not isinstance( labels, np.ndarray ):
       self.__return_code = (ReturnCode.ERROR, f"'labels' must be None, an integer, or a list of integers" )
@@ -963,17 +975,16 @@ class _MiliInternal:
       self.__return_code = (ReturnCode.ERROR, 'State variable names must be a string or iterable of strings' )
       any_invalid = True
 
-    if isinstance(ips, (int, np.integer)):
-      ips = [ips]
     if ips is None:
-      ips = []
+      ips = np_empty(dtype=np.int32)
+    else:
+      ips = argument_to_ndarray(ips, np.int32)
 
-    if not isinstance(ips, (list,np.ndarray)):
-      self.__return_code = (ReturnCode.ERROR, 'comp must be an integer or list of integers' )
+    if not isinstance(ips, np.ndarray):
+      self.__return_code = (ReturnCode.ERROR, 'ips must be an integer or list of integers' )
       any_invalid = True
     else:
-      # Ensure not duplicate integration points
-      ips = np.unique( np.array( ips, dtype=np.int32 ))
+      ips = np.unique(ips)
 
     if write_data is not None:
       for queried_name in svar_names:
@@ -981,36 +992,58 @@ class _MiliInternal:
           self.__return_code = (ReturnCode.ERROR, f"When writing data to a database, the write_data must have the same states as the query.")
           any_invalid = True
 
-    return any_invalid, svar_names, class_sname, material, labels, states, ips, write_data
-
+    return any_invalid, svar_names, class_sname, labels, states, ips  # type: ignore
 
   def query( self,
-             svar_names : Union[List[str],str],
-             class_sname : str,
-             material : Optional[Union[str,int]] = None,
-             labels : Optional[Union[List[int],int]] = None,
-             states : Optional[Union[List[int],int]] = None,
-             ips : Optional[Union[List[int],int]] = None,
-             write_data : Optional[Dict[str,QueryDict]] = None,
-             **kwargs ) -> Dict[str,QueryDict]:
+             svar_names: Union[List[str],str],
+             class_sname: str,
+             material: Optional[Union[str,int,np.integer]] = None,
+             labels: Optional[ArrayLike] = None,
+             states: Optional[ArrayLike] = None,
+             ips: Optional[ArrayLike] = None,
+             write_data: Optional[Dict[str,QueryDict]] = None,
+             **kwargs: Any ) -> Dict[str,QueryDict]:
     """Query the database for state variables or derived variables, returning data for the specified parameters, optionally writing data to the database.
 
     Args:
       svar_names (Union[List[str],str]): The names of the state variables to be queried.
       class_sname (str): The element class name being queried (e.g. brick. shell, node).
       material (Optional[Union[str,int]], default=None): Optional material name or number to select labels from.
-      labels (Optional[Union[List[int],int]], default=None): Optional labels to query data for, filtered by material
+      labels (Optional[ArrayLike], default=None): Optional labels to query data for, filtered by material
         if material if material is supplied, default is all.
-      states (Optional[Union[List[int],int]], default=None): Optional state numbers from which to query data, default is all.
-      ips (Optional[Union[List[int],int]], default=None): Optional integration point to query for vector array state variables, default is all available.
+      states (Optional[ArrayLike], default=None): Optional state numbers from which to query data, default is all.
+      ips (Optional[ArrayLike], default=None): Optional integration point to query for vector array state variables, default is all available.
       write_data (Optional[Dict[str,QueryDict]], default=None): Optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
         then modify the values desired, then query again with the modified result in this param
     """
     # normalize arguments to expected types / default values
-    errors, svar_names, class_sname, material, labels, states, ips, write_data = self.__init_query_parameters( svar_names, class_sname, material, labels, states, ips, write_data )
+    errors, normalized_svar_names, normalized_class_sname, normalized_labels, normalized_states, normalized_ips = self.__init_query_parameters( svar_names, class_sname, material, labels, states, ips, write_data )
     if errors:
       return {}
 
+    return self.__query(normalized_svar_names, normalized_class_sname, normalized_labels,
+                        normalized_states, normalized_ips, write_data,
+                        **kwargs)
+
+  def __query(self,
+              svar_names: List[str],
+              class_sname: str,
+              labels: NDArray[np.int32],
+              states: NDArray[np.int32],
+              ips: NDArray[np.int32],
+              write_data: Optional[Dict[str,QueryDict]],
+              **kwargs: Any ) -> Dict[str,QueryDict]:
+    """Internal query method that takes the expected argument types and does all the work.
+
+    Args:
+      svar_names (List[str]): The names of the state variables to be queried.
+      class_sname (str): The element class name being queried (e.g. brick. shell, node).
+      labels (NDArray[np.int32]): Labels to query data for.
+      states (NDArray[np.int32]): State numbers from which to query data.
+      ips (NDArray[np.int32]): Integration point to query for vector array state variables, default is all available.
+      write_data (Optional[Dict[str,QueryDict]], default=None): Optional the format of this is identical to the query result, so if you want to write data, query it first to retrieve the object/format,
+        then modify the values desired, then query again with the modified result in this param
+    """
     # handle possible hidden keyword arguments
     output_object_labels = kwargs.get("output_object_labels", True)
     subrec = kwargs.get("subrec", None)
@@ -1026,8 +1059,8 @@ class _MiliInternal:
       self.__return_code = (ReturnCode.ERROR, f"The following unexpected keywords were provided to the query method: {unexpected_keywords}")
       return {}
 
-    res = dict.fromkeys( svar_names )
-    for ikey in res.keys():
+    res: Dict[str, QueryDict] = {}
+    for ikey in svar_names:
       res[ikey] = QueryDict(
         data = np_empty( np.float32 ),    # Numpy array of results
         layout = QueryLayout(
@@ -1039,6 +1072,7 @@ class _MiliInternal:
         source = '',                       # primals vs. derived
         class_name = class_sname,          # Element class name for the result
         title = '',                        # The state variable title
+        modifier = '',
       )
 
     # for parallel operation it will often be the case a specific file doesn't have any labels
@@ -1064,7 +1098,7 @@ class _MiliInternal:
     derived_query_names = [spec[0] for spec in derived_specs]
     if derived_query_names:
       try:
-        derived_data = self.__derived.query(derived_query_names, class_sname, material, labels, states, ips, **kwargs)
+        derived_data = self.__derived.query(derived_query_names, class_sname, labels, states, ips, **kwargs)
       except Exception as e:
         self.__return_code = (ReturnCode.ERROR, f"Exception occurred during derived query: {str(e)}")
         derived_data = {}
@@ -1084,6 +1118,7 @@ class _MiliInternal:
         match_aggregate_svar = queried_svar_name
 
       # if svar is an aggregate svar and we're not querying specific comps, query all the comps
+      svars_to_query: List[StateVariable] = []
       if comp_svar_names == []:
         if self.__svars[queried_svar_name].agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:
           svars_to_query = self.__svars[queried_svar_name].svars
@@ -1109,8 +1144,8 @@ class _MiliInternal:
         srecs_to_query = [srec for srec in srecs_to_query if srec.name == subrec]
 
       # if we're looking for ip data determine which int_points we can get for each svar in each subrec
-      matching_int_points = dict()
-      int_point_labels = dict()
+      matching_int_points: Dict[str,Dict[str,List[int]]] = dict()
+      int_point_labels: Dict[str,List[int]] = dict()
       for svar in svars_to_query:
         comp_svar_name = svar.name
         candidate_ip_svars = list( self.__int_points.get( comp_svar_name, [] ) )
@@ -1128,7 +1163,7 @@ class _MiliInternal:
                 matching_int_points[ comp_svar_name ][ srec.name ] = [ i for i in range(self.__int_points[comp_svar_name][candidate][-1]) ]
 
               if comp_svar_name not in int_point_labels:
-                int_point_labels[ comp_svar_name ] = {}
+                int_point_labels[ comp_svar_name ] = []
               int_point_labels[ comp_svar_name ] = [ self.__int_points[comp_svar_name][candidate][idx] for idx in matching_int_points[comp_svar_name][srec.name] ]
 
       # For each subrecord, determine which elements (labels) appear in that subrecord
@@ -1151,9 +1186,9 @@ class _MiliInternal:
       unique_labels, counts = np.unique( res[queried_name]['layout']['labels'], return_counts=True )
       if np.any( counts > 1 ):
         duplicate_labels = unique_labels[ counts > 1 ]
-        self.__return_code(ReturnCode.CRITICAL,
-                           f'Invalid database: The following labels appear in multiple subrecords for the result "{queried_name}\n"'
-                           f'Labels = {duplicate_labels}')
+        self.__return_code = (ReturnCode.CRITICAL,
+                              f'Invalid database: The following labels appear in multiple subrecords for the result "{queried_name}\n"'
+                              f'Labels = {duplicate_labels}')
         break
 
       # filter out any subrecords we have no labels for
@@ -1217,7 +1252,7 @@ class _MiliInternal:
       # Determine which states (of those requested) appear in each of the state files.
       # This way we can open each file only once and process all the states that appear in it
       # rather than opening a state file for each iteration
-      state_file_dict = {}
+      state_file_dict: Dict[str,List[int]] = {}
       for state in states:
         state_map = self.__smaps[state - 1]
         sfn = self.__state_files[state_map.file_number]
@@ -1332,7 +1367,7 @@ class _MiliInternal:
       self.__afile.dirs[DirectoryDecl.Type.APPLICATION_PARAM]['state_count'] += 1
 
     afile_writer = AFileWriter()
-    afile_name = f"{os.path.join( self.__dir_name, self.__base_filename )}"
+    afile_name = os.path.join( self.__dir_name, self.__base_filename )
     afile_writer.write(self.__afile, afile_name)
 
     # Update State file
@@ -1389,7 +1424,7 @@ class _MiliInternal:
     # Write out the new AFile
     afile_writer = AFileWriter()
     # Copy trailing digits from basename to mimic processor numbers for uncombined databases
-    trailing_digits_regex = re.compile(r'(\d+)$').search(self.__base_filename)
+    trailing_digits_regex = re.compile(r'(\d+)$').search(str(self.__base_filename))
     trailing_digits = "" if trailing_digits_regex is None else trailing_digits_regex.group(1)
     new_base_name = new_base_name + trailing_digits
     afile_writer.write(new_afile, new_base_name)

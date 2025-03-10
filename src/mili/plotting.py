@@ -14,8 +14,10 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
 from mili.reductions import combine
+from mili.datatypes import QueryDict
 
 @dataclass
 class PlotObject:
@@ -23,21 +25,22 @@ class PlotObject:
   name: str = ""
   title: str = ""
   class_name: str = ""
-  label: int = -1
-  x_data : np.ndarray = field(default_factory=lambda: np.empty([0],dtype = np.float64))
-  y_data : np.ndarray = field(default_factory=lambda: np.empty([0],dtype = np.float64))
+  label: Union[int,np.integer] = -1
+  x_data : NDArray[np.floating] = field(default_factory=lambda: np.empty([0],dtype = np.float64))
+  y_data : NDArray[np.floating] = field(default_factory=lambda: np.empty([0],dtype = np.float64))
 
 
 class Plotter(ABC):
   """Abstract Plotter Class."""
-  def __init__(self):
+  def __init__(self) -> None:
     pass
 
-  def _query_data_to_plot_data(self, query_data: Dict) -> List[PlotObject]:
+  def _query_data_to_plot_data(self, query_data: Union[Dict[str,QueryDict],List[Dict[str,QueryDict]]]) -> List[PlotObject]:
     """Convert Mili-python query data to plot data."""
     plot_objects = []
-    query_data = combine(query_data)
-    for svar_name, result_data in query_data.items():
+    if isinstance(query_data, list):
+      query_data = combine(query_data)
+    for _, result_data in query_data.items():
       if isinstance( result_data, pd.DataFrame ):
         raise ValueError("Plotting is not supported for Dataframe results. Please set on_dataframe to False.")
       class_name = result_data["class_name"]
@@ -59,32 +62,29 @@ class Plotter(ABC):
   def initialize_plot(self, *_: Any, **__: Any) -> Any: ...
 
   @abstractmethod
-  def update_plot(self, query_data: Dict, *_: Any, **__: Any) -> Any: ...
+  def update_plot(self, query_data: Dict[str,QueryDict], *_: Any, **__: Any) -> Any: ...
 
 
 class MatPlotLibPlotter(Plotter):
   """Plotter for Matplotlib."""
-  def __init__(self):
+  def __init__(self) -> None:
     super(MatPlotLibPlotter, self).__init__()
 
   @overload
   def initialize_plot(self) -> Tuple[Figure,Axes]: ...
 
   @overload
-  def initialize_plot(self, nrows: Literal[1], ncols: Literal[1]) -> Tuple[Figure,Axes]: ...
-
-  @overload
   def initialize_plot(self, nrows: int, ncols: int) -> Tuple[Figure,List[Axes]]: ...
 
   @overload
-  def initialize_plot(self, nrows: Optional[int] = 1, ncols: Optional[int] = 1) -> Tuple[Figure,Union[Axes,List[Axes]]]: ...
+  def initialize_plot(self, nrows: int = 1, ncols: int = 1) -> Tuple[Figure,Union[Axes,List[Axes]]]: ...
 
-  def initialize_plot(self, nrows: Optional[int] = 1, ncols: Optional[int] = 1) -> Tuple[Figure,Union[Axes,List[Axes]]]:
+  def initialize_plot(self, nrows: int = 1, ncols: int = 1) -> Tuple[Figure,Union[Axes,List[Axes]]]:
     """Initialize a Figure and one or more Axes object to plot results on.
 
     Args:
-      nrows (Optional[int], default=1): The number of rows of plots.
-      ncols (Optional[int], default=1): The number of colums of plots.
+      nrows (int, default=1): The number of rows of plots.
+      ncols (int, default=1): The number of colums of plots.
 
     Returns: Tuple[Figure,Union[Axes,List[Axes]]]
       A Matplotlib Figure object and either a single Axes object or an array of Axes objects
@@ -93,7 +93,7 @@ class MatPlotLibPlotter(Plotter):
     fig, ax = plt.subplots(nrows, ncols, layout="constrained")
     return fig, ax
 
-  def update_plot(self, query_data: Dict, ax: Axes) -> None:
+  def update_plot(self, query_data: Dict[str,QueryDict], ax: Axes) -> None:
     """Add plot data to the specified Axes object.
 
     Args:
