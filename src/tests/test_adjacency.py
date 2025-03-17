@@ -8,6 +8,7 @@ SPDX-License-Identifier: (MIT)
 import os
 import unittest
 from mili import reader, adjacency
+from mili.mdg_defines import EntityType
 import numpy as np
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -86,28 +87,28 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
         centroid = self.adjacency.compute_centroid("brick", label=22, state=1)
         np.testing.assert_allclose( centroid, np.array([0.939143, 0.939143, 2.333333]), rtol=6.0e-7 )
 
-        centroid = self.adjacency.compute_centroid("brick", label=7, state=100)
+        centroid = self.adjacency.compute_centroid(EntityType.BRICK, label=7, state=100)
         np.testing.assert_allclose( centroid, np.array([0.583133, 0.15625 , 2.272023]), rtol=2.0e-7 )
 
         # Shell elements
         centroid = self.adjacency.compute_centroid("shell", label=3, state=1)
         np.testing.assert_allclose( centroid, np.array([0.426883, 0.426883, 2.      ]), rtol=2.0e-7 )
 
-        centroid = self.adjacency.compute_centroid("shell", label=4, state=100)
+        centroid = self.adjacency.compute_centroid(EntityType.SHELL, label=4, state=100)
         np.testing.assert_allclose( centroid, np.array([0.597617, 0.597617, 1.845676]), rtol=8.0e-7 )
 
         # beam elements
         centroid = self.adjacency.compute_centroid("beam", label=33, state=1)
         np.testing.assert_allclose( centroid, np.array([0.579082, 0.334333, 1.466667]), rtol=1.0e-6 )
 
-        centroid = self.adjacency.compute_centroid("beam", label=45, state=100)
+        centroid = self.adjacency.compute_centroid(EntityType.BEAM, label=45, state=100)
         np.testing.assert_allclose( centroid, np.array([-2.934491e-08,  7.380999e-01,  1.125251e+00]) )
 
         # Nodes
         centroid = self.adjacency.compute_centroid("node", label=1, state=1)
         np.testing.assert_allclose( centroid, np.array([1.0, 0.0, 0.0]) )
 
-        centroid = self.adjacency.compute_centroid("node", label=132, state=100)
+        centroid = self.adjacency.compute_centroid(EntityType.NODE, label=132, state=100)
         np.testing.assert_allclose( centroid, np.array([1.5, 0.0, 2.672029]) )
 
     def test_mesh_entities_in_radius(self):
@@ -115,7 +116,7 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
         elems = self.adjacency.mesh_entities_within_radius("node", 120, 1, 0.1)
         np.testing.assert_equal( sorted(elems["brick"]), [31,32,33,34] )
 
-        elems = self.adjacency.mesh_entities_within_radius("brick", 32, 1, 0.4)
+        elems = self.adjacency.mesh_entities_within_radius(EntityType.BRICK, 32, 1, 0.4)
         np.testing.assert_equal( sorted(elems["brick"]), [25,26,27,28,31,32,33,34] )
 
         elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3)
@@ -128,7 +129,7 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
         self.assertEqual( list(elems.keys()), ["beam", "node"] )
         np.testing.assert_equal( sorted(elems["beam"]), [5,6,37,42] )
 
-        elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3, material=3)
+        elems = self.adjacency.mesh_entities_within_radius(EntityType.SHELL, 6, 1, 0.3, material=3)
         self.assertEqual( list(elems.keys()), ["shell", "node"] )
         np.testing.assert_equal( sorted(elems["shell"]), [3,4,5,6,9,11] )
 
@@ -252,7 +253,7 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
         np.testing.assert_equal(sorted(elems["brick"]), [1, 2, 3, 4, 7, 8, 9, 10])
         np.testing.assert_equal(sorted(elems["cseg"]), [13, 14, 16, 17])
 
-        elems = self.adjacency.neighbor_elements("brick", 1, material = 2)
+        elems = self.adjacency.neighbor_elements(EntityType.BRICK, 1, material = 2)
         self.assertEqual(list(elems.keys()), ["brick"])
         np.testing.assert_equal(sorted(elems["brick"]), [1, 2, 3, 4, 7, 8, 9, 10])
 
@@ -267,7 +268,7 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
                                                  19, 21, 23, 25, 27, 29, 31, 33, 35])
         np.testing.assert_equal(sorted(elems["cseg"]), [13, 14, 15, 16, 17, 18, 19, 20, 21])
 
-        elems = self.adjacency.neighbor_elements("brick", 1, material=[2,3], neighbor_radius = 3)
+        elems = self.adjacency.neighbor_elements(EntityType.BRICK, 1, material=[2,3], neighbor_radius = 3)
         self.assertEqual(list(elems.keys()), ["brick"])
         np.testing.assert_equal(sorted(elems["brick"]), np.arange(1, 37)) # All brick elements are within 3 neighbors of brick 1
 
@@ -376,7 +377,7 @@ class ParallelAdjacencyTests:
             elems = self.adjacency.mesh_entities_within_radius("brick", 32, 1, 0.4)
             np.testing.assert_equal( sorted(elems["brick"]), [25,26,27,28,31,32,33,34] )
 
-            elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3)
+            elems = self.adjacency.mesh_entities_within_radius(EntityType.SHELL, 6, 1, 0.3)
             np.testing.assert_equal( sorted(elems["shell"]), [3,4,5,6,9,11] )
             np.testing.assert_equal( sorted(elems["beam"]), [5,6,37,42] )
             np.testing.assert_equal( sorted(elems["cseg"]), [2,3,5,6,8,9] )
@@ -394,7 +395,7 @@ class ParallelAdjacencyTests:
             self.assertEqual( list(elems.keys()), ["cseg", "node"] )
             np.testing.assert_equal( sorted(elems["cseg"]), [2,3,5,6,8,9] )
 
-            elems = self.adjacency.mesh_entities_within_radius("shell", 6, 1, 0.3, material=[3,4])
+            elems = self.adjacency.mesh_entities_within_radius(EntityType.SHELL, 6, 1, 0.3, material=[3,4])
             self.assertEqual( list(elems.keys()), ["shell", "cseg", "node"] )
             np.testing.assert_equal( sorted(elems["cseg"]), [2,3,5,6,8,9] )
             np.testing.assert_equal( sorted(elems["shell"]), [3,4,5,6,9,11] )
@@ -485,7 +486,7 @@ class ParallelAdjacencyTests:
             self.assertEqual(list(elems.keys()), ["cseg"])
             np.testing.assert_equal(sorted(elems["cseg"]), [13, 14, 16, 17])
 
-            elems = self.adjacency.neighbor_elements("brick", 1, neighbor_radius = 2)
+            elems = self.adjacency.neighbor_elements(EntityType.BRICK, 1, neighbor_radius = 2)
             self.assertEqual(list(elems.keys()), ["brick", "cseg"])
             np.testing.assert_equal(sorted(elems["brick"]), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
                                                     11, 12, 13, 14, 15, 16, 17, 18,

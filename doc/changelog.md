@@ -5,6 +5,20 @@ All notable changes to Mili-python will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Added the enum `mili.mdg_defines.EntityType` which contains all the Entity types ('brick', 'node', ect.) that are output by MDG simulation codes. These were previously referred to as element class names, but are now referred to as Entity types throughout mili-python's functions/documentation. The values of this enum can be used as arguments for functions that previously took the element entity type as a string. Strings can still be used as well.
+- Added the following enums to `mili.mdg_defines` which contain many of the state variables that are output by MDG simulation codes:
+  - `mili.mdg_defines.GlobalStateVariables`
+  - `mili.mdg_defines.MaterialStateVariables`
+  - `mili.mdg_defines.NodalStateVariables`
+  - `mili.mdg_defines.LoadCurveStateVariables`
+  - `mili.mdg_defines.BeamStateVariables`
+  - `mili.mdg_defines.DiscreteStateVariables`
+  - `mili.mdg_defines.ShellStateVariables`
+  - `mili.mdg_defines.ContactSegmentStateVariables`
+  - `mili.mdg_defines.PressureSegmentStateVariables`
+  - `mili.mdg_defines.StressStrainStateVariables`
+  - `mili.mdg_defines.SharedStateVariables`
+  - `mili.mdg_defines.DerivedStateVariables`
 
 ### Fixed
 

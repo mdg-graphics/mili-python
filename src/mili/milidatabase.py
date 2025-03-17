@@ -10,7 +10,7 @@ from numpy import iterable
 import os
 
 from typing import (Union, List, Tuple, Dict, Literal, Optional, overload,
-                    Literal, Type, Any, Callable)
+                    Literal, Type, Any, Callable, TYPE_CHECKING)
 
 import pandas as pd
 from enum import Enum
@@ -19,8 +19,15 @@ import mili.reductions as reductions
 from mili.parallel import ServerWrapper, LoopWrapper
 from mili.miliinternal import _MiliInternal, ReturnCode
 from mili.datatypes import StateMap, QueryDict, ReturnCode, ReturnCodeTuple
+from mili.mdg_defines import mdg_enum_to_string
 from mili.utils import result_dictionary_to_dataframe
 from mili.geometric_mesh_info import GeometricMeshInfo
+
+if TYPE_CHECKING:
+  # NOTE: We only import these when Type checking. These enums should not
+  # be used internally, outside of typing and in the derived variable
+  # specifications
+  from mili.mdg_defines import EntityType, StateVariableName
 
 
 class MiliPythonError(Exception):
@@ -176,28 +183,30 @@ class MiliDatabase:
     return result
 
   def class_names(self) -> List[str]:
-    """Getter for all class names in the database.
+    """Getter for all class names (entity types) in the database.
 
     Returns:
-      List[str]: List of element class names in the database.
+      List[str]: List of element class names (entity types) in the database.
     """
     result: List[str]
     result = self.__postprocess(results = self._mili.class_names(),
                                 reduce_function = reductions.list_concatenate_unique_str)
     return result
 
-  def int_points_of_state_variable(self, svar_name: str, class_name: str) -> NDArray[np.int32]:
-    """Get the available integration points for a state variable + class_name.
+  def int_points_of_state_variable(self, svar_name: Union[str,StateVariableName], entity_type: Union[str,EntityType]) -> NDArray[np.int32]:
+    """Get the available integration points for a state variable + entity type.
 
     Args:
-      svar_name (str): The state variable name.
-      class_name (str): The element class name.
+      svar_name (Union[str,StateVariableName]): The state variable name.
+      entity_type (Union[str,EntityType]): The entity type ("brick", "node", etc.).
 
     Returns:
       NDArray[np.int32]: Array of integration points.
     """
     result: NDArray[np.int32]
-    result = self.__postprocess(results = self._mili.int_points_of_state_variable(svar_name, class_name),
+    entity_type_str = mdg_enum_to_string(entity_type)
+    svar_name_str = mdg_enum_to_string(svar_name)
+    result = self.__postprocess(results = self._mili.int_points_of_state_variable(svar_name_str, entity_type_str),
                                 reduce_function = reductions.list_concatenate_unique)
     return result
 
@@ -223,7 +232,7 @@ class MiliDatabase:
                                 reduce_function = reductions.dictionary_merge_no_concat)
     return result
 
-  def times( self, states : Optional[ArrayLike] = None ) -> NDArray[np.float64]:
+  def times(self, states: Optional[ArrayLike] = None) -> NDArray[np.float64]:
     """Get the times for each state in the database.
 
     Args:
@@ -264,52 +273,58 @@ class MiliDatabase:
                                  reduce_function = reductions.zeroth_entry)
     return result
 
-  def derived_variables_of_class(self, class_name: str) -> List[str]:
-    """Get the derived variables that can be calculated for the specified class.
+  def derived_variables_of_class(self, entity_type: Union[str,EntityType]) -> List[str]:
+    """Get the derived variables that can be calculated for the specified entity type.
 
     Args:
-      class_name (str): The element class name.
+      entity_type (Union[str,EntityType]): The entity type ("brick", "node", etc.).
 
     Returns:
-      List[str]: List of derived variables that can be calculated for the specified class.
+      List[str]: List of derived variables that can be calculated for the specified entity type.
     """
     result: List[str]
-    result = self.__postprocess(results = self._mili.derived_variables_of_class(class_name),
+    entity_type_str = mdg_enum_to_string(entity_type)
+    result = self.__postprocess(results = self._mili.derived_variables_of_class(entity_type_str),
                                 reduce_function = reductions.list_concatenate_unique_str)
     return result
 
-  def classes_of_derived_variable(self, var_name: str) -> List[str]:
-    """Get the classes for which a derived variable can be calculated.
+  def classes_of_derived_variable(self, var_name: Union[str,StateVariableName]) -> List[str]:
+    """Get the classes (entity types) for which a derived variable can be calculated.
 
     Args:
-      var_name (str): The derived variable name:
+      var_name (Union[str,StateVariableName]): The derived variable name:
 
     Returns:
-      List[str]: List of element class names for which var_name can be calculated.
+      List[str]: List of element class names (entity types) for which var_name can be calculated.
     """
     result: List[str]
-    result = self.__postprocess(results = self._mili.classes_of_derived_variable(var_name),
+    var_name_str = mdg_enum_to_string(var_name)
+    result = self.__postprocess(results = self._mili.classes_of_derived_variable(var_name_str),
                                 reduce_function = reductions.list_concatenate_unique_str)
     return result
 
   @overload
-  def labels(self, class_name: str) -> NDArray[np.int32]: ...
+  def labels(self, entity_type: Union[str,EntityType]) -> NDArray[np.int32]: ...
   @overload
-  def labels(self, class_name: None = ...) -> Dict[str,NDArray[np.int32]]: ...
+  def labels(self, entity_type: None = ...) -> Dict[str,NDArray[np.int32]]: ...
 
-  def labels(self, class_name: Optional[str] = None) -> Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]:
+  def labels(self, entity_type: Optional[Union[str,EntityType]] = None) -> Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]:
     """Getter for the element labels.
 
     Args:
-      class_name (Optional[str], default=None): If provided, only return labels for specifid element class.
+      entity_type (Optional[Union[str,EntityType]], default=None): If provided, only return labels for the
+        specified entity type ("brick", "node", etc.).
 
     Returns:
-      Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]: If class_name is None the a dictionary containing
-      the labels for each element class is returned. If class_name is not None, then a numpy array
-      is returned containing the labels for the specified element class.
+      Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]: If entity_type is None then a dictionary containing
+      the labels for each entity type/class is returned. If entity_type is not None, then a numpy array
+      is returned containing the labels for the specified entity type/class.
     """
     result: Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]
-    result = self.__postprocess(results = self._mili.labels(class_name),
+    entity_type_str: Optional[str] = None
+    if entity_type is not None:
+      entity_type_str = mdg_enum_to_string(entity_type)
+    result = self.__postprocess(results = self._mili.labels(entity_type_str),
                                 reduce_function = reductions.reduce_labels)
     return result
 
@@ -335,34 +350,37 @@ class MiliDatabase:
     return result
 
   @overload
-  def connectivity(self, class_name: str) -> NDArray[np.int32]: ...
+  def connectivity(self, entity_type: Union[str,EntityType]) -> NDArray[np.int32]: ...
   @overload
-  def connectivity(self, class_name: None = ...) -> Dict[str,NDArray[np.int32]]: ...
+  def connectivity(self, entity_type: None = ...) -> Dict[str,NDArray[np.int32]]: ...
 
-  def connectivity(self, class_name: Optional[str] = None) -> Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]:
+  def connectivity(self, entity_type: Optional[Union[str,EntityType]] = None) -> Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]:
     """Getter for the element connectivity as element LABELS.
 
     Args:
-      class_name (Optional[str], default=None): An element class name. If provided only return connectivty for the specified class.
+      entity_type (Optional[Union[str,EntityType]], default=None): If provided, only return connectivity for the
+        specified entity type ("brick", "node", etc.).
 
     Returns:
-      Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]: If class_name is None the a dictionary containing
-        the connectivity for each element class is returned. If class_name is not None, then a numpy array
-        is returned containing the connectivity for the specified element class. If the specified element
-        class does not exists then None is returned.
+      Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]: If entity_type is None then a dictionary containing
+      the connectivity for each entity type/class is returned. If entity_type is not None, then a numpy array
+      is returned containing the connectivity for the specified entity type/class.
     """
     result: Union[Dict[str,NDArray[np.int32]],NDArray[np.int32]]
-    result = self.__postprocess(results = self._mili.connectivity(class_name),
+    entity_type_str: Optional[str] = None
+    if entity_type is not None:
+      entity_type_str = mdg_enum_to_string(entity_type)
+    result = self.__postprocess(results = self._mili.connectivity(entity_type_str),
                                 reduce_function = reductions.reduce_connectivity)
     return result
 
-  def faces(self, class_name: str, label: int) -> Dict[int,NDArray[np.int32]]:
-    """Getter for the faces of an element of a specified class.
+  def faces(self, entity_type: Union[str,EntityType], label: int) -> Dict[int,NDArray[np.int32]]:
+    """Getter for the faces of an element of a specified entity type/class.
 
     NOTE: Currently only supports HEX elements.
 
     Args:
-      class_name (str): The element class.
+      entity_type (Union[str,EntityType]): The entity type ("brick", "node", etc.).
       label (int): The element label.
 
     Returns:
@@ -370,49 +388,52 @@ class MiliDatabase:
       each key is a numpy array of 4 intergers specifying the nodes that make up that face.
     """
     result: Dict[int,NDArray[np.int32]]
-    result = self.__postprocess(results = self._mili.faces(class_name, label),
+    entity_type_str = mdg_enum_to_string(entity_type)
+    result = self.__postprocess(results = self._mili.faces(entity_type_str, label),
                                 reduce_function = reductions.dictionary_merge_no_concat)
     return result
 
   def material_classes(self, mat: Union[str,int,np.integer]) -> List[str]:
-    """Get list of classes of a specified material.
+    """Get list of classes (entity types) of a specified material.
 
     Args:
       mat (Union[str,int,np.integer]): A material name or number.
 
     Returns:
-      List[str]: List of element classes associated with the material.
+      List[str]: List of element classes (entity types) associated with the material.
     """
     result: List[str]
     result = self.__postprocess(results = self._mili.material_classes(mat),
                                 reduce_function = reductions.list_concatenate_unique_str)
     return result
 
-  def classes_of_state_variable(self, svar: str) -> List[str]:
-    """Get list of element classes for a state variable.
+  def classes_of_state_variable(self, svar: Union[str,StateVariableName]) -> List[str]:
+    """Get list of element classes (entity types) for a state variable.
 
     Args:
-      svar (str): The state variable name.
+      svar (Union[str,StateVariableName]): The state variable name.
 
     Returns:
-      List[str]: List of element classes the state variable exists for.
+      List[str]: List of element classes (entity types) the state variable exists for.
     """
     result: List[str]
-    result = self.__postprocess(results = self._mili.classes_of_state_variable(svar),
+    svar_str = mdg_enum_to_string(svar)
+    result = self.__postprocess(results = self._mili.classes_of_state_variable(svar_str),
                                 reduce_function = reductions.list_concatenate_unique_str)
     return result
 
-  def state_variables_of_class(self, class_name: str) -> List[str]:
-    """Get list of primal state variables for a given element class.
+  def state_variables_of_class(self, entity_type: Union[str,EntityType]) -> List[str]:
+    """Get list of primal state variables for a given entity type/class.
 
     Args:
-      class_name (str): The element class name.
+      entity_type (Union[str,EntityType]): The entity type ("brick", "node", etc.).
 
     Returns:
-      List[str]: A list of primal state variables that can be queried for the specified element class.
+      List[str]: A list of primal state variables that can be queried for the specified entity type/class.
     """
     result: List[str]
-    result = self.__postprocess(results = self._mili.state_variables_of_class(class_name),
+    entity_type_str = mdg_enum_to_string(entity_type)
+    result = self.__postprocess(results = self._mili.state_variables_of_class(entity_type_str),
                                 reduce_function = reductions.list_concatenate_unique_str)
     return result
 
@@ -427,75 +448,81 @@ class MiliDatabase:
                                 reduce_function = reductions.dictionary_merge_no_concat)
     return result
 
-  def containing_state_variables_of_class(self, svar: str, class_name: str) -> List[str]:
-    """Get List of state variables that contain the specific state variable + class_name.
+  def containing_state_variables_of_class(self, svar: Union[str,StateVariableName], entity_type: Union[str,EntityType]) -> List[str]:
+    """Get List of state variables that contain the specific state variable + entity type.
 
     Args:
-      svar (str): The state variable name.
-      class_name (str): The element class name.
+      svar (Union[str,StateVariableName]): The state variable name.
+      entity_type (Union[str,EntityType]): The entity type ("brick", "node", etc.).
 
     Returns:
       List[str]: List of containing state variables.
     """
     result: List[str]
-    result = self.__postprocess(results = self._mili.containing_state_variables_of_class(svar, class_name),
+    entity_type_str = mdg_enum_to_string(entity_type)
+    svar_str = mdg_enum_to_string(svar)
+    result = self.__postprocess(results = self._mili.containing_state_variables_of_class(svar_str, entity_type_str),
                                 reduce_function = reductions.list_concatenate_unique_str)
     return result
 
-  def components_of_vector_svar(self, svar: str) -> List[str]:
+  def components_of_vector_svar(self, svar: Union[str,StateVariableName]) -> List[str]:
     """Get a list of component state variables of a vector state variable.
 
     Args:
-      svar (str): The name of a vector state variable.
+      svar (Union[str,StateVariableName]): The name of a vector state variable.
 
     Returns:
       List[str]: The components of the vector state variable.
     """
     result: List[str]
-    result = self.__postprocess(results = self._mili.components_of_vector_svar(svar),
+    svar_str = mdg_enum_to_string(svar)
+    result = self.__postprocess(results = self._mili.components_of_vector_svar(svar_str),
                                 reduce_function = reductions.list_concatenate_unique_str)
     return result
 
-  def parts_of_class_name(self, class_name: str) -> NDArray[np.int32]:
-    """Get List of part numbers for all elements of a given class name.
+  def parts_of_class_name(self, entity_type: Union[str,EntityType]) -> NDArray[np.int32]:
+    """Get List of part numbers for all elements of a given entity type/class.
 
     Args:
-      class_name (str): The element class name.
+      entity_type (Union[str,EntityType]): The entity type ("brick", "node", etc.).
 
     Returns:
-      NDArray[np.int32]: array of part numbers for each element of the class name.
+      NDArray[np.int32]: array of part numbers for each element of the entity type.
     """
     result: NDArray[np.int32]
-    result = self.__postprocess(results = self._mili.parts_of_class_name(class_name),
+    entity_type_str = mdg_enum_to_string(entity_type)
+    result = self.__postprocess(results = self._mili.parts_of_class_name(entity_type_str),
                                 reduce_function = reductions.list_concatenate)
     return result
 
-  def materials_of_class_name(self, class_name: str) -> NDArray[np.int32]:
-    """Get List of materials for all elements of a given class name.
+  def materials_of_class_name(self, entity_type: Union[str,EntityType]) -> NDArray[np.int32]:
+    """Get List of materials for all elements of a given entity type/class.
 
     Args:
-      class_name (str): The element class name.
+      entity_type (Union[str,EntityType]): The entity type ("brick", "node", etc.).
 
     Returns:
-      NDArray[np.int32]: array of material numbers for each element of the class name.
+      NDArray[np.int32]: array of material numbers for each element of the entity type.
     """
     result: NDArray[np.int32]
-    result = self.__postprocess(results = self._mili.materials_of_class_name(class_name),
+    entity_type_str = mdg_enum_to_string(entity_type)
+    result = self.__postprocess(results = self._mili.materials_of_class_name(entity_type_str),
                                 reduce_function = reductions.list_concatenate)
     return result
 
-  def class_labels_of_material(self, mat: Union[str,int,np.integer], class_name: str) -> NDArray[np.int32]:
-    """Convert a material name into labels of the specified class (if any).
+  def class_labels_of_material(self, mat: Union[str,int,np.integer], entity_type: Union[str,EntityType]) -> NDArray[np.int32]:
+    """Convert a material name into labels of the specified entity type/class (if any).
 
     Args:
       mat (Union[str,int,np.integer]): The material name or number.
-      class_name (str): The element class name.
+      entity_type (Union[str,EntityType]): The entity type ("brick", "node", etc.).
 
     Returns:
-      NDArray[np.int32]: array of labels of the specified class name and material.
+      NDArray[np.int32]: array of labels of the specified class name (entity type) and material.
     """
     result: NDArray[np.int32]
-    result = self.__postprocess(results = self._mili.class_labels_of_material(mat, class_name),
+    entity_type_str = mdg_enum_to_string(entity_type)
+    result = self.__postprocess(results = self._mili.class_labels_of_material(mat, entity_type_str),
                                 reduce_function = reductions.list_concatenate)
     return result
 
@@ -506,25 +533,26 @@ class MiliDatabase:
       mat (Union[str,int,np.integer]): The material name or number.
 
     Returns:
-      Dict[str,NDArray[np.int32]]: Keys are element class names. Values are numpy arrays of element labels.
+      Dict[str,NDArray[np.int32]]: Keys are element entity types. Values are numpy arrays of element labels.
     """
     result: Dict[str,NDArray[np.int32]]
     result = self.__postprocess(results = self._mili.all_labels_of_material(mat),
                                 reduce_function = reductions.dictionary_merge_concat)
     return result
 
-  def nodes_of_elems(self, class_sname: str, elem_labels: ArrayLike) -> Tuple[NDArray[np.int32],NDArray[np.int32]]:
+  def nodes_of_elems(self, entity_type: Union[str,EntityType], elem_labels: ArrayLike) -> Tuple[NDArray[np.int32],NDArray[np.int32]]:
     """Find nodes associated with elements by label.
 
     Args:
-      class_sname (str): The element class name.
+      entity_type (Union[str,EntityType]): The entity type ("brick", "node", etc.).
       elem_labels (ArrayLike): List of element labels.
 
     Returns:
       Tuple[NDArray[np.int32],NDArray[np.int32]]: (The nodal connectivity, The element labels)
     """
     result: Tuple[NDArray[np.int32],NDArray[np.int32]]
-    result = self.__postprocess(results = self._mili.nodes_of_elems(class_sname, elem_labels),
+    entity_type_str = mdg_enum_to_string(entity_type)
+    result = self.__postprocess(results = self._mili.nodes_of_elems(entity_type_str, elem_labels),
                                 reduce_function = reductions.reduce_nodes_of_elems)
     return result
 
@@ -623,22 +651,24 @@ class MiliDatabase:
     return merged_results
 
   @overload
-  def query(self, svar_names: Union[List[str],str], class_sname: str, material: Optional[Union[str,int]] = None,
+  def query(self, svar_names: Union[List[str],List[StateVariableName],str,StateVariableName],
+            entity_type: Union[str,EntityType], material: Optional[Union[str,int]] = None,
             labels: Optional[Union[List[int],int]] = None, states: Optional[Union[List[int],int]] = None,
             ips: Optional[Union[List[int],int]] = None, write_data: Optional[Dict[str,QueryDict]] = None,
             as_dataframe: Literal[False] = False, modifier: Optional[ResultModifier] = None,
             **kwargs: Any) -> Dict[str,QueryDict]: ...
 
   @overload
-  def query(self, svar_names: Union[List[str],str], class_sname: str, material: Optional[Union[str,int]] = None,
+  def query(self, svar_names: Union[List[str],List[StateVariableName],str,StateVariableName],
+            entity_type: Union[str,EntityType], material: Optional[Union[str,int]] = None,
             labels: Optional[Union[List[int],int]] = None, states: Optional[Union[List[int],int]] = None,
             ips: Optional[Union[List[int],int]] = None, write_data: Optional[Dict[str,QueryDict]] = None,
             as_dataframe: Literal[True] = ..., modifier: Optional[ResultModifier] = None,
             **kwargs: Any) -> Dict[str,pd.DataFrame]: ...
 
   def query(self,
-            svar_names: Union[List[str],str],
-            class_sname: str,
+            svar_names: Union[List[str],List[StateVariableName],str,StateVariableName],
+            entity_type: Union[str,EntityType],
             material: Optional[Union[str,int]] = None,
             labels: Optional[Union[List[int],int]] = None,
             states: Optional[Union[List[int],int]] = None,
@@ -650,8 +680,8 @@ class MiliDatabase:
     """Query the database for state variables or derived variables, returning data for the specified parameters, optionally writing data to the database.
 
     Args:
-      svar_names (Union[List[str],str]): The names of the state variables to be queried.
-      class_sname (str): The element class name being queried (e.g. brick. shell, node).
+      svar_names (Union[List[str],List[StateVariableName],str,StateVariableName]): The names of the state variables to be queried.
+      entity_type (Union[str,EntityType]): The entity type/class being queried (e.g. brick. shell, node).
       material (Optional[Union[str,int]], default=None): Optional material name or number to select labels from.
       labels (Optional[Union[List[int],int]], default=None): Optional labels to query data for, filtered by material
         if material if material is supplied, default is all.
@@ -664,8 +694,15 @@ class MiliDatabase:
       modifier (Optional[ResultModifier]): Optional modifer to apply to results.
     """
     result: Union[Dict[str,pd.DataFrame],Dict[str,QueryDict]]
+
+    entity_type_str = mdg_enum_to_string(entity_type)
+    if isinstance(svar_names, list):
+      svar_names = [mdg_enum_to_string(svar) for svar in svar_names]
+    else:
+      svar_names = mdg_enum_to_string(svar_names)
+
     result = self.__postprocess(
-      results = self._mili.query(svar_names, class_sname, material, labels, states, ips, write_data, **kwargs),
+      results = self._mili.query(svar_names, entity_type_str, material, labels, states, ips, write_data, **kwargs),
       reduce_function = reductions.combine)
 
     if modifier:

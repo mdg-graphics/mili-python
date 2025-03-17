@@ -15,6 +15,7 @@ from numpy.typing import NDArray
 from itertools import groupby
 
 from mili.datatypes import Superclass, QueryDict, QueryLayout
+from mili.mdg_defines import DerivedVariables, NodalStateVariables, StressStrainStateVariables, MaterialStateVariables, EntityType
 
 if TYPE_CHECKING:
   from mili.miliinternal import _MiliInternal
@@ -47,341 +48,479 @@ class DerivedExpressions:
   def __init__(self, db: _MiliInternal):
     self.db = db
 
-    self.__derived_expressions = {
-      "disp_x": DerivedSpec(
+    self.__derived_expressions: Dict[str,DerivedSpec] = {
+      DerivedVariables.X_DISPLACEMENT.value: DerivedSpec(
         title = "X Displacement",
-        primals = ["ux"],  # The primals needed to compute the derived result
+        primals = [NodalStateVariables.X_POSITION.value],  # The primals needed to compute the derived result
         primals_class =  [None],  # The element class of each primal, None = same as requested class_name.
         supports_batching = False,
         compute_function = self.__compute_node_displacement
       ),
-      "disp_y": DerivedSpec(
+      DerivedVariables.Y_DISPLACEMENT.value: DerivedSpec(
         title = "Y Displacement",
-        primals = ["uy"],
+        primals = [NodalStateVariables.Y_POSITION.value],
         primals_class = [None],
         supports_batching = False,
         compute_function = self.__compute_node_displacement
       ),
-      "disp_z": DerivedSpec(
+      DerivedVariables.Z_DISPLACEMENT.value: DerivedSpec(
         title = "Z Displacement",
-        primals = ["uz"],
+        primals = [NodalStateVariables.Z_POSITION.value],
         primals_class = [None],
         supports_batching = False,
         compute_function = self.__compute_node_displacement
       ),
-      "disp_mag": DerivedSpec(
+      DerivedVariables.DISPLACEMENT_MAGNITUDE.value: DerivedSpec(
         title = "Displacement Magnitude",
-        primals = ["ux", "uy", "uz"],
+        primals = [NodalStateVariables.X_POSITION.value,
+                   NodalStateVariables.Y_POSITION.value,
+                   NodalStateVariables.Z_POSITION.value],
         primals_class = [None, None, None],
         supports_batching = False,
         compute_function = self.__compute_node_displacement_magnitude
       ),
-      "disp_rad_mag_xy": DerivedSpec(
+      DerivedVariables.RADIAL_DISPLACEMENT_MAGNITUDE_XY.value: DerivedSpec(
         title = "Radial Displacement Magnitude XY",
-        primals = ["ux", "uy"],
+        primals = [NodalStateVariables.X_POSITION.value,
+                   NodalStateVariables.Y_POSITION.value],
         primals_class = [None, None],
         supports_batching = False,
         compute_function = self.__compute_node_radial_displacement
       ),
-      "vel_x": DerivedSpec(
+      DerivedVariables.X_VELOCITY.value: DerivedSpec(
         title = "X Velocity",
-        primals = ["ux"],
+        primals = [NodalStateVariables.X_POSITION.value],
         primals_class = [None],
         supports_batching = False,
         compute_function = self.__compute_node_velocity
       ),
-      "vel_y": DerivedSpec(
+      DerivedVariables.Y_VELOCITY.value: DerivedSpec(
         title = "Y Velocity",
-        primals = ["uy"],
+        primals = [NodalStateVariables.Y_POSITION.value],
         primals_class = [None],
         supports_batching = False,
         compute_function = self.__compute_node_velocity
       ),
-      "vel_z": DerivedSpec(
+      DerivedVariables.Z_VELOCITY.value: DerivedSpec(
         title = "Z Velocity",
-        primals = ["uz"],
+        primals = [NodalStateVariables.Z_POSITION.value],
         primals_class = [None],
         supports_batching = False,
         compute_function = self.__compute_node_velocity
       ),
-      "acc_x": DerivedSpec(
+      DerivedVariables.X_ACCELERATION.value: DerivedSpec(
         title = "X Acceleration",
-        primals = ["ux"],
+        primals = [NodalStateVariables.X_POSITION.value],
         primals_class = [None],
         supports_batching = False,
         compute_function = self.__compute_node_acceleration
       ),
-      "acc_y": DerivedSpec(
+      DerivedVariables.Y_ACCELERATION.value: DerivedSpec(
         title = "Y Acceleration",
-        primals = ["uy"],
+        primals = [NodalStateVariables.Y_POSITION.value],
         primals_class = [None],
         supports_batching = False,
         compute_function = self.__compute_node_acceleration
       ),
-      "acc_z": DerivedSpec(
+      DerivedVariables.Z_ACCELERATION.value: DerivedSpec(
         title = "Z Acceleration",
-        primals = ["uz"],
+        primals = [NodalStateVariables.Z_POSITION.value],
         primals_class = [None],
         supports_batching = False,
         compute_function = self.__compute_node_acceleration
       ),
-      "vol_strain": DerivedSpec(
+      DerivedVariables.VOLUMETRIC_STRAIN.value: DerivedSpec(
         title = "Volumetric Strain",
-        primals = ["ex","ey","ez"],
+        primals = [StressStrainStateVariables.X_STRAIN.value,
+                   StressStrainStateVariables.Y_STRAIN.value,
+                   StressStrainStateVariables.Z_STRAIN.value],
         primals_class = [None, None, None],
         supports_batching = False,
         compute_function = self.__compute_vol_strain
       ),
-      "prin_strain1": DerivedSpec(
+      DerivedVariables.PRINCIPAL_STRAIN_1.value: DerivedSpec(
         title = "Principal Strain 1",
-        primals = ["ex","ey","ez","exy","eyz","ezx"],
+        primals = [StressStrainStateVariables.X_STRAIN.value,
+                   StressStrainStateVariables.Y_STRAIN.value,
+                   StressStrainStateVariables.Z_STRAIN.value,
+                   StressStrainStateVariables.XY_STRAIN.value,
+                   StressStrainStateVariables.YZ_STRAIN.value,
+                   StressStrainStateVariables.ZX_STRAIN.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = True,
         compute_function = self.__compute_principal_strain
       ),
-      "prin_strain2": DerivedSpec(
+      DerivedVariables.PRINCIPAL_STRAIN_2.value: DerivedSpec(
         title = "Principal Strain 2",
-        primals = ["ex","ey","ez","exy","eyz","ezx"],
+        primals = [StressStrainStateVariables.X_STRAIN.value,
+                   StressStrainStateVariables.Y_STRAIN.value,
+                   StressStrainStateVariables.Z_STRAIN.value,
+                   StressStrainStateVariables.XY_STRAIN.value,
+                   StressStrainStateVariables.YZ_STRAIN.value,
+                   StressStrainStateVariables.ZX_STRAIN.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = True,
         compute_function = self.__compute_principal_strain
       ),
-      "prin_strain3": DerivedSpec(
+      DerivedVariables.PRINCIPAL_STRAIN_3.value: DerivedSpec(
         title = "Principal Strain 3",
-        primals = ["ex","ey","ez","exy","eyz","ezx"],
+        primals = [StressStrainStateVariables.X_STRAIN.value,
+                   StressStrainStateVariables.Y_STRAIN.value,
+                   StressStrainStateVariables.Z_STRAIN.value,
+                   StressStrainStateVariables.XY_STRAIN.value,
+                   StressStrainStateVariables.YZ_STRAIN.value,
+                   StressStrainStateVariables.ZX_STRAIN.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = True,
         compute_function = self.__compute_principal_strain
       ),
-      "prin_dev_strain1": DerivedSpec(
+      DerivedVariables.PRINCIPAL_DEV_STRAIN_1.value: DerivedSpec(
         title = "Principal Deviatoric Strain 1",
-        primals = ["ex","ey","ez","exy","eyz","ezx"],
+        primals = [StressStrainStateVariables.X_STRAIN.value,
+                   StressStrainStateVariables.Y_STRAIN.value,
+                   StressStrainStateVariables.Z_STRAIN.value,
+                   StressStrainStateVariables.XY_STRAIN.value,
+                   StressStrainStateVariables.YZ_STRAIN.value,
+                   StressStrainStateVariables.ZX_STRAIN.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = True,
         compute_function = self.__compute_dev_principal_strain
       ),
-      "prin_dev_strain2": DerivedSpec(
+      DerivedVariables.PRINCIPAL_DEV_STRAIN_2.value: DerivedSpec(
         title = "Principal Deviatoric Strain 2",
-        primals = ["ex","ey","ez","exy","eyz","ezx"],
+        primals = [StressStrainStateVariables.X_STRAIN.value,
+                   StressStrainStateVariables.Y_STRAIN.value,
+                   StressStrainStateVariables.Z_STRAIN.value,
+                   StressStrainStateVariables.XY_STRAIN.value,
+                   StressStrainStateVariables.YZ_STRAIN.value,
+                   StressStrainStateVariables.ZX_STRAIN.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = True,
         compute_function = self.__compute_dev_principal_strain
       ),
-      "prin_dev_strain3": DerivedSpec(
+      DerivedVariables.PRINCIPAL_DEV_STRAIN_3.value: DerivedSpec(
         title = "Principal Deviatoric Strain 3",
-        primals = ["ex","ey","ez","exy","eyz","ezx"],
+        primals = [StressStrainStateVariables.X_STRAIN.value,
+                   StressStrainStateVariables.Y_STRAIN.value,
+                   StressStrainStateVariables.Z_STRAIN.value,
+                   StressStrainStateVariables.XY_STRAIN.value,
+                   StressStrainStateVariables.YZ_STRAIN.value,
+                   StressStrainStateVariables.ZX_STRAIN.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = True,
         compute_function = self.__compute_dev_principal_strain
       ),
       # Alternate calculation methods used to check for possibility of errors.
-      "prin_strain1_alt": DerivedSpec(
+      DerivedVariables.PRINCIPAL_STRAIN_1_ALT.value: DerivedSpec(
         title = "Principal Strain 1 (alt)",
-        primals = ["ex","ey","ez","exy","eyz","ezx"],
+        primals = [StressStrainStateVariables.X_STRAIN.value,
+                   StressStrainStateVariables.Y_STRAIN.value,
+                   StressStrainStateVariables.Z_STRAIN.value,
+                   StressStrainStateVariables.XY_STRAIN.value,
+                   StressStrainStateVariables.YZ_STRAIN.value,
+                   StressStrainStateVariables.ZX_STRAIN.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = False,
         compute_function = self.__compute_principal_strain_alt
       ),
-      "prin_strain2_alt": DerivedSpec(
+      DerivedVariables.PRINCIPAL_STRAIN_2_ALT.value: DerivedSpec(
         title = "Principal Strain 2 (alt)",
-        primals = ["ex","ey","ez","exy","eyz","ezx"],
+        primals = [StressStrainStateVariables.X_STRAIN.value,
+                   StressStrainStateVariables.Y_STRAIN.value,
+                   StressStrainStateVariables.Z_STRAIN.value,
+                   StressStrainStateVariables.XY_STRAIN.value,
+                   StressStrainStateVariables.YZ_STRAIN.value,
+                   StressStrainStateVariables.ZX_STRAIN.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = False,
         compute_function = self.__compute_principal_strain_alt
       ),
-      "prin_strain3_alt": DerivedSpec(
+      DerivedVariables.PRINCIPAL_STRAIN_3_ALT.value: DerivedSpec(
         title = "Principal Strain 3 (alt)",
-        primals = ["ex","ey","ez","exy","eyz","ezx"],
+        primals = [StressStrainStateVariables.X_STRAIN.value,
+                   StressStrainStateVariables.Y_STRAIN.value,
+                   StressStrainStateVariables.Z_STRAIN.value,
+                   StressStrainStateVariables.XY_STRAIN.value,
+                   StressStrainStateVariables.YZ_STRAIN.value,
+                   StressStrainStateVariables.ZX_STRAIN.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = False,
         compute_function = self.__compute_principal_strain_alt
       ),
-      "prin_dev_strain1_alt": DerivedSpec(
+      DerivedVariables.PRINCIPAL_DEV_STRAIN_1_ALT.value: DerivedSpec(
         title = "Principal Deviatoric Strain 1 (alt)",
-        primals = ["ex","ey","ez","exy","eyz","ezx"],
+        primals = [StressStrainStateVariables.X_STRAIN.value,
+                   StressStrainStateVariables.Y_STRAIN.value,
+                   StressStrainStateVariables.Z_STRAIN.value,
+                   StressStrainStateVariables.XY_STRAIN.value,
+                   StressStrainStateVariables.YZ_STRAIN.value,
+                   StressStrainStateVariables.ZX_STRAIN.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = False,
         compute_function = self.__compute_dev_principal_strain_alt
       ),
-      "prin_dev_strain2_alt": DerivedSpec(
+      DerivedVariables.PRINCIPAL_DEV_STRAIN_2_ALT.value: DerivedSpec(
         title = "Principal Deviatoric Strain 2 (alt)",
-        primals = ["ex","ey","ez","exy","eyz","ezx"],
+        primals = [StressStrainStateVariables.X_STRAIN.value,
+                   StressStrainStateVariables.Y_STRAIN.value,
+                   StressStrainStateVariables.Z_STRAIN.value,
+                   StressStrainStateVariables.XY_STRAIN.value,
+                   StressStrainStateVariables.YZ_STRAIN.value,
+                   StressStrainStateVariables.ZX_STRAIN.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = False,
         compute_function = self.__compute_dev_principal_strain_alt
       ),
-      "prin_dev_strain3_alt": DerivedSpec(
+      DerivedVariables.PRINCIPAL_DEV_STRAIN_3_ALT.value: DerivedSpec(
         title = "Principal Deviatoric Strain 3 (alt)",
-        primals = ["ex","ey","ez","exy","eyz","ezx"],
+        primals = [StressStrainStateVariables.X_STRAIN.value,
+                   StressStrainStateVariables.Y_STRAIN.value,
+                   StressStrainStateVariables.Z_STRAIN.value,
+                   StressStrainStateVariables.XY_STRAIN.value,
+                   StressStrainStateVariables.YZ_STRAIN.value,
+                   StressStrainStateVariables.ZX_STRAIN.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = False,
         compute_function = self.__compute_dev_principal_strain_alt
       ),
-      "prin_stress1": DerivedSpec(
+      DerivedVariables.PRINCIPAL_STRESS_1.value: DerivedSpec(
         title = "Principal Stress 1",
-        primals =  ["sx","sy","sz","sxy","syz","szx"],
+        primals =  [StressStrainStateVariables.X_STRESS.value,
+                    StressStrainStateVariables.Y_STRESS.value,
+                    StressStrainStateVariables.Z_STRESS.value,
+                    StressStrainStateVariables.XY_STRESS.value,
+                    StressStrainStateVariables.YZ_STRESS.value,
+                    StressStrainStateVariables.ZX_STRESS.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = True,
         compute_function = self.__compute_principal_stress
       ),
-      "prin_stress2": DerivedSpec(
+      DerivedVariables.PRINCIPAL_STRESS_2.value: DerivedSpec(
         title = "Principal Stress 2",
-        primals =  ["sx","sy","sz","sxy","syz","szx"],
+        primals =  [StressStrainStateVariables.X_STRESS.value,
+                    StressStrainStateVariables.Y_STRESS.value,
+                    StressStrainStateVariables.Z_STRESS.value,
+                    StressStrainStateVariables.XY_STRESS.value,
+                    StressStrainStateVariables.YZ_STRESS.value,
+                    StressStrainStateVariables.ZX_STRESS.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = True,
         compute_function = self.__compute_principal_stress
       ),
-      "prin_stress3": DerivedSpec(
+      DerivedVariables.PRINCIPAL_STRESS_3.value: DerivedSpec(
         title = "Principal Stress 3",
-        primals =  ["sx","sy","sz","sxy","syz","szx"],
+        primals =  [StressStrainStateVariables.X_STRESS.value,
+                    StressStrainStateVariables.Y_STRESS.value,
+                    StressStrainStateVariables.Z_STRESS.value,
+                    StressStrainStateVariables.XY_STRESS.value,
+                    StressStrainStateVariables.YZ_STRESS.value,
+                    StressStrainStateVariables.ZX_STRESS.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = True,
         compute_function = self.__compute_principal_stress
       ),
-      "eff_stress": DerivedSpec(
+      DerivedVariables.EFFECTIVE_STRESS.value: DerivedSpec(
         title = "Effective Stress",
-        primals =  ["sx","sy","sz","sxy","syz","szx"],
+        primals =  [StressStrainStateVariables.X_STRESS.value,
+                    StressStrainStateVariables.Y_STRESS.value,
+                    StressStrainStateVariables.Z_STRESS.value,
+                    StressStrainStateVariables.XY_STRESS.value,
+                    StressStrainStateVariables.YZ_STRESS.value,
+                    StressStrainStateVariables.ZX_STRESS.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = False,
         compute_function = self.__compute_effective_stress
       ),
-      "pressure": DerivedSpec(
+      DerivedVariables.PRESSURE.value: DerivedSpec(
         title = "Pressure",
-        primals =  ['sx', 'sy', 'sz'],
+        primals =  [StressStrainStateVariables.X_STRESS.value,
+                    StressStrainStateVariables.Y_STRESS.value,
+                    StressStrainStateVariables.Z_STRESS.value],
         primals_class = [None, None, None],
         supports_batching = False,
         compute_function = self.__compute_pressure
       ),
-      "prin_dev_stress1": DerivedSpec(
+      DerivedVariables.PRINCIPAL_DEV_STRESS_1.value: DerivedSpec(
         title = "Principal Deviatoric Stress 1",
-        primals =  ["sx","sy","sz","sxy","syz","szx"],
+        primals =  [StressStrainStateVariables.X_STRESS.value,
+                    StressStrainStateVariables.Y_STRESS.value,
+                    StressStrainStateVariables.Z_STRESS.value,
+                    StressStrainStateVariables.XY_STRESS.value,
+                    StressStrainStateVariables.YZ_STRESS.value,
+                    StressStrainStateVariables.ZX_STRESS.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = True,
         compute_function = self.__compute_principal_dev_stress
       ),
-      "prin_dev_stress2": DerivedSpec(
+      DerivedVariables.PRINCIPAL_DEV_STRESS_2.value: DerivedSpec(
         title = "Principal Deviatoric Stress 2",
-        primals =  ["sx","sy","sz","sxy","syz","szx"],
+        primals =  [StressStrainStateVariables.X_STRESS.value,
+                    StressStrainStateVariables.Y_STRESS.value,
+                    StressStrainStateVariables.Z_STRESS.value,
+                    StressStrainStateVariables.XY_STRESS.value,
+                    StressStrainStateVariables.YZ_STRESS.value,
+                    StressStrainStateVariables.ZX_STRESS.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = True,
         compute_function = self.__compute_principal_dev_stress
       ),
-      "prin_dev_stress3": DerivedSpec(
+      DerivedVariables.PRINCIPAL_DEV_STRESS_3.value: DerivedSpec(
         title = "Principal Deviatoric Stress 3",
-        primals = ["sx","sy","sz","sxy","syz","szx"],
+        primals =  [StressStrainStateVariables.X_STRESS.value,
+                    StressStrainStateVariables.Y_STRESS.value,
+                    StressStrainStateVariables.Z_STRESS.value,
+                    StressStrainStateVariables.XY_STRESS.value,
+                    StressStrainStateVariables.YZ_STRESS.value,
+                    StressStrainStateVariables.ZX_STRESS.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = True,
         compute_function = self.__compute_principal_dev_stress
       ),
-      "max_shear_stress": DerivedSpec(
+      DerivedVariables.MAX_SHEAR_STRESS.value: DerivedSpec(
         title = "Maximum Shear Stress",
-        primals = ["sx","sy","sz","sxy","syz","szx"],
+        primals =  [StressStrainStateVariables.X_STRESS.value,
+                    StressStrainStateVariables.Y_STRESS.value,
+                    StressStrainStateVariables.Z_STRESS.value,
+                    StressStrainStateVariables.XY_STRESS.value,
+                    StressStrainStateVariables.YZ_STRESS.value,
+                    StressStrainStateVariables.ZX_STRESS.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = False,
         compute_function = self.__compute_max_shear_stress
       ),
-      "triaxiality": DerivedSpec(
+      DerivedVariables.TRIAXIALITY.value: DerivedSpec(
         title = "Triaxiality",
-        primals = ["sx","sy","sz","sxy","syz","szx"],
+        primals =  [StressStrainStateVariables.X_STRESS.value,
+                    StressStrainStateVariables.Y_STRESS.value,
+                    StressStrainStateVariables.Z_STRESS.value,
+                    StressStrainStateVariables.XY_STRESS.value,
+                    StressStrainStateVariables.YZ_STRESS.value,
+                    StressStrainStateVariables.ZX_STRESS.value],
         primals_class = [None, None, None, None, None, None],
         supports_batching = False,
         compute_function = self.__compute_triaxiality
       ),
-      "eps_rate": DerivedSpec(
+      DerivedVariables.EPS_RATE.value: DerivedSpec(
         title = "Equiv. Plastic Strain Rate",
-        primals = ["eps"],
+        primals = [StressStrainStateVariables.EQUIV_PLASTIC_STRAIN.value],
         primals_class = [None],
         supports_batching = False,
         compute_function = self.__compute_plastic_strain_rate
       ),
-      "nodtangmag": DerivedSpec(
+      DerivedVariables.TANGENTIAL_TRACTION_MAGNITUDE.value: DerivedSpec(
         title = "Nodal Tangential Traction Magnitude",
-        primals = ["nodtang_x", "nodtang_y", "nodtang_z"],
+        primals = [NodalStateVariables.X_TANGENTIAL_TRACTION.value,
+                   NodalStateVariables.Y_TANGENTIAL_TRACTION.value,
+                   NodalStateVariables.Z_TANGENTIAL_TRACTION.value],
         primals_class = [None, None, None],
         supports_batching = False,
         compute_function = self.__compute_nodal_tangential_traction_magnitude
       ),
-      "mat_cog_disp_x": DerivedSpec(
+      DerivedVariables.MAT_COG_DISP_X.value: DerivedSpec(
         title = "Material Center of Gravity X Displacement",
-        primals = ["matcgx"],
+        primals = [MaterialStateVariables.CENTER_OF_GRAVITY_X_POSITION.value],
         primals_class = [None],
         supports_batching = False,
         compute_function = self.__compute_material_cog_displacement
       ),
-      "mat_cog_disp_y": DerivedSpec(
+      DerivedVariables.MAT_COG_DISP_Y.value: DerivedSpec(
         title = "Material Center of Gravity Y Displacement",
-        primals = ["matcgy"],
+        primals = [MaterialStateVariables.CENTER_OF_GRAVITY_Y_POSITION.value],
         primals_class = [None],
         supports_batching = False,
         compute_function = self.__compute_material_cog_displacement
       ),
-      "mat_cog_disp_z": DerivedSpec(
+      DerivedVariables.MAT_COG_DISP_Z.value: DerivedSpec(
         title = "Material Center of Gravity Z Displacement",
-        primals = ["matcgz"],
+        primals = [MaterialStateVariables.CENTER_OF_GRAVITY_Z_POSITION.value],
         primals_class = [None],
         supports_batching = False,
         compute_function = self.__compute_material_cog_displacement
       ),
-      "element_volume": DerivedSpec(
+      DerivedVariables.ELEMENT_VOLUME.value: DerivedSpec(
         title = "Element Volume",
-        primals = ["nodpos"],
-        primals_class = ["node"],
+        primals = [NodalStateVariables.NODAL_POSITION.value],
+        primals_class = [EntityType.NODE.value],
         supports_batching = False,
         compute_function = self.__compute_element_volume,
         only_sclasses = [Superclass.M_HEX, Superclass.M_TET]
       ),
-      "area": DerivedSpec(
+      DerivedVariables.AREA.value: DerivedSpec(
         title = "Quad Area",
-        primals = ["nodpos"],
-        primals_class = ["node"],
+        primals = [NodalStateVariables.NODAL_POSITION.value],
+        primals_class = [EntityType.NODE.value],
         supports_batching = False,
         compute_function = self.__compute_quad_area,
         only_sclasses = [Superclass.M_QUAD],
       ),
-      "surfstrainx": DerivedSpec(
+      DerivedVariables.SURFACE_STRAIN_X.value: DerivedSpec(
         title = "Surface Strain X",
-        primals = ["ux", "uy", "uz"],
-        primals_class = ["node", "node", "node"],
+        primals = [NodalStateVariables.X_POSITION.value,
+                   NodalStateVariables.Y_POSITION.value,
+                   NodalStateVariables.Z_POSITION.value],
+        primals_class = [EntityType.NODE.value,
+                         EntityType.NODE.value,
+                         EntityType.NODE.value],
         supports_batching = False,
         compute_function = self.__compute_surface_strain,
         only_sclasses = [Superclass.M_HEX],
       ),
-      "surfstrainy": DerivedSpec(
+      DerivedVariables.SURFACE_STRAIN_Y.value: DerivedSpec(
         title = "Surface Strain Y",
-        primals = ["ux", "uy", "uz"],
-        primals_class = ["node", "node", "node"],
+        primals = [NodalStateVariables.X_POSITION.value,
+                   NodalStateVariables.Y_POSITION.value,
+                   NodalStateVariables.Z_POSITION.value],
+        primals_class = [EntityType.NODE.value,
+                         EntityType.NODE.value,
+                         EntityType.NODE.value],
         supports_batching = False,
         compute_function = self.__compute_surface_strain,
         only_sclasses = [Superclass.M_HEX],
       ),
-      "surfstrainz": DerivedSpec(
+      DerivedVariables.SURFACE_STRAIN_Z.value: DerivedSpec(
         title = "Surface Strain Z",
-        primals = ["ux", "uy", "uz"],
-        primals_class = ["node", "node", "node"],
+        primals = [NodalStateVariables.X_POSITION.value,
+                   NodalStateVariables.Y_POSITION.value,
+                   NodalStateVariables.Z_POSITION.value],
+        primals_class = [EntityType.NODE.value,
+                         EntityType.NODE.value,
+                         EntityType.NODE.value],
         supports_batching = False,
         compute_function = self.__compute_surface_strain,
         only_sclasses = [Superclass.M_HEX],
       ),
-      "surfstrainxy": DerivedSpec(
+      DerivedVariables.SURFACE_STRAIN_XY.value: DerivedSpec(
         title = "Surface Strain XY",
-        primals = ["ux", "uy", "uz"],
-        primals_class = ["node", "node", "node"],
+        primals = [NodalStateVariables.X_POSITION.value,
+                   NodalStateVariables.Y_POSITION.value,
+                   NodalStateVariables.Z_POSITION.value],
+        primals_class = [EntityType.NODE.value,
+                         EntityType.NODE.value,
+                         EntityType.NODE.value],
         supports_batching = False,
         compute_function = self.__compute_surface_strain,
         only_sclasses = [Superclass.M_HEX],
       ),
-      "surfstrainyz": DerivedSpec(
+      DerivedVariables.SURFACE_STRAIN_YZ.value: DerivedSpec(
         title = "Surface Strain YZ",
-        primals = ["ux", "uy", "uz"],
-        primals_class = ["node", "node", "node"],
+        primals = [NodalStateVariables.X_POSITION.value,
+                   NodalStateVariables.Y_POSITION.value,
+                   NodalStateVariables.Z_POSITION.value],
+        primals_class = [EntityType.NODE.value,
+                         EntityType.NODE.value,
+                         EntityType.NODE.value],
         supports_batching = False,
         compute_function = self.__compute_surface_strain,
         only_sclasses = [Superclass.M_HEX],
       ),
-      "surfstrainzx": DerivedSpec(
+      DerivedVariables.SURFACE_STRAIN_ZX.value: DerivedSpec(
         title = "Surface Strain ZX",
-        primals = ["ux", "uy", "uz"],
-        primals_class = ["node", "node", "node"],
+        primals = [NodalStateVariables.X_POSITION.value,
+                   NodalStateVariables.Y_POSITION.value,
+                   NodalStateVariables.Z_POSITION.value],
+        primals_class = [EntityType.NODE.value,
+                         EntityType.NODE.value,
+                         EntityType.NODE.value],
         supports_batching = False,
         compute_function = self.__compute_surface_strain,
         only_sclasses = [Superclass.M_HEX],

@@ -9,6 +9,7 @@ import os
 import unittest
 from mili import reader
 from mili.milidatabase import MiliPythonError, ResultModifier
+from mili.mdg_defines import EntityType, NodalStateVariables, StressStrainStateVariables, MaterialStateVariables, GlobalStateVariables
 from mili.datatypes import Superclass
 import numpy as np
 
@@ -167,6 +168,20 @@ class SharedSerialTests:
             np.testing.assert_equal(labels['glob'], GLOB_LBLS)
             np.testing.assert_equal(labels['mat'], MATS_LBLS)
 
+            np.testing.assert_equal(self.mili.labels('node'), NODE_LBLS)
+            np.testing.assert_equal(self.mili.labels('beam'), BEAM_LBLS)
+            np.testing.assert_equal(self.mili.labels('brick'), BRICK_LBLS)
+            np.testing.assert_equal(self.mili.labels('shell'), SHELL_LBLS)
+            np.testing.assert_equal(self.mili.labels('glob'), GLOB_LBLS)
+            np.testing.assert_equal(self.mili.labels('mat'), MATS_LBLS)
+
+            np.testing.assert_equal(self.mili.labels(EntityType.NODE), NODE_LBLS)
+            np.testing.assert_equal(self.mili.labels(EntityType.BEAM), BEAM_LBLS)
+            np.testing.assert_equal(self.mili.labels(EntityType.BRICK), BRICK_LBLS)
+            np.testing.assert_equal(self.mili.labels(EntityType.SHELL), SHELL_LBLS)
+            np.testing.assert_equal(self.mili.labels(EntityType.GLOBAL), GLOB_LBLS)
+            np.testing.assert_equal(self.mili.labels(EntityType.MATERIAL), MATS_LBLS)
+
         #==============================================================================
         def test_connectivity(self):
             all_conn = self.mili.connectivity()
@@ -183,12 +198,26 @@ class SharedSerialTests:
             self.assertTrue( all( all_conn['cseg'][1:12,-1] == 4) )  # Csegs 1-12 are material 4
             self.assertTrue( all( all_conn['cseg'][12:24,-1] == 5) )  # Csegs 12-24 are material 5
 
+            self.assertTrue( all( self.mili.connectivity('beam')[:,-1] == 1) )  # All beams are material 1
+            self.assertTrue( all( self.mili.connectivity('brick')[:,-1] == 2) )  # All bricks are material 2
+            self.assertTrue( all( self.mili.connectivity('shell')[:,-1] == 3) )  # All shells are material 3
+            self.assertTrue( all( self.mili.connectivity('cseg')[1:12,-1] == 4) )  # Csegs 1-12 are material 4
+            self.assertTrue( all( self.mili.connectivity('cseg')[12:24,-1] == 5) )  # Csegs 12-24 are material 5
+
+            self.assertTrue( all( self.mili.connectivity(EntityType.BEAM)[:,-1] == 1) )  # All beams are material 1
+            self.assertTrue( all( self.mili.connectivity(EntityType.BRICK)[:,-1] == 2) )  # All bricks are material 2
+            self.assertTrue( all( self.mili.connectivity(EntityType.SHELL)[:,-1] == 3) )  # All shells are material 3
+            self.assertTrue( all( self.mili.connectivity(EntityType.CONTACT_SEGMENT)[1:12,-1] == 4) )  # Csegs 1-12 are material 4
+            self.assertTrue( all( self.mili.connectivity(EntityType.CONTACT_SEGMENT)[12:24,-1] == 5) )  # Csegs 12-24 are material 5
+
         #==============================================================================
         def test_faces(self):
             with self.assertRaises(MiliPythonError):
                 self.mili.faces("brickkkkk", 1)
             with self.assertRaises(MiliPythonError):
                 self.mili.faces("shell", 1)
+            with self.assertRaises(MiliPythonError):
+                self.mili.faces(EntityType.SHELL, 1)
             with self.assertRaises(MiliPythonError):
                 self.mili.faces("brick", 100)
 
@@ -208,7 +237,7 @@ class SharedSerialTests:
             np.testing.assert_equal(faces[5], [114, 130, 134, 118])
             np.testing.assert_equal(faces[6], [113, 117, 133, 129])
 
-            faces = self.mili.faces("brick", 32)
+            faces = self.mili.faces(EntityType.BRICK, 32)
             np.testing.assert_equal(faces[1], [131, 135, 136, 132])
             np.testing.assert_equal(faces[2], [135, 119, 120, 136])
             np.testing.assert_equal(faces[3], [115, 116, 120, 119])
@@ -218,7 +247,7 @@ class SharedSerialTests:
 
         #==============================================================================
         def test_components_of_vector_svar(self):
-            comps = self.mili.components_of_vector_svar("stress")
+            comps = self.mili.components_of_vector_svar(StressStrainStateVariables.STRESS)
             self.assertEqual(comps, ["sx", "sy", "sz", "sxy", "syz", "szx"])
 
             with self.assertRaises(MiliPythonError):
@@ -265,6 +294,26 @@ class SharedSerialTests:
                 print(mat_classes)
 
         #==============================================================================
+        def test_int_points_of_state_variable(self):
+            ipts = self.mili.int_points_of_state_variable("sx", "brick")
+            np.testing.assert_equal(ipts, [])
+
+            ipts = self.mili.int_points_of_state_variable("sx", "beam")
+            np.testing.assert_equal(ipts, [1,2,3,4])
+
+            ipts = self.mili.int_points_of_state_variable("sx", "shell")
+            np.testing.assert_equal(ipts, [1,2])
+
+            ipts = self.mili.int_points_of_state_variable("sx", EntityType.BRICK)
+            np.testing.assert_equal(ipts, [])
+
+            ipts = self.mili.int_points_of_state_variable("sx", EntityType.BEAM)
+            np.testing.assert_equal(ipts, [1,2,3,4])
+
+            ipts = self.mili.int_points_of_state_variable("sx", EntityType.SHELL)
+            np.testing.assert_equal(ipts, [1,2])
+
+        #==============================================================================
         def test_element_sets(self):
             elem_sets = self.mili.element_sets()
             self.assertEqual( set(elem_sets.keys()), set(["es_1", "es_3"]))
@@ -279,11 +328,41 @@ class SharedSerialTests:
             self.assertEqual( int_points['3'], [1,2] )
 
         #==============================================================================
+        def test_derived_variables_of_class(self):
+            BRICK_DERIVED = ['vol_strain', 'prin_strain1', 'prin_strain2', 'prin_strain3', 'prin_dev_strain1', 'prin_dev_strain2',
+                            'prin_dev_strain3', 'prin_strain1_alt', 'prin_strain2_alt', 'prin_strain3_alt', 'prin_dev_strain1_alt',
+                            'prin_dev_strain2_alt', 'prin_dev_strain3_alt', 'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress',
+                            'pressure', 'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress', 'triaxiality',
+                            'element_volume', 'surfstrainx', 'surfstrainy', 'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx',
+                            ]
+            BEAM_DERIVED = ['prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure', 'prin_dev_stress1', 'prin_dev_stress2',
+                            'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'eps_rate'
+                            ]
+            SHELL_DERIVED = ['vol_strain', 'prin_strain1', 'prin_strain2', 'prin_strain3', 'prin_dev_strain1', 'prin_dev_strain2', 'prin_dev_strain3',
+                            'prin_strain1_alt', 'prin_strain2_alt', 'prin_strain3_alt', 'prin_dev_strain1_alt', 'prin_dev_strain2_alt', 'prin_dev_strain3_alt',
+                            'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure', 'prin_dev_stress1', 'prin_dev_stress2',
+                            'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'area'
+                            ]
+            CSEG_DERIVED = ['area']
+            NODE_DERIVED = ['disp_x', 'disp_y', 'disp_z', 'disp_mag', 'disp_rad_mag_xy', 'vel_x', 'vel_y', 'vel_z', 'acc_x', 'acc_y', 'acc_z',]
+            self.assertEqual( self.mili.derived_variables_of_class("brick"), BRICK_DERIVED )
+            self.assertEqual( self.mili.derived_variables_of_class("beam"), BEAM_DERIVED )
+            self.assertEqual( self.mili.derived_variables_of_class("shell"), SHELL_DERIVED )
+            self.assertEqual( self.mili.derived_variables_of_class("cseg"), CSEG_DERIVED )
+            self.assertEqual( self.mili.derived_variables_of_class("node"), NODE_DERIVED )
+
+            self.assertEqual( self.mili.derived_variables_of_class(EntityType.BRICK), BRICK_DERIVED )
+            self.assertEqual( self.mili.derived_variables_of_class(EntityType.BEAM), BEAM_DERIVED )
+            self.assertEqual( self.mili.derived_variables_of_class(EntityType.SHELL), SHELL_DERIVED )
+            self.assertEqual( self.mili.derived_variables_of_class(EntityType.CONTACT_SEGMENT), CSEG_DERIVED )
+            self.assertEqual( self.mili.derived_variables_of_class(EntityType.NODE), NODE_DERIVED )
+
+        #==============================================================================
         def test_classes_of_state_variable(self):
             sx_classes = self.mili.classes_of_state_variable('sx')
             self.assertEqual(set(sx_classes), set(["beam", "shell", "brick"]))
 
-            uy_classes = self.mili.classes_of_state_variable('uy')
+            uy_classes = self.mili.classes_of_state_variable(NodalStateVariables.Y_POSITION)
             self.assertEqual(uy_classes, ["node"])
 
             axf_classes = self.mili.classes_of_state_variable('axf')
@@ -291,9 +370,9 @@ class SharedSerialTests:
 
         #==============================================================================
         def test_materials_of_class_name(self):
-            brick_mats = self.mili.materials_of_class_name("brick")
+            brick_mats = self.mili.materials_of_class_name(EntityType.BRICK)
             beam_mats = self.mili.materials_of_class_name("beam")
-            shell_mats = self.mili.materials_of_class_name("shell")
+            shell_mats = self.mili.materials_of_class_name(EntityType.SHELL)
             cseg_mats = self.mili.materials_of_class_name("cseg")
 
             self.assertEqual( brick_mats.size, 36 )
@@ -312,9 +391,9 @@ class SharedSerialTests:
         #==============================================================================
         def test_parts_of_class_name(self):
             brick_parts = self.mili.parts_of_class_name("brick")
-            beam_parts = self.mili.parts_of_class_name("beam")
+            beam_parts = self.mili.parts_of_class_name(EntityType.BEAM)
             shell_parts = self.mili.parts_of_class_name("shell")
-            cseg_parts = self.mili.parts_of_class_name("cseg")
+            cseg_parts = self.mili.parts_of_class_name(EntityType.CONTACT_SEGMENT)
 
             self.assertEqual( brick_parts.size, 36 )
             np.testing.assert_equal( np.unique(brick_parts), np.array([2]) )
@@ -432,12 +511,17 @@ class SharedSerialTests:
             self.assertEqual(nodes.size, 8)
             np.testing.assert_equal(nodes, np.array( [[65, 81, 85, 69, 66, 82, 86, 70]], dtype = np.int32 ))
 
+            nodes, elem_labels = self.mili.nodes_of_elems(EntityType.BRICK, 1)
+            self.assertEqual( elem_labels[0], 1 )
+            self.assertEqual(nodes.size, 8)
+            np.testing.assert_equal(nodes, np.array( [[65, 81, 85, 69, 66, 82, 86, 70]], dtype = np.int32 ))
+
         #==============================================================================
         def test_class_labels_of_mat(self):
             answer = self.mili.class_labels_of_material(5,'cseg')
             np.testing.assert_equal(answer, np.array([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],dtype=np.int32))
 
-            answer = self.mili.class_labels_of_material("5",'cseg')
+            answer = self.mili.class_labels_of_material("5", EntityType.CONTACT_SEGMENT)
             np.testing.assert_equal(answer, np.array([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],dtype=np.int32))
 
             answer = self.mili.class_labels_of_material("slide1m",'cseg')
@@ -477,40 +561,52 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
 
     #==============================================================================
     def test_state_variables_of_class(self):
+        GLOB_SVARS = ['ke', 'ke_part', 'pe', 'he', 'bve', 'dre', 'stde', 'flde', 'tcon_damp_eng',
+                      'tcon_fric_eng', 'tcon_eng', 'ew', 'te', 'rbvx', 'rbvy', 'rbvz', 'rbax', 'rbay',
+                      'rbaz', 'init', 'plot', 'hsp', 'other_i_o', 'brick', 'beam', 'shell', 'tshell',
+                      'discrete', 'delam', 'cohesive', 'ml', 'ntet', 'sph', 'kin_contact', 'reglag_contact',
+                      'lag_solver', 'coupling', 'solution', 'xfem', 'total', 'cpu_time']
+        MAT_SVARS = ['matpe', 'matke', 'mathe', 'matbve', 'matdre', 'matstde', 'matflde', 'matte',
+            'matmass', 'matcgx', 'matcgy', 'matcgz', 'matxv', 'matyv', 'matzv', 'matxa', 'matya',
+            'matza', 'con_forx', 'con_fory', 'con_forz', 'con_momx', 'con_momy', 'con_momz',
+            'con_damp_eng', 'con_fric_eng', 'con_eng']
+        BEAM_SVARS = ['sx', 'sy', 'sz', 'sxy', 'syz', 'szx', 'eps', 'es_1a', 'axf', 'sfs', 'sft', 'ms', 'mt',
+            'tor', 'svec_x', 'svec_y', 'svec_z', 'svec', 'sand', 'cause']
+        BRICK_SVARS = ['sx', 'sy', 'sz', 'sxy', 'syz', 'szx', 'stress', 'ex', 'ey', 'ez',
+            'exy', 'eyz', 'ezx', 'strain', 'edrate', 'sand', 'cause']
+
         glob_vars = self.mili.state_variables_of_class("glob")
         mat_vars = self.mili.state_variables_of_class("mat")
         beam_vars = self.mili.state_variables_of_class("beam")
         brick_vars = self.mili.state_variables_of_class("brick")
+        self.assertEqual(glob_vars, GLOB_SVARS)
+        self.assertEqual(mat_vars, MAT_SVARS)
+        self.assertEqual(beam_vars, BEAM_SVARS)
+        self.assertEqual(brick_vars, BRICK_SVARS)
 
-        self.assertEqual(
-            glob_vars,
-            ['ke', 'ke_part', 'pe', 'he', 'bve', 'dre', 'stde', 'flde', 'tcon_damp_eng',
-            'tcon_fric_eng', 'tcon_eng', 'ew', 'te', 'rbvx', 'rbvy', 'rbvz', 'rbax', 'rbay',
-            'rbaz', 'init', 'plot', 'hsp', 'other_i_o', 'brick', 'beam', 'shell', 'tshell',
-            'discrete', 'delam', 'cohesive', 'ml', 'ntet', 'sph', 'kin_contact', 'reglag_contact',
-            'lag_solver', 'coupling', 'solution', 'xfem', 'total', 'cpu_time']
-        )
-        self.assertEqual(
-            mat_vars,
-            ['matpe', 'matke', 'mathe', 'matbve', 'matdre', 'matstde', 'matflde', 'matte',
-            'matmass', 'matcgx', 'matcgy', 'matcgz', 'matxv', 'matyv', 'matzv', 'matxa', 'matya',
-            'matza', 'con_forx', 'con_fory', 'con_forz', 'con_momx', 'con_momy', 'con_momz',
-            'con_damp_eng', 'con_fric_eng', 'con_eng']
-        )
-        self.assertEqual(
-            beam_vars,
-            ['sx', 'sy', 'sz', 'sxy', 'syz', 'szx', 'eps', 'es_1a', 'axf', 'sfs', 'sft', 'ms', 'mt',
-            'tor', 'svec_x', 'svec_y', 'svec_z', 'svec', 'sand', 'cause']
-        )
-        self.assertEqual(
-            brick_vars,
-            ['sx', 'sy', 'sz', 'sxy', 'syz', 'szx', 'stress', 'ex', 'ey', 'ez',
-            'exy', 'eyz', 'ezx', 'strain', 'edrate', 'sand', 'cause']
-        )
+        glob_vars = self.mili.state_variables_of_class(EntityType.GLOBAL)
+        mat_vars = self.mili.state_variables_of_class(EntityType.MATERIAL)
+        beam_vars = self.mili.state_variables_of_class(EntityType.BEAM)
+        brick_vars = self.mili.state_variables_of_class(EntityType.BRICK)
+        self.assertEqual(glob_vars, GLOB_SVARS)
+        self.assertEqual(mat_vars, MAT_SVARS)
+        self.assertEqual(beam_vars, BEAM_SVARS)
+        self.assertEqual(brick_vars, BRICK_SVARS)
+
+    #==============================================================================
+    def test_containing_state_variables_of_class(self):
+        containing = self.mili.containing_state_variables_of_class("sx", "brick")
+        self.assertEqual(containing, ["stress"])
+
+        containing = self.mili.containing_state_variables_of_class(NodalStateVariables.X_POSITION, "node")
+        self.assertEqual(containing, ["nodpos"])
+
+        containing = self.mili.containing_state_variables_of_class("ux", EntityType.BRICK)
+        self.assertEqual(containing, [])
 
     #==============================================================================
     def test_state_variable(self):
-        answer = self.mili.query('matcgx', 'mat', labels = [1,2], states = 3 )
+        answer = self.mili.query(MaterialStateVariables.CENTER_OF_GRAVITY_X_POSITION, 'mat', labels = [1,2], states = 3 )
         self.assertEqual(list(answer.keys()), ['matcgx'] )
         self.assertEqual(answer['matcgx']['title'], "C.G. X-Position")
         self.assertEqual(answer['matcgx']['class_name'], "mat")
@@ -520,7 +616,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         np.testing.assert_equal( answer['matcgx']['layout']['labels'], np.array( [ 1, 2 ], dtype = np.int32) )
         np.testing.assert_equal( answer['matcgx']['data'][0,:,:], np.array( [ [ 0.6021666526794434 ], [ 0.6706029176712036 ] ], dtype = np.float32) )
 
-        answer = self.mili.query('matcgx', 'mat', labels = [1,2], states = -99 )
+        answer = self.mili.query('matcgx', EntityType.MATERIAL, labels = [1,2], states = -99 )
         self.assertEqual(list(answer.keys()), ['matcgx'] )
         self.assertEqual(answer['matcgx']['title'], "C.G. X-Position")
         self.assertEqual(answer['matcgx']['class_name'], "mat")
@@ -542,13 +638,13 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         self.assertEqual(answer['nodpos[ux]']['layout']['labels'], [70])
         self.assertEqual(answer['nodpos[ux]']['data'][0], 0.4330127537250519 )
 
-        answer = self.mili.query('nodpos[ux]', 'node', labels = 70, states = -99 )
+        answer = self.mili.query('nodpos[ux]', EntityType.NODE, labels = 70, states = -99 )
         self.assertEqual(answer['nodpos[ux]']['layout']['states'], [3])
         np.testing.assert_allclose(answer['nodpos[ux]']['layout']['times'], [2.0e-05])
         self.assertEqual(answer['nodpos[ux]']['layout']['labels'][0], 70)
         self.assertEqual(answer['nodpos[ux]']['data'][0], 0.4330127537250519 )
 
-        answer = self.mili.query('ux', 'node', labels = 70, states = 3 )
+        answer = self.mili.query(NodalStateVariables.X_POSITION, EntityType.NODE, labels = 70, states = 3 )
         self.assertEqual(answer['ux']['title'], "X Position")
         self.assertEqual(answer['ux']['class_name'], "node")
         self.assertEqual(answer['ux']['layout']['components'], ['ux'])
@@ -578,7 +674,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         np.testing.assert_allclose(answer['sx']['layout']['times'], [3.6e-04])
         self.assertEqual(answer['sx']['layout']['labels'].size, 36)
 
-        answer = self.mili.query('sx', 'brick', material = 'es_12', states = 37 )
+        answer = self.mili.query('sx', EntityType.BRICK, material = 'es_12', states = 37 )
         self.assertEqual(answer['sx']['title'], 'X Stress')
         self.assertEqual(answer['sx']['class_name'], 'brick')
         self.assertEqual(answer['sx']['layout']['components'], ['sx'])
@@ -586,7 +682,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         np.testing.assert_allclose(answer['sx']['layout']['times'], [3.6e-04])
         self.assertEqual(answer['sx']['layout']['labels'].size, 36)
 
-        answer = self.mili.query('sx', 'brick', material = 'es_12', states = -65 )
+        answer = self.mili.query(StressStrainStateVariables.X_STRESS, EntityType.BRICK, material = 'es_12', states = -65 )
         self.assertEqual(answer['sx']['layout']['states'], [37])
         np.testing.assert_allclose(answer['sx']['layout']['times'], [3.6e-04])
         self.assertEqual(answer['sx']['layout']['labels'].size, 36)
@@ -629,7 +725,7 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         """
         Test querying for results for M_MESH ("glob") element class.
         """
-        answer = self.mili.query("he", "glob", states=[22])
+        answer = self.mili.query(GlobalStateVariables.HOURGLASS_ENERGY, "glob", states=[22])
         self.assertEqual( answer['he']['title'], 'Hourglass Energy')
         self.assertEqual( answer['he']['class_name'], 'glob')
         self.assertEqual( answer['he']['layout']['components'], ['he'] )
@@ -2034,7 +2130,7 @@ class SerialContextManagerTests(SharedSerialTests.SerialTests):
         self.assertEqual(answer['nodpos[ux]']['layout']['labels'][0], 70)
         self.assertEqual(answer['nodpos[ux]']['data'][0], 0.4330127537250519 )
 
-        answer = self.mili.query('ux', 'node', labels = 70, states = 3 )
+        answer = self.mili.query('ux', EntityType.NODE, labels = 70, states = 3 )
         self.assertEqual(answer['ux']['layout']['labels'][0], 70)
         self.assertEqual(answer['ux']['data'][0], 0.4330127537250519)
 
@@ -2072,7 +2168,7 @@ class SerialContextManagerTests(SharedSerialTests.SerialTests):
         answer = self.mili.query("bve", "glob", states=[22])
         self.assertAlmostEqual( answer["bve"]["data"][0,0,0], 2.05536485, delta=1e-7)
 
-        answer = self.mili.query("te", "glob", states=[22])
+        answer = self.mili.query(GlobalStateVariables.TOTAL_ENERGY, EntityType.GLOBAL, states=[22])
         self.assertAlmostEqual( answer["te"]["data"][0,0,0], 1629.718, delta=1e-4)
 
 if __name__ == "__main__":
