@@ -64,6 +64,33 @@ class StateVariableName(Enum):
     """Common State variables output by MDG codes."""
     pass
 
+class Dyna3dStateVariables(StateVariableName):
+    """State variables only written by Dyna3d."""
+    SHELL_EFF_PLASTIC_STRAIN_MID = "eeff_mid"
+    SHELL_EFF_PLASTIC_STRAIN_IN = "eeff_in"
+    SHELL_EFF_PLASTIC_STRAIN_OUT = "eeff_out"
+    MIN_PRESSURE = "min_press"
+    MAX_PRESSURE = "max_press"
+    MIN_PRINCIPAL_1 = "min_prin1"
+    MAX_PRINCIPAL_1 = "max_prin1"
+    MIN_PRINCIPAL_3 = "min_prin3"
+    MAX_PRINCIPAL_3 = "max_prin3"
+    MAX_MISES = "max_mises"
+    GLOBAL_RIGID_BODY_X_VEL = "rbvx"
+    GLOBAL_RIGID_BODY_Y_VEL = "rbvy"
+    GLOBAL_RIGID_BODY_Z_VEL = "rbvz"
+
+class DiabloStateVariables(StateVariableName):
+    """State variables only written by Diablo."""
+    SHELL_EFF_PLASTIC_STRAIN_MID = "eps_mid"
+    SHELL_EFF_PLASTIC_STRAIN_IN = "eps_in"
+    SHELL_EFF_PLASTIC_STRAIN_OUT = "eps_out"
+    GLOBAL_RIGID_BODY_X_VEL = "rigx"
+    GLOBAL_RIGID_BODY_Y_VEL = "rigy"
+    GLOBAL_RIGID_BODY_Z_VEL = "rigz"
+    NODAL_TEMPERATURE_RATE = "dtemp/dt"
+    NODAL_EIGENVECTOR = "evec"
+
 class GlobalStateVariables(StateVariableName):
     """Global (glob) variables"""
     KINETIC_ENERGY = "ke"
@@ -158,8 +185,6 @@ class NodalStateVariables(StateVariableName):
     Y_ANGLE_ACCELERATION = "ray"
     Z_ANGLE_ACCELERATION = "raz"
     TEMPERATURE = "temp"
-    TEMPERATURE_RATE = "dtemp/dt"
-    EIGENVECTOR = "evec"
     FRICTIONAL_WORK = "frwk"
     REACTION_MOMENT = "remom"
     X_REACTION_MOMENT = "remomx"
@@ -232,8 +257,16 @@ class ShellStateVariables(StateVariableName):
     DIABLO_EFF_PLASTIC_STRAIN_OUT = "eps_out"
     EQUIV_PLASTIC_STRAIN = "eps"
     BENDING_RESULTANT = "bend"
+    BEND_XX = "mxx"
+    BEND_YY = "myy"
+    BEND_ZZ = "mzz"
     SHEAR_RESULTANT = "shear"
+    SHEAR_XX = "qxx"
+    SHEAR_YY = "qyy"
     NORMAL_RESULTANT = "normal"
+    NORMAL_XX = "nxx"
+    NORMAL_YY = "nyy"
+    NORMAL_ZZ = "nzz"
     THICKNESS = "thick"
     ELEMENT_VARIABLE_1 = "edv1"
     ELEMENT_VARIABLE_2 = "edv2"
@@ -275,21 +308,11 @@ class StressStrainStateVariables(StateVariableName):
     EDRATE = "edrate"
     EPS_RATE = "eps_rate"
 
-class SharedStateVariables(StateVariableName):
+class ElementStateVariables(StateVariableName):
     """Common state variables shared by various entity types"""
-    MIN_PRESSURE = "min_press"
-    MAX_PRESSURE = "max_press"
-    MIN_PRINCIPAL_1 = "min_prin1"
-    MAX_PRINCIPAL_1 = "max_prin1"
-    MIN_PRINCIPAL_3 = "min_prin3"
-    MAX_PRINCIPAL_3 = "max_prin3"
-    MAX_MISES = "max_mises"
-    SAND = "sand"
+    SAND_FLAG = "sand"
     ELEMENT_TIME_STEP = "tstep"
     ELEMENT_DELETION_CAUSE = "cause"
-    CURRENT_TEMPERATURE = "t_cur"
-    YIELD_STRENGTH = "yield"
-    PLASTIC_ENERGY_DENSITY = "plas_work"
 
 class DerivedVariables(StateVariableName):
     """Common Derived variables that can be calculated from MDG codes."""

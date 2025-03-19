@@ -9,6 +9,9 @@ default naming as best we can, but these values are not guaranteed to always be 
 periodically changed throughout the history of the MDG codes and they may change again at any time. We will do our best to keep these values up to
 date.
 
+**NOTE**: These enumerations do not contain all variables that can be output by MDG's codes, just the most common. If there are state variables that
+that you would like to see added to these enumerations, please reach out.
+
 
 Entity Types
 ===============
@@ -20,6 +23,16 @@ Entity Types
 State Variables
 =================
 .. autoclass:: mili.mdg_defines.StateVariableName
+    :members:
+    :undoc-members:
+    :member-order: bysource
+
+.. autoclass:: mili.mdg_defines.Dyna3dStateVariables
+    :members:
+    :undoc-members:
+    :member-order: bysource
+
+.. autoclass:: mili.mdg_defines.DiabloStateVariables
     :members:
     :undoc-members:
     :member-order: bysource
@@ -74,7 +87,7 @@ State Variables
     :undoc-members:
     :member-order: bysource
 
-.. autoclass:: mili.mdg_defines.SharedStateVariables
+.. autoclass:: mili.mdg_defines.ElementStateVariables
     :members:
     :undoc-members:
     :member-order: bysource
