@@ -303,6 +303,8 @@ Mili-python also provides the option to modify the query results in various ways
 * :code:`ResultModifier.MIN`: Gets the minimum value at each state and the element it is associated with.
 * :code:`ResultModifier.MAX`: Gets the maximum value at each state and the element it is associated with.
 * :code:`ResultModifier.AVERAGE`: Get the average value at each state.
+* :code:`ResultModifier.MEDIAN`: Get the median value at each state.
+* :code:`ResultModifier.STDDEV`: Get the standard deviation at each state.
 
 More information on each of these modifiers as well as examples of how to use them are shown below:
 
@@ -372,7 +374,13 @@ The main differences are:
         'layout': {
            'states': array([10, 11, 12], dtype=int32),
            'labels': array([1, 1, 1], dtype=int32)
-        }
+           'components': ['sx'],
+           'times': array([0.00009 , 0.0001, 0.00011])
+        },
+        'source': 'primal',
+        'class_name': 'brick',
+        'title': 'X Stress',
+        'modifier': 'min',
     }
     """
 
@@ -397,8 +405,14 @@ The main differences are:
                        [[5.4794955e-09]]], dtype=float32),
         'layout': {
             'states': array([10, 11, 12], dtype=int32),
-            'labels': array([3, 3, 3], dtype=int32)
-        }
+            'labels': array([3, 3, 3], dtype=int32),
+            'components': ['sx'],
+            'times': array([0.00009 , 0.0001, 0.00011])
+        },
+        'source': 'primal',
+        'class_name': 'brick',
+        'title': 'X Stress',
+        'modifier': 'max',
     }
     """
 
@@ -436,14 +450,19 @@ average
     print(result["sx"])
     """
     {
-        'source': 'primal',
         'data': array([[[1.2160362e-10]],
                        [[1.7721129e-10]],
                        [[1.6010111e-10]]], dtype=float32),
         'layout': {
             'states': array([10, 11, 12], dtype=int32),
-            'labels': array([1, 2, 3], dtype=int32)
-        }
+            'labels': array([1, 2, 3], dtype=int32),
+            'components': ['sx'],
+            'times': array([0.00009 , 0.0001, 0.00011])
+        },
+        'source': 'primal',
+        'class_name': 'brick',
+        'title': 'X Stress',
+        'modifier': 'average',
     }
     """
 
@@ -451,10 +470,106 @@ average
     result = db.query("sx", "brick", labels=[1,2,3], states=[10,11,12], as_dataframe=True, modifier=ResultModifier.AVERAGE)
     print(result["sx"])
     """
-                 avg
+             average
     10  1.216036e-10
     11  1.772113e-10
     12  1.601011e-10
+    """
+
+median
+--------------
+
+.. code-block:: python
+
+    from mili.milidatabase import ResultModifier
+
+    # Query the X Stress for brick labels 1-3 for states 10-12
+    result = db.query("sx", "brick", labels=[1,2,3], states=[21,22,23], as_dataframe=True)
+    print(result["sx"])
+    """
+               1             2             3
+    21 -1.341000e-08  3.849760e-09  1.012488e-08
+    22 -4.756892e+03 -2.634086e+04 -7.198997e+03
+    23 -5.873996e+03 -9.543579e+03 -6.538296e+03
+    """
+
+    # Get the Median X stress for brick labels 1-3 for states 21-23
+    result = db.query("sx", "brick", labels=[1,2,3], states=[21,22,23], as_dataframe=False, modifier=ResultModifier.MEDIAN)
+    print(result["sx"])
+    """
+    {
+        'data': array([[[ 3.8497601e-09]],
+                       [[-7.1989971e+03]],
+                       [[-6.5382964e+03]]], dtype=float32),
+        'layout': {
+            'states': array([21, 22, 23], dtype=int32),
+            'labels': array([1, 2, 3], dtype=int32),
+            'components': ['sx'],
+            'times': array([0.0002 , 0.00021, 0.00022])
+        },
+        'source': 'primal',
+        'class_name': 'brick',
+        'title': 'X Stress',
+        'modifier': 'median'
+    }
+    """
+
+    # Get the Median X stress for brick labels 1-3 for states 21-23
+    result = db.query("sx", "brick", labels=[1,2,3], states=[21,22,23], as_dataframe=True, modifier=ResultModifier.MEDIAN)
+    print(result["sx"])
+    """
+              median
+    21  3.849760e-09
+    22 -7.198997e+03
+    23 -6.538296e+03
+    """
+
+stddev
+--------------
+
+.. code-block:: python
+
+    from mili.milidatabase import ResultModifier
+
+    # Query the X Stress for brick labels 1-3 for states 21-23
+    result = db.query("sx", "brick", labels=[1,2,3], states=[21,22,23], as_dataframe=True)
+    print(result["sx"])
+    """
+               1             2             3
+    21 -1.341000e-08  3.849760e-09  1.012488e-08
+    22 -4.756892e+03 -2.634086e+04 -7.198997e+03
+    23 -5.873996e+03 -9.543579e+03 -6.538296e+03}
+    """
+
+    # Get the Standard deviation of the X stress for brick labels 1-3 for states 21-23
+    result = db.query("sx", "brick", labels=[1,2,3], states=[21,22,23], as_dataframe=False, modifier=ResultModifier.STDDEV)
+    print(result["sx"])
+    """
+    {
+        'data': array([[[9.9508064e-09]],
+                       [[9.6508057e+03]],
+                       [[1.5964844e+03]]], dtype=float32),
+        'layout': {
+            'states': array([21, 22, 23], dtype=int32),
+            'labels': array([1, 2, 3], dtype=int32),
+            'components': ['sx'],
+            'times': array([0.0002 , 0.00021, 0.00022])
+        },
+        'source': 'primal',
+        'class_name': 'brick',
+        'title': 'X Stress',
+        'modifier': 'stddev',
+    }
+    """
+
+    # Get the Standard deviation of the X stress for brick labels 1-3 for states 21-23
+    result = db.query("sx", "brick", labels=[1,2,3], states=[21,22,23], as_dataframe=True, modifier=ResultModifier.STDDEV)
+    print(result["sx"])
+    """
+              stddev
+    21  9.950806e-09
+    22  9.650806e+03
+    23  1.596484e+03
     """
 
 

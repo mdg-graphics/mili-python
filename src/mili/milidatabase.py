@@ -55,6 +55,8 @@ class ResultModifier(Enum):
   MIN = "min"
   MAX = "max"
   AVERAGE = "average"
+  MEDIAN = "median"
+  STDDEV = "stddev"
 
 
 class MiliDatabase:
@@ -596,7 +598,7 @@ class MiliDatabase:
           else:
             data = np.reshape( merged_results[svar]["data"], (len(states),-1))
             labels = np.reshape( labels, (len(states),-1))
-          merged_results[svar] = pd.DataFrame( zip(data,labels), index=states, columns=["min", "label"])  # type: ignore  # mypy errors because it expects result to be QueryDict.
+          merged_results[svar] = pd.DataFrame( zip(data,labels), index=states, columns=[modifier.value, "label"])  # type: ignore  # mypy errors because it expects result to be QueryDict.
 
     ##### Maximum #####
     elif modifier == ResultModifier.MAX:
@@ -616,7 +618,7 @@ class MiliDatabase:
           else:
             data = np.reshape( merged_results[svar]["data"], (len(states),-1))
             labels = np.reshape( labels, (len(states),-1))
-          merged_results[svar] = pd.DataFrame( zip(data,labels), index=states, columns=["max", "label"])  # type: ignore  # mypy errors because it expects result to be QueryDict.
+          merged_results[svar] = pd.DataFrame( zip(data,labels), index=states, columns=[modifier.value, "label"])  # type: ignore  # mypy errors because it expects result to be QueryDict.
 
     ##### Average #####
     elif modifier == ResultModifier.AVERAGE:
@@ -630,9 +632,9 @@ class MiliDatabase:
           data = merged_results[svar]["data"]
           states = merged_results[svar]["layout"]["states"]
           if data.size != len(states):
-            merged_results[svar] = pd.DataFrame.from_records(data, index=states, columns=["average"])  # type: ignore  # mypy errors because it expects result to be QueryDict.
+            merged_results[svar] = pd.DataFrame.from_records(data, index=states, columns=[modifier.value])  # type: ignore  # mypy errors because it expects result to be QueryDict.
           else:
-            merged_results[svar] = pd.DataFrame( data.flatten(), index=states, columns=["average"])  # type: ignore  # mypy errors because it expects result to be QueryDict.
+            merged_results[svar] = pd.DataFrame( data.flatten(), index=states, columns=[modifier.value])  # type: ignore  # mypy errors because it expects result to be QueryDict.
 
     ##### Cumulative Min #####
     elif modifier == ResultModifier.CUMMIN:
@@ -647,6 +649,38 @@ class MiliDatabase:
         states = merged_results[svar]["layout"]["states"]
         for i in range(1,len(states)):
           merged_results[svar]["data"][i] = np.maximum( merged_results[svar]["data"][i], merged_results[svar]["data"][i-1])
+
+    ##### Median #####
+    elif modifier == ResultModifier.MEDIAN:
+      for svar in merged_results:
+        merged_results[svar]["data"] = np.median( merged_results[svar]["data"], axis=1, keepdims=True )
+
+      if as_dataframe:
+        # Special handing for median dataframes
+        for svar in merged_results:
+          data = merged_results[svar]["data"].flatten()
+          states = merged_results[svar]["layout"]["states"]
+          if len(data) != len(states):
+            data = merged_results[svar]["data"]
+            merged_results[svar] = pd.DataFrame.from_records(data, index=states, columns=[modifier.value])  # type: ignore  # mypy errors because it expects result to be QueryDict.
+          else:
+            merged_results[svar] = pd.DataFrame( data, index=states, columns=[modifier.value])  # type: ignore  # mypy errors because it expects result to be QueryDict.
+
+    ##### Standard Deviation #####
+    elif modifier == ResultModifier.STDDEV:
+      for svar in merged_results:
+        merged_results[svar]["data"] = np.std( merged_results[svar]["data"], axis=1, keepdims=True )
+
+      if as_dataframe:
+        # Special handing for stddev dataframes
+        for svar in merged_results:
+          data = merged_results[svar]["data"].flatten()
+          states = merged_results[svar]["layout"]["states"]
+          if len(data) != len(states):
+            data = merged_results[svar]["data"]
+            merged_results[svar] = pd.DataFrame.from_records(data, index=states, columns=[modifier.value])  # type: ignore  # mypy errors because it expects result to be QueryDict.
+          else:
+            merged_results[svar] = pd.DataFrame( data, index=states, columns=[modifier.value])  # type: ignore  # mypy errors because it expects result to be QueryDict.
 
     return merged_results
 
@@ -693,6 +727,9 @@ class MiliDatabase:
       as_dataframe (bool, default = False): If True the result is returned as a Pandas DataFrame.
       modifier (Optional[ResultModifier]): Optional modifer to apply to results.
     """
+    if write_data and modifier:
+      raise ValueError("Result modifiers may not be used when the write_data argument is passed.")
+
     result: Union[Dict[str,pd.DataFrame],Dict[str,QueryDict]]
 
     entity_type_str = mdg_enum_to_string(entity_type)

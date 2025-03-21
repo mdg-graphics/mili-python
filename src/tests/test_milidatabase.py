@@ -1034,6 +1034,107 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         np.testing.assert_allclose(df["average"][98], 0.010649, rtol=5.0e-05)
         np.testing.assert_allclose(df["average"][99], 0.010595, rtol=5.0e-05)
 
+    def test_query_median(self):
+        """Test median query modifier."""
+        svar_name = "sx"
+        result = self.mili.query(svar_name, "brick", states=[21,22,23], labels=[1,2,3,4,5], ips=[1], modifier=ResultModifier.MEDIAN)
+        self.assertEqual(result[svar_name]["source"], "primal")
+        self.assertEqual(result[svar_name]["modifier"], "median")
+        self.assertEqual(result[svar_name]["title"], "X Stress")
+        self.assertEqual(result[svar_name]["class_name"], "brick")
+        self.assertEqual(result[svar_name]["layout"]["components"], ["sx"])
+        np.testing.assert_equal(result[svar_name]["layout"]["states"], [21,22,23])
+        np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,2,3,4,5])
+        np.testing.assert_allclose(result[svar_name]["layout"]["times"], [2.0e-04, 2.1e-04, 2.2e-04])
+
+        np.testing.assert_allclose(result[svar_name]['data'][0,0,:], -1.924881e-09, rtol=1.2e-07)
+        np.testing.assert_allclose(result[svar_name]['data'][1,0,:], -7.198997e+03)
+        np.testing.assert_allclose(result[svar_name]['data'][2,0,:], -5.880557e+03)
+
+        svar_name = "disp_y"
+        result = self.mili.query(svar_name, "node", states=[97,98,99], labels=[1,23,40], modifier=ResultModifier.MEDIAN)
+        self.assertEqual(result[svar_name]["source"], "derived")
+        self.assertEqual(result[svar_name]["modifier"], "median")
+        self.assertEqual(result[svar_name]["title"], "Y Displacement")
+        self.assertEqual(result[svar_name]["class_name"], "node")
+        self.assertEqual(result[svar_name]["layout"]["components"], ["disp_y"])
+        np.testing.assert_equal(result[svar_name]["layout"]["states"], [97,98,99])
+        np.testing.assert_allclose(result[svar_name]["layout"]["times"], [9.6e-04, 9.7e-04, 9.8e-04])
+
+        np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.038422, rtol=6.0e-06)
+        np.testing.assert_allclose(result[svar_name]['data'][1,0,:], 0.038286, rtol=9.0e-06)
+        np.testing.assert_allclose(result[svar_name]['data'][2,0,:], 0.038071, rtol=5.0e-06)
+
+    def test_query_median_dataframe(self):
+        """Test median query modifier with as_dataframe=True."""
+        svar_name = "sx"
+        result = self.mili.query(svar_name, "brick", states=[21,22,23], labels=[1,2,3,4,5], as_dataframe=True, modifier=ResultModifier.MEDIAN)
+        df = result[svar_name]
+        np.testing.assert_equal(list(df.columns), ["median"])
+        np.testing.assert_equal(list(df.index), [21,22,23])
+        np.testing.assert_allclose(df["median"][21], -1.924881e-09, rtol=1.2e-07)
+        np.testing.assert_allclose(df["median"][22], -7.198997e+03)
+        np.testing.assert_allclose(df["median"][23], -5.880557e+03)
+
+        svar_name = "disp_y"
+        result = self.mili.query(svar_name, "node", states=[97,98,99], labels=[1,23,40], as_dataframe=True, modifier=ResultModifier.MEDIAN)
+        df = result[svar_name]
+        self.assertEqual(list(df.columns), ["median"])
+        self.assertEqual(list(df.index), [97,98,99])
+        np.testing.assert_allclose(df["median"][97], 0.038422, rtol=6.0e-06)
+        np.testing.assert_allclose(df["median"][98], 0.038286, rtol=9.0e-06)
+        np.testing.assert_allclose(df["median"][99], 0.038071, rtol=5.0e-06)
+
+    def test_query_stddev(self):
+        """Test stddev query modifier."""
+        svar_name = "sx"
+        result = self.mili.query(svar_name, "brick", states=[21,22,23], labels=[1,2,3,4,5], ips=[1], modifier=ResultModifier.STDDEV)
+        self.assertEqual(result[svar_name]["source"], "primal")
+        self.assertEqual(result[svar_name]["modifier"], "stddev")
+        self.assertEqual(result[svar_name]["title"], "X Stress")
+        self.assertEqual(result[svar_name]["class_name"], "brick")
+        self.assertEqual(result[svar_name]["layout"]["components"], ["sx"])
+        np.testing.assert_equal(result[svar_name]["layout"]["states"], [21,22,23])
+        np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,2,3,4,5])
+        np.testing.assert_allclose(result[svar_name]["layout"]["times"], [2.0e-04, 2.1e-04, 2.2e-04])
+
+        np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 7.788077e-09, rtol=1.2e-07)
+        np.testing.assert_allclose(result[svar_name]['data'][1,0,:], 9.055870e+03)
+        np.testing.assert_allclose(result[svar_name]['data'][2,0,:], 2.214029e+03, rtol=1.2e-07)
+
+        svar_name = "disp_y"
+        result = self.mili.query(svar_name, "node", states=[97,98,99], labels=[1,23,40], modifier=ResultModifier.STDDEV)
+        self.assertEqual(result[svar_name]["source"], "derived")
+        self.assertEqual(result[svar_name]["modifier"], "stddev")
+        self.assertEqual(result[svar_name]["title"], "Y Displacement")
+        self.assertEqual(result[svar_name]["class_name"], "node")
+        self.assertEqual(result[svar_name]["layout"]["components"], ["disp_y"])
+        np.testing.assert_equal(result[svar_name]["layout"]["states"], [97,98,99])
+        np.testing.assert_allclose(result[svar_name]["layout"]["times"], [9.6e-04, 9.7e-04, 9.8e-04])
+
+        np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.025586, rtol=1.6e-05)
+        np.testing.assert_allclose(result[svar_name]['data'][1,0,:], 0.025499, rtol=1.0e-05)
+        np.testing.assert_allclose(result[svar_name]['data'][2,0,:], 0.025357, rtol=3.3e-06)
+
+    def test_query_stddev_dataframe(self):
+        """Test stddev query modifier with as_dataframe=True."""
+        svar_name = "sx"
+        result = self.mili.query(svar_name, "brick", states=[21,22,23], labels=[1,2,3,4,5], as_dataframe=True, modifier=ResultModifier.STDDEV)
+        df = result[svar_name]
+        np.testing.assert_equal(list(df.columns), ["stddev"])
+        np.testing.assert_equal(list(df.index), [21,22,23])
+        np.testing.assert_allclose(df["stddev"][21], 7.788077e-09, rtol=1.2e-07)
+        np.testing.assert_allclose(df["stddev"][22], 9.055870e+03)
+        np.testing.assert_allclose(df["stddev"][23], 2.214029e+03, rtol=1.2e-07)
+
+        svar_name = "disp_y"
+        result = self.mili.query(svar_name, "node", states=[97,98,99], labels=[1,23,40], as_dataframe=True, modifier=ResultModifier.STDDEV)
+        df = result[svar_name]
+        self.assertEqual(list(df.columns), ["stddev"])
+        self.assertEqual(list(df.index), [97,98,99])
+        np.testing.assert_allclose(df["stddev"][97], 0.025586, rtol=1.6e-05)
+        np.testing.assert_allclose(df["stddev"][98], 0.025499, rtol=1.0e-05)
+        np.testing.assert_allclose(df["stddev"][99], 0.025357, rtol=3.3e-06)
 
 
 class SerialMultiStateFile(SharedSerialTests.SerialTests):
@@ -2045,6 +2146,107 @@ class ParallelTests:
             np.testing.assert_allclose(df["average"][98], 0.010649, rtol=5.0e-05)
             np.testing.assert_allclose(df["average"][99], 0.010595, rtol=5.0e-05)
 
+        def test_query_median(self):
+            """Test median query modifier."""
+            svar_name = "sx"
+            result = self.mili.query(svar_name, "brick", states=[21,22,23], labels=[1,2,3,4,5], ips=[1], modifier=ResultModifier.MEDIAN)
+            self.assertEqual(result[svar_name]["source"], "primal")
+            self.assertEqual(result[svar_name]["modifier"], "median")
+            self.assertEqual(result[svar_name]["title"], "X Stress")
+            self.assertEqual(result[svar_name]["class_name"], "brick")
+            self.assertEqual(result[svar_name]["layout"]["components"], ["sx"])
+            np.testing.assert_equal(result[svar_name]["layout"]["states"], [21,22,23])
+            np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,2,3,4,5])
+            np.testing.assert_allclose(result[svar_name]["layout"]["times"], [2.0e-04, 2.1e-04, 2.2e-04])
+
+            np.testing.assert_allclose(result[svar_name]['data'][0,0,:], -1.924881e-09, rtol=1.2e-07)
+            np.testing.assert_allclose(result[svar_name]['data'][1,0,:], -7.198997e+03)
+            np.testing.assert_allclose(result[svar_name]['data'][2,0,:], -5.880557e+03)
+
+            svar_name = "disp_y"
+            result = self.mili.query(svar_name, "node", states=[97,98,99], labels=[1,23,40], modifier=ResultModifier.MEDIAN)
+            self.assertEqual(result[svar_name]["source"], "derived")
+            self.assertEqual(result[svar_name]["modifier"], "median")
+            self.assertEqual(result[svar_name]["title"], "Y Displacement")
+            self.assertEqual(result[svar_name]["class_name"], "node")
+            self.assertEqual(result[svar_name]["layout"]["components"], ["disp_y"])
+            np.testing.assert_equal(result[svar_name]["layout"]["states"], [97,98,99])
+            np.testing.assert_allclose(result[svar_name]["layout"]["times"], [9.6e-04, 9.7e-04, 9.8e-04])
+
+            np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.038422, rtol=6.0e-06)
+            np.testing.assert_allclose(result[svar_name]['data'][1,0,:], 0.038286, rtol=7.1e-06)
+            np.testing.assert_allclose(result[svar_name]['data'][2,0,:], 0.038071, rtol=4.2e-06)
+
+        def test_query_median_dataframe(self):
+            """Test median query modifier with as_dataframe=True."""
+            svar_name = "sx"
+            result = self.mili.query(svar_name, "brick", states=[21,22,23], labels=[1,2,3,4,5], as_dataframe=True, modifier=ResultModifier.MEDIAN)
+            df = result[svar_name]
+            np.testing.assert_equal(list(df.columns), ["median"])
+            np.testing.assert_equal(list(df.index), [21,22,23])
+            np.testing.assert_allclose(df["median"][21], -1.924881e-09, rtol=1.2e-07)
+            np.testing.assert_allclose(df["median"][22], -7.198997e+03)
+            np.testing.assert_allclose(df["median"][23], -5.880557e+03)
+
+            svar_name = "disp_y"
+            result = self.mili.query(svar_name, "node", states=[97,98,99], labels=[1,23,40], as_dataframe=True, modifier=ResultModifier.MEDIAN)
+            df = result[svar_name]
+            self.assertEqual(list(df.columns), ["median"])
+            self.assertEqual(list(df.index), [97,98,99])
+            np.testing.assert_allclose(df["median"][97], 0.038422, rtol=6.0e-06)
+            np.testing.assert_allclose(df["median"][98], 0.038286, rtol=7.1e-06)
+            np.testing.assert_allclose(df["median"][99], 0.038071, rtol=4.1e-06)
+
+        def test_query_stddev(self):
+            """Test stddev query modifier."""
+            svar_name = "sx"
+            result = self.mili.query(svar_name, "brick", states=[21,22,23], labels=[1,2,3,4,5], ips=[1], modifier=ResultModifier.STDDEV)
+            self.assertEqual(result[svar_name]["source"], "primal")
+            self.assertEqual(result[svar_name]["modifier"], "stddev")
+            self.assertEqual(result[svar_name]["title"], "X Stress")
+            self.assertEqual(result[svar_name]["class_name"], "brick")
+            self.assertEqual(result[svar_name]["layout"]["components"], ["sx"])
+            np.testing.assert_equal(result[svar_name]["layout"]["states"], [21,22,23])
+            np.testing.assert_equal(result[svar_name]["layout"]["labels"], [1,2,3,4,5])
+            np.testing.assert_allclose(result[svar_name]["layout"]["times"], [2.0e-04, 2.1e-04, 2.2e-04])
+
+            np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 7.788077e-09, rtol=1.2e-07)
+            np.testing.assert_allclose(result[svar_name]['data'][1,0,:], 9.055870e+03)
+            np.testing.assert_allclose(result[svar_name]['data'][2,0,:], 2.214029e+03, rtol=1.2e-07)
+
+            svar_name = "disp_y"
+            result = self.mili.query(svar_name, "node", states=[97,98,99], labels=[1,23,40], modifier=ResultModifier.STDDEV)
+            self.assertEqual(result[svar_name]["source"], "derived")
+            self.assertEqual(result[svar_name]["modifier"], "stddev")
+            self.assertEqual(result[svar_name]["title"], "Y Displacement")
+            self.assertEqual(result[svar_name]["class_name"], "node")
+            self.assertEqual(result[svar_name]["layout"]["components"], ["disp_y"])
+            np.testing.assert_equal(result[svar_name]["layout"]["states"], [97,98,99])
+            np.testing.assert_allclose(result[svar_name]["layout"]["times"], [9.6e-04, 9.7e-04, 9.8e-04])
+
+            np.testing.assert_allclose(result[svar_name]['data'][0,0,:], 0.025586, rtol=1.6e-05)
+            np.testing.assert_allclose(result[svar_name]['data'][1,0,:], 0.025499, rtol=1.1e-05)
+            np.testing.assert_allclose(result[svar_name]['data'][2,0,:], 0.025357, rtol=3.3e-06)
+
+        def test_query_stddev_dataframe(self):
+            """Test stddev query modifier with as_dataframe=True."""
+            svar_name = "sx"
+            result = self.mili.query(svar_name, "brick", states=[21,22,23], labels=[1,2,3,4,5], as_dataframe=True, modifier=ResultModifier.STDDEV)
+            df = result[svar_name]
+            np.testing.assert_equal(list(df.columns), ["stddev"])
+            np.testing.assert_equal(list(df.index), [21,22,23])
+            np.testing.assert_allclose(df["stddev"][21], 7.788077e-09, rtol=1.2e-07)
+            np.testing.assert_allclose(df["stddev"][22], 9.055870e+03)
+            np.testing.assert_allclose(df["stddev"][23], 2.214029e+03, rtol=1.2e-07)
+
+            svar_name = "disp_y"
+            result = self.mili.query(svar_name, "node", states=[97,98,99], labels=[1,23,40], as_dataframe=True, modifier=ResultModifier.STDDEV)
+            df = result[svar_name]
+            self.assertEqual(list(df.columns), ["stddev"])
+            self.assertEqual(list(df.index), [97,98,99])
+            np.testing.assert_allclose(df["stddev"][97], 0.025586, rtol=1.6e-05)
+            np.testing.assert_allclose(df["stddev"][98], 0.025499, rtol=1.1e-05)
+            np.testing.assert_allclose(df["stddev"][99], 0.025357, rtol=3.3e-06)
 
 ###############################################
 # Tests for each parallel wrapper class

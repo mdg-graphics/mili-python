@@ -5,6 +5,7 @@ All notable changes to Mili-python will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Added `ResultModifier.STDDEV` and `ResultModifier.MEDIAN` to support calculating the standard deviation and median for results.
 - Added the enum `mili.mdg_defines.EntityType` which contains all the Entity types ('brick', 'node', ect.) that are output by MDG simulation codes. These were previously referred to as element class names, but are now referred to as Entity types throughout mili-python's functions/documentation. The values of this enum can be used as arguments for functions that previously took the element entity type as a string. Strings can still be used as well.
 - Added the following enums to `mili.mdg_defines` which contain many of the state variables that are output by MDG simulation codes:
   - `mili.mdg_defines.GlobalStateVariables`
