@@ -527,3 +527,12 @@ class ReturnCode(Enum):
     return ["Success", "Error", "Critical"][self.value]
 
 ReturnCodeTuple: TypeAlias = Tuple[ReturnCode,str]
+
+class Metadata(TypedDict):
+  code_name: str
+  username: str
+  job_id: str
+  nprocs: int
+  date: str
+  host_name: str
+  library_version: str

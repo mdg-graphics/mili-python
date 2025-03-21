@@ -70,6 +70,7 @@ class _MiliInternal:
     self.__mesh_dim: int = 0
 
     self.__params: Dict[str,Any] = {}
+    self.__metadata: Metadata
 
     self.__afile = AFile()
     self.__base_filename = base_filename
@@ -114,7 +115,7 @@ class _MiliInternal:
         self.__element_sets[ip_name] = param.tolist()
       elif sname.startswith("SetRGB"):
         self.__params[sname] = param
-      elif sname == "particles_on":
+      elif sname in ("particles_on", "code_name", "nproc"):
         self.__params[sname] = param
 
     # Add all mili parameters and application parameters to parameters dictionary
@@ -122,6 +123,17 @@ class _MiliInternal:
       self.__params[sname] = param
     for sname, param in self.__afile.dirs[DirectoryDecl.Type.APPLICATION_PARAM].items():
       self.__params[sname] = param
+
+    # Set up metadata dictionary
+    self.__metadata = Metadata(
+      code_name = self.__params.get("code_name", ""),
+      username = self.__params.get("username", ""),
+      job_id = self.__params.get("job_id", ""),
+      nprocs = self.__params.get("nproc", 1),
+      date = self.__params.get("date", ""),
+      host_name = self.__params.get("host name", ""),
+      library_version = self.__params.get("lib version", ""),
+    )
 
     # setup svar.svars for easier VECTOR svar traversal
     self.__svars = self.__afile.dirs[DirectoryDecl.Type.STATE_VAR_DICT]
@@ -303,7 +315,15 @@ class _MiliInternal:
       success = True
     return success
 
-  def nodes(self) -> NDArray[np.float32]:
+  def metadata(self) -> Metadata:
+    """Getter for Mili file metadata dictionary.
+
+    Returns:
+      Metadata: The meta data dictionary.
+    """
+    return self.__metadata
+
+  def nodes(self) -> NDArray[np.floating]:
     """Getter for initial nodal coordinates.
 
     Returns:

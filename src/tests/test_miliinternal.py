@@ -10,6 +10,7 @@ import unittest
 from mili import miliinternal
 from mili.miliinternal import *
 from mili.geometric_mesh_info import GeometricMeshInfo
+from mili.datatypes import Metadata
 import numpy as np
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -47,6 +48,20 @@ class TestMiliInternal(unittest.TestCase):
     def test_reload_state_maps(self):
         # Just check that it runs without errors
         self.mili.reload_state_maps()
+
+    #==============================================================================
+    def test_metadata(self):
+        metadata = self.mili.metadata()
+        EXPECTED = Metadata(
+            code_name = "",
+            username = "legler5",
+            job_id = "",
+            nprocs = 1,
+            date = "Wed Mar 20 14:26:44 2019",
+            host_name = "rzgenie2",
+            library_version = "V16_01"
+        )
+        np.testing.assert_equal(metadata, EXPECTED)
 
     #==============================================================================
     def test_nodes(self):

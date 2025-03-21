@@ -17,6 +17,11 @@ include:
 variables:
     MINIMUM_COVERAGE: "86"
     INSTALL_ROOT: "/collab/usr/gapps/mdg/python/"
+    NNODES: 1
+    NPROCS: 16
+    QUEUE: pdebug
+    INTEG_WALL_TIME: 40
+    LLNL_SLURM_SCHEDULER_PARAMETERS: "-N $NNODES -n $NPROCS -p $QUEUE -t $INTEG_WALL_TIME"
 
 stages:
     - docs
@@ -32,7 +37,7 @@ build-documentation:
     stage: docs
     tags:
         - rzwhippet
-        - shell
+        - batch
     script:
         # Test subset of files with pydocstyle. Only those that are added to documentation.
         - pydocstyle src/mili/milidatabase.py
@@ -48,7 +53,7 @@ type_checking:
     stage: typing
     tags:
         - rzwhippet
-        - shell
+        - batch
     script:
         - mypy src/mili
 
@@ -56,7 +61,7 @@ type_checking:
     stage: test
     tags:
         - rzwhippet
-        - shell
+        - batch
     script:
         - cd src
         - tox -e $TOX_CI_PYTHON_VERSION
@@ -95,11 +100,11 @@ coverage:
     stage: test
     tags:
         - rzwhippet
-        - shell
+        - batch
     script:
         - cd src
         - python3 -m coverage --version
-        - salloc -N1 -n8 -t15 -p pdebug python3 -m coverage run -m unittest
+        - python3 -m coverage run -m unittest
         # avoid failure if there are not multiple reports
         - python3 -m coverage combine || freturn 0
         - python3 -m coverage xml
@@ -119,7 +124,7 @@ stage-release:
     stage: deploy
     tags:
         - rzwhippet
-        - shell
+        - batch
     script:
         - pip3 install --upgrade build
         - python3 -m build
@@ -129,7 +134,7 @@ stage-release:
 #     stage: deploy
 #     tags:
 #         - rzwhippet
-#         - shell
+#         - batch
 #     script:
 #         - version=$(cat src/mili/__init__.py | grep 'version' | grep -Eo "[[:digit:]]+,[[:digit:]]+,[[:digit:]]+" | tr , . )
 #         - git tag -a v${version} -m "version $version"

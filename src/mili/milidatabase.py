@@ -18,7 +18,7 @@ from enum import Enum
 import mili.reductions as reductions
 from mili.parallel import ServerWrapper, LoopWrapper
 from mili.miliinternal import _MiliInternal, ReturnCode
-from mili.datatypes import StateMap, QueryDict, ReturnCode, ReturnCodeTuple
+from mili.datatypes import StateMap, QueryDict, ReturnCode, ReturnCodeTuple, Metadata
 from mili.mdg_defines import mdg_enum_to_string
 from mili.utils import result_dictionary_to_dataframe
 from mili.geometric_mesh_info import GeometricMeshInfo
@@ -132,7 +132,18 @@ class MiliDatabase:
                                 reduce_function = reductions.zeroth_entry)
     return result
 
-  def nodes(self) -> NDArray[np.float32]:
+  def metadata(self) -> Metadata:
+    """Getter for Mili file metadata dictionary.
+
+    Returns:
+      Metadata: The meta data dictionary.
+    """
+    result: Metadata
+    result = self.__postprocess(results = self._mili.metadata(),
+                                reduce_function = reductions.zeroth_entry)
+    return result
+
+  def nodes(self) -> NDArray[np.floating]:
     """Getter for initial nodal coordinates.
 
     Returns:

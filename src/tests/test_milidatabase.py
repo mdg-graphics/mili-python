@@ -9,8 +9,8 @@ import os
 import unittest
 from mili import reader
 from mili.milidatabase import MiliPythonError, ResultModifier
+from mili.datatypes import Superclass, Metadata
 from mili.mdg_defines import EntityType, NodalStateVariables, StressStrainStateVariables, MaterialStateVariables, GlobalStateVariables
-from mili.datatypes import Superclass
 import numpy as np
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -535,6 +535,20 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         self.mili = reader.open_database( SerialSingleStateFile.file_name, suppress_parallel = True, merge_results=False )
 
     # Tests unique to single state file
+    #==============================================================================
+    def test_metadata(self):
+        metadata = self.mili.metadata()
+        EXPECTED = Metadata(
+            code_name = "",
+            username = "legler5",
+            job_id = "",
+            nprocs = 1,
+            date = "Wed Mar 20 14:26:44 2019",
+            host_name = "rzgenie2",
+            library_version = "V16_01"
+        )
+        np.testing.assert_equal(metadata, EXPECTED)
+
     #==============================================================================
     def test_state_variables(self):
         state_variable_names = set(self.mili._mili.state_variables().keys())
@@ -1194,6 +1208,21 @@ class ParallelTests:
                 self.mili.query(svar_names="sx", class_name="brick")
             with self.assertRaises(TypeError):
                 self.mili.query("sx")
+
+        #==============================================================================
+        def test_metadata(self):
+            metadata = self.mili.metadata()
+            EXPECTED = Metadata(
+                code_name = "",
+                username = "jdurren",
+                job_id = "",
+                nprocs = 8,
+                date = "Wed Mar  3 09:01:15 2021",
+                host_name = "rzgenie11",
+                library_version = "V20_02"
+            )
+            for m in metadata:
+                np.testing.assert_equal(m, EXPECTED)
 
         #==============================================================================
         def test_nodes_getter(self):
