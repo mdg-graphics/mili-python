@@ -82,7 +82,7 @@ class _MiliInternal:
       raise MiliAParseError("AFile parsing validation failure!")
 
     self.__sfile_suf_len = self.__afile.sfile_suffix_length
-    sfile_re = re.compile(re.escape(str(self.__base_filename)) + f"(\d{{{self.__sfile_suf_len},}})$")
+    sfile_re = re.compile(re.escape(str(self.__base_filename)) + rf"(\d{{{self.__sfile_suf_len},}})$")
 
     # load and sort the state files numerically (NOT alphabetically)
     state_file_matches = list(map(sfile_re.match,os.listdir(dir_name)))
