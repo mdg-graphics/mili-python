@@ -5,10 +5,22 @@ All notable changes to Mili-python will be documented in this file.
 ## [Unreleased]
 
 ### Added
+
+### Fixed
+
+### Changed
+
+### Removed
+
+## [v0.9.0] - 2025-3-21
+
+### Added
 - Added `Milidatabase.metadata` method to access meta data about the Mili database such as the code that generated the database, user, date, etc.
 - Added `ResultModifier.STDDEV` and `ResultModifier.MEDIAN` to support calculating the standard deviation and median for results.
 - Added the enum `mili.mdg_defines.EntityType` which contains all the Entity types ('brick', 'node', ect.) that are output by MDG simulation codes. These were previously referred to as element class names, but are now referred to as Entity types throughout mili-python's functions/documentation. The values of this enum can be used as arguments for functions that previously took the element entity type as a string. Strings can still be used as well.
 - Added the following enums to `mili.mdg_defines` which contain many of the state variables that are output by MDG simulation codes:
+  - `mili.mdg_defines.Dyna3dStateVariables`
+  - `mili.mdg_defines.DiabloStateVariables`
   - `mili.mdg_defines.GlobalStateVariables`
   - `mili.mdg_defines.MaterialStateVariables`
   - `mili.mdg_defines.NodalStateVariables`
@@ -19,15 +31,11 @@ All notable changes to Mili-python will be documented in this file.
   - `mili.mdg_defines.ContactSegmentStateVariables`
   - `mili.mdg_defines.PressureSegmentStateVariables`
   - `mili.mdg_defines.StressStrainStateVariables`
-  - `mili.mdg_defines.SharedStateVariables`
+  - `mili.mdg_defines.ElementStateVariables`
   - `mili.mdg_defines.DerivedStateVariables`
-
-### Fixed
 
 ### Changed
 - Started using `mypy` type checking. Many type hints throughout Mili-python have been updated/changed to more accurately reflect the argument or return types.
-
-### Removed
 
 ## [v0.8.2] - 2025-2-21
 
