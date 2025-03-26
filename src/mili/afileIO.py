@@ -12,10 +12,7 @@ import os
 import re
 import struct
 import math
-from typing import *
-import typing
-if hasattr( typing, 'io' ):
-  from typing.io import * # type: ignore
+from typing import Literal, BinaryIO, Callable, Set, Mapping
 
 import numpy as np
 from numpy.typing import NDArray
