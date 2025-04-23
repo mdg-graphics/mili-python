@@ -869,7 +869,8 @@ class _MiliInternal:
     labels_list = np.intersect1d(labels_array, self.__labels[class_sname])
 
     # get the indices of the labels we're querying in the list of local labels of the element class, so we can retrieve their connectivity
-    indices = (self.__labels[class_sname][:,None] == labels_list).argmax(axis=0)
+    sorter = np.argsort( self.__labels[class_sname] )
+    indices = sorter[ np.searchsorted( self.__labels[class_sname], labels_list, sorter=sorter) ]
     elem_conn = self.__conns_ids[class_sname][indices][:,:-1]
     return self.__labels['node'][elem_conn], self.__labels[class_sname][indices,None]
 

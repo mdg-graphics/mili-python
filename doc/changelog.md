@@ -12,6 +12,11 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Removed
 
+## [v0.9.1] - 2025-4-23
+
+### Fixed
+- Fixed bug in the `Milidatabase.nodes_of_elems` method that caused memory allocation errors when getting the nodal connectivity for a large number of elements. This could happen when calling this function or when making some derived queries.
+
 ## [v0.9.0] - 2025-3-21
 
 ### Added
