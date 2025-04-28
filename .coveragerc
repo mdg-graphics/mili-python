@@ -1,5 +1,13 @@
 # .coveragerc to control coverage.py
 
 [run]
-include = mili/reader.py
+source = src
+
+omit =
+    tests/*
+    */__init__.py
+
 concurrency = multiprocessing
+
+[xml]
+output = coverage.xml

@@ -1,7 +1,7 @@
 """Generates derived_variables.rst."""
 from mili import reader
 
-file_path: str = "../src/tests/data/serial/sstate/d3samp6.plt"
+file_path: str = "../tests/data/serial/sstate/d3samp6.plt"
 
 output_text = """
 .. code-block:: python

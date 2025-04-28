@@ -63,7 +63,6 @@ type_checking:
         - rzwhippet
         - batch
     script:
-        - cd src
         - tox -e $TOX_CI_PYTHON_VERSION
 
 unit_tests_py38:
@@ -102,7 +101,6 @@ coverage:
         - rzwhippet
         - batch
     script:
-        - cd src
         - python3 -m coverage --version
         - python3 -m coverage run -m unittest
         # avoid failure if there are not multiple reports
@@ -112,11 +110,11 @@ coverage:
     artifacts:
         when: always
         paths:
-            - src/coverage.xml
+            - coverage.xml
         reports:
             coverage_report:
                 coverage_format: cobertura
-                path: src/coverage.xml
+                path: coverage.xml
         expire_in: 1 week
     coverage: '/TOTAL.+?([0-9]+\%)$/'
 
