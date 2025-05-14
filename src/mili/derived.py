@@ -400,6 +400,18 @@ class DerivedExpressions:
         supports_batching = False,
         compute_function = self.__compute_triaxiality
       ),
+      DerivedVariables.NORMALIZED_PRESSURE.value: DerivedSpec(
+        title = "Normalized Pressure",
+        primals =  [StressStrainStateVariables.X_STRESS.value,
+                    StressStrainStateVariables.Y_STRESS.value,
+                    StressStrainStateVariables.Z_STRESS.value,
+                    StressStrainStateVariables.XY_STRESS.value,
+                    StressStrainStateVariables.YZ_STRESS.value,
+                    StressStrainStateVariables.ZX_STRESS.value],
+        primals_class = [None, None, None, None, None, None],
+        supports_batching = False,
+        compute_function = self.__compute_normalized_pressure
+      ),
       DerivedVariables.EPS_RATE.value: DerivedSpec(
         title = "Equiv. Plastic Strain Rate",
         primals = [StressStrainStateVariables.EQUIV_PLASTIC_STRAIN.value],
@@ -1533,6 +1545,38 @@ class DerivedExpressions:
     seff = np.sqrt(3*J2)
 
     derived_result[result_name]['data'] = -pressure/seff
+
+    return derived_result
+
+  def __compute_normalized_pressure(self,
+                                    result_name: str,
+                                    primal_data: Dict[str,QueryDict],
+                                    query_args: QueryArgs) -> Dict[str,QueryDict]:
+    """Calculate the derived result 'norm_press'."""
+    class_name = query_args['result_class_name']
+    # Create dictionary structure for the final result
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data, class_name )
+
+    sx = primal_data['sx']['data']
+    sy = primal_data['sy']['data']
+    sz = primal_data['sz']['data']
+    sxy = primal_data['sxy']['data']
+    syz = primal_data['syz']['data']
+    szx = primal_data['szx']['data']
+
+    pressure = -(1/3) * (sx + sy + sz)
+    dev_stress_x = sx+pressure
+    dev_stress_y = sy+pressure
+    dev_stress_z = sz+pressure
+
+    # Calculate the 2nd deviatoric stress invariant, J2
+    J2 = 0.5 * (dev_stress_x**2 + dev_stress_y**2 + dev_stress_z**2) \
+              + sxy*sxy + syz*syz + szx*szx
+
+    # Calculate the effective stress
+    seff = np.sqrt(3*J2)
+
+    derived_result[result_name]['data'] = pressure/seff
 
     return derived_result
 

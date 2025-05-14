@@ -355,6 +355,7 @@ class DerivedVariables(StateVariableName):
     MAX_SHEAR_STRESS = "max_shear_stress"
 
     TRIAXIALITY = "triaxiality"
+    NORMALIZED_PRESSURE = "norm_press"
     EPS_RATE = "eps_rate"
 
     MAT_COG_DISP_X = "mat_cog_disp_x"
