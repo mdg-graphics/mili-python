@@ -96,10 +96,13 @@ To generate and deploy new documentation do the following:
 
 ```bash
 # This needs to be done on both CZ and RZ
+source .venv-mili-python-3.10.8/bin/activate
 cd doc/
 make html
 python3 deploy_docs.py
 ```
+
+**NOTE**: You can build the documentation once on RZ and then transfer the `html` directory and the `deploy_docs.py` script to CZ and run the script there to deploy the documentation.
 
 # License
 ----------------
