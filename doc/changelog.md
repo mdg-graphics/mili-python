@@ -12,6 +12,12 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Removed
 
+## [v0.9.2] - 2025-5-14
+
+### Added
+- Added the derived variable `norm_press` to calculate the normalized pressure (`pressure/seff`).
+
+
 ## [v0.9.1] - 2025-4-23
 
 ### Fixed
