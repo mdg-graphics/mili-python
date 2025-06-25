@@ -247,7 +247,7 @@ class Subrecord:
   svars : List[StateVariable] = dataclasses.field(default_factory=list)
   svar_atom_lengths : NDArray[np.int64] = field(default_factory=lambda: np.empty([0],dtype = np.int64))
   svar_atom_offsets : NDArray[np.int64] = field(default_factory=lambda: np.empty([0],dtype = np.int64))
-  svar_comp_layout : List[str] = field(default_factory=list)
+  svar_comp_layout : List[List[str]] = field(default_factory=list)
   svar_comp_offsets : List[NDArray[np.integer]] = field(default_factory=list)
   ordinal_blocks : NDArray[np.int64] = field(default_factory=lambda: np.empty([0], dtype = np.int64))
   ordinal_block_counts : NDArray[np.int64] = field(default_factory=lambda: np.empty([0], dtype = np.int64))

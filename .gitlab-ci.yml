@@ -127,6 +127,26 @@ stage-release:
         - pip3 install --upgrade build
         - python3 -m build
 
+github-sync:
+    variables:
+        GITHUB_REPO: git@github.com:mdg-graphics/mili-python.git
+        GITLAB_REMOTE: ssh://git@rzgitlab.llnl.gov:7999/mdg/mili/mili-python.git
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "master"
+          when: always
+        - when: never
+    stage: deploy
+    tags:
+        - rzwhippet
+        - batch
+    script:
+        - git clone $GITHUB_REPO
+        - cd mili-python
+        - git remote add gitlab $GITLAB_REMOTE
+        - git remote -v
+        - git pull gitlab master
+        - git push
+
 # TODO(wrt): make this actually deploy
 # deploy-release:
 #     stage: deploy
