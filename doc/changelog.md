@@ -12,6 +12,12 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Removed
 
+### Added
+
+## [v0.9.3] - 2025-7-3
+
+- Added the derived variable `centroid` to calculate the centroid of an element.
+
 ## [v0.9.2] - 2025-5-14
 
 ### Added

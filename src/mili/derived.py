@@ -465,6 +465,13 @@ class DerivedExpressions:
         compute_function = self.__compute_quad_area,
         only_sclasses = [Superclass.M_QUAD],
       ),
+      DerivedVariables.CENTROID.value: DerivedSpec(
+        title = "Centroid Position",
+        primals = [NodalStateVariables.NODAL_POSITION.value],
+        primals_class = [EntityType.NODE.value],
+        supports_batching = False,
+        compute_function = self.__compute_centroid,
+      ),
       DerivedVariables.SURFACE_STRAIN_X.value: DerivedSpec(
         title = "Surface Strain X",
         primals = [NodalStateVariables.X_POSITION.value,
@@ -1867,6 +1874,54 @@ class DerivedExpressions:
 
     area = np.reshape( area, area.shape + (1,) )
     derived_result[result_name]["data"] = area
+    return derived_result
+
+  def __compute_centroid(self,
+                          result_name: str,
+                          primal_data: Dict[str,QueryDict],
+                          query_args: QueryArgs) -> Dict[str,QueryDict]:
+    """Compute the Centroid of an element."""
+    labels = query_args['labels']
+    states = query_args['states']
+    times = self.db.times(states)
+    class_name = query_args['result_class_name']
+
+    # Manually construct derived result dictionary since result element class
+    # does not match primal data element class.
+    derived_result = {
+      result_name: QueryDict(
+        class_name=class_name,
+        source='derived',
+        title=self.__derived_expressions[result_name]["title"],
+        data=np.empty( (len(states), len(labels), 1), dtype=np.float32 ),
+        layout=QueryLayout(
+          states=states,
+          labels=labels,
+          components=primal_data['nodpos']['layout']['components'],
+          times=times,
+        )
+      )
+    }
+
+    elem_node_map = query_args["elem_node_map"]
+    nodpos = primal_data["nodpos"]["data"]
+
+    # Need to differentiate between the connectivities of superclasses.
+    class_def = self.db.mesh_object_classes().get(class_name)
+    if class_def is None:
+      raise ValueError(f"Failed to find class data for {class_name}")
+    qty_conns = class_def.sclass.node_count()
+    if class_def.sclass == Superclass.M_BEAM:
+      qty_conns -= 1  # The third node in BEAM connectivity should be ignored.
+    if qty_conns == 0 and class_def.sclass != Superclass.M_NODE:
+      raise ValueError(f"Cannot calculate 'centroid' for class {class_name} with no connectivity")
+
+    if class_def.sclass == Superclass.M_NODE:
+      centroid = nodpos
+    else:
+      centroid = np.sum( nodpos[:, elem_node_map[:,:qty_conns], :], axis=2) / qty_conns
+
+    derived_result[result_name]["data"] = centroid
     return derived_result
 
   def __compute_surface_strain(self,

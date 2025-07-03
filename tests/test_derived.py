@@ -32,7 +32,7 @@ class SerialDerivedExpressions(unittest.TestCase):
                     'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure',
                     'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress',
                     'triaxiality', 'norm_press', 'eps_rate', 'nodtangmag', 'mat_cog_disp_x', 'mat_cog_disp_y',
-                    'mat_cog_disp_z', 'element_volume', 'area', 'surfstrainx', 'surfstrainy',
+                    'mat_cog_disp_z', 'element_volume', 'area', 'centroid', 'surfstrainx', 'surfstrainy',
                     'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx',
                     ]
         supported_variables = self.mili.supported_derived_variables()
@@ -43,15 +43,15 @@ class SerialDerivedExpressions(unittest.TestCase):
                          'prin_dev_strain3', 'prin_strain1_alt', 'prin_strain2_alt', 'prin_strain3_alt', 'prin_dev_strain1_alt',
                          'prin_dev_strain2_alt', 'prin_dev_strain3_alt', 'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress',
                          'pressure', 'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'norm_press',
-                         'element_volume', 'surfstrainx', 'surfstrainy', 'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx']
+                         'element_volume', 'centroid', 'surfstrainx', 'surfstrainy', 'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx']
         BEAM_DERIVED = ['prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure', 'prin_dev_stress1', 'prin_dev_stress2',
-                        'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'norm_press', 'eps_rate']
+                        'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'norm_press', 'eps_rate', 'centroid']
         SHELL_DERIVED = ['vol_strain', 'prin_strain1', 'prin_strain2', 'prin_strain3', 'prin_dev_strain1', 'prin_dev_strain2', 'prin_dev_strain3',
                          'prin_strain1_alt', 'prin_strain2_alt', 'prin_strain3_alt', 'prin_dev_strain1_alt', 'prin_dev_strain2_alt', 'prin_dev_strain3_alt',
                          'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure', 'prin_dev_stress1', 'prin_dev_stress2',
-                         'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'norm_press', 'area',]
-        CSEG_DERIVED = ['area',]
-        NODE_DERIVED = ['disp_x', 'disp_y', 'disp_z', 'disp_mag', 'disp_rad_mag_xy', 'vel_x', 'vel_y', 'vel_z', 'acc_x', 'acc_y', 'acc_z']
+                         'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'norm_press', 'area', 'centroid']
+        CSEG_DERIVED = ['area', 'centroid']
+        NODE_DERIVED = ['disp_x', 'disp_y', 'disp_z', 'disp_mag', 'disp_rad_mag_xy', 'vel_x', 'vel_y', 'vel_z', 'acc_x', 'acc_y', 'acc_z', 'centroid']
 
         self.assertEqual( self.mili.derived_variables_of_class("brick"), BRICK_DERIVED )
         self.assertEqual( self.mili.derived_variables_of_class("beam"), BEAM_DERIVED )
@@ -984,6 +984,90 @@ class SerialDerivedExpressions(unittest.TestCase):
         self.assertAlmostEqual(result["area"]["data"][2,0,0], 0.07812706)
         self.assertAlmostEqual(result["area"]["data"][2,1,0], 0.17187445)
         self.assertAlmostEqual(result["area"]["data"][2,2,0], 0.17187496)
+
+    def test_hex_centroid(self):
+        """Test centroid calculation for Hex elements."""
+        result = self.mili.query("centroid", "brick", labels=[1,12], states=[1,40,80])
+
+        np.testing.assert_equal( result["centroid"]["layout"]["labels"], [1,12])
+        np.testing.assert_equal( result["centroid"]["layout"]["states"], [1,40,80])
+        np.testing.assert_allclose( result["centroid"]["layout"]["times"], [0.0,  0.00039, 0.00079])
+        self.assertEqual( result["centroid"]["source"], "derived")
+        self.assertEqual( result["centroid"]["class_name"], "brick")
+        self.assertEqual( result["centroid"]["title"], "Centroid Position")
+
+        # State 1
+        np.testing.assert_allclose(result["centroid"]["data"][0,0,:], [0.583133  , 0.15625003, 2.3333337 ])
+        np.testing.assert_allclose(result["centroid"]["data"][0,1,:], [0.21874999, 0.81638616, 2.6000001 ])
+        # State 40
+        np.testing.assert_allclose(result["centroid"]["data"][1,0,:], [0.583133  , 0.15625003, 2.0106943 ])
+        np.testing.assert_allclose(result["centroid"]["data"][1,1,:], [0.21874999, 0.81638616, 2.2773683 ])
+        # State 80
+        np.testing.assert_allclose(result["centroid"]["data"][2,0,:], [0.583133  , 0.15625003, 1.9905574 ])
+        np.testing.assert_allclose(result["centroid"]["data"][2,1,:], [0.21874999, 0.81638616, 2.2572217 ])
+
+    def test_beam_centroid(self):
+        """Test centroid calculation for Beam elements."""
+        result = self.mili.query("centroid", "beam", labels=[1,12], states=[1,40,80])
+
+        np.testing.assert_equal( result["centroid"]["layout"]["labels"], [1,12])
+        np.testing.assert_equal( result["centroid"]["layout"]["states"], [1,40,80])
+        np.testing.assert_allclose( result["centroid"]["layout"]["times"], [0.0,  0.00039, 0.00079])
+        self.assertEqual( result["centroid"]["source"], "derived")
+        self.assertEqual( result["centroid"]["class_name"], "beam")
+        self.assertEqual( result["centroid"]["title"], "Centroid Position")
+
+        # State 1
+        np.testing.assert_allclose(result["centroid"]["data"][0,0,:], [0.9330127 , 0.25      , 0.        ])
+        np.testing.assert_allclose(result["centroid"]["data"][0,1,:], [0.8668914 , 0.50049996, 0.1       ])
+        # State 40
+        np.testing.assert_allclose(result["centroid"]["data"][1,0,:], [0.9330127 , 0.25      , 0.        ])
+        np.testing.assert_allclose(result["centroid"]["data"][1,1,:], [0.86924446, 0.50186634, 0.09236038])
+        # State 80
+        np.testing.assert_allclose(result["centroid"]["data"][2,0,:], [0.9330127 , 0.25      , 0.        ])
+        np.testing.assert_allclose(result["centroid"]["data"][2,1,:], [0.87171483, 0.50328773, 0.08988625])
+
+    def test_shell_centroid(self):
+        """Test centroid calculation for Shell elements."""
+        result = self.mili.query("centroid", "shell", labels=[1,12], states=[1,40,80])
+
+        np.testing.assert_equal( result["centroid"]["layout"]["labels"], [1,12])
+        np.testing.assert_equal( result["centroid"]["layout"]["states"], [1,40,80])
+        np.testing.assert_allclose( result["centroid"]["layout"]["times"], [0.0,  0.00039, 0.00079])
+        self.assertEqual( result["centroid"]["source"], "derived")
+        self.assertEqual( result["centroid"]["class_name"], "shell")
+        self.assertEqual( result["centroid"]["title"], "Centroid Position")
+
+        # State 1
+        np.testing.assert_allclose(result["centroid"]["data"][0,0,:], [0.5831329 , 0.15625003, 2.        ])
+        np.testing.assert_allclose(result["centroid"]["data"][0,1,:], [0.34374994, 1.2828925 , 2.        ])
+        # State 40
+        np.testing.assert_allclose(result["centroid"]["data"][1,0,:], [0.5831725 , 0.15626055, 1.8761616 ])
+        np.testing.assert_allclose(result["centroid"]["data"][1,1,:], [0.3437595 , 1.2829274 , 1.8770695 ])
+        # State 80
+        np.testing.assert_allclose(result["centroid"]["data"][2,0,:], [0.5831527 , 0.1562534 , 1.8437902 ])
+        np.testing.assert_allclose(result["centroid"]["data"][2,1,:], [0.3437514 , 1.2829016 , 1.8467228 ])
+
+    def test_node_centroid(self):
+        """Test centroid calculation for Node elements."""
+        result = self.mili.query("centroid", "node", labels=[1,12], states=[1,40,80])
+
+        np.testing.assert_equal( result["centroid"]["layout"]["labels"], [1,12])
+        np.testing.assert_equal( result["centroid"]["layout"]["states"], [1,40,80])
+        np.testing.assert_allclose( result["centroid"]["layout"]["times"], [0.0,  0.00039, 0.00079])
+        self.assertEqual( result["centroid"]["source"], "derived")
+        self.assertEqual( result["centroid"]["class_name"], "node")
+        self.assertEqual( result["centroid"]["title"], "Centroid Position")
+
+        # State 1
+        np.testing.assert_allclose(result["centroid"]["data"][0,0,:], [1.       , 0.       , 0.       ])
+        np.testing.assert_allclose(result["centroid"]["data"][0,1,:], [1.       , 0.       , 2.       ])
+        # State 40
+        np.testing.assert_allclose(result["centroid"]["data"][1,0,:], [1.       , 0.       , 0.       ])
+        np.testing.assert_allclose(result["centroid"]["data"][1,1,:], [1.0000436, 0.       , 1.8774046])
+        # State 80
+        np.testing.assert_allclose(result["centroid"]["data"][2,0,:], [1.       , 0.       , 0.       ])
+        np.testing.assert_allclose(result["centroid"]["data"][2,1,:], [1.000033 , 0.       , 1.8454171])
 
     def test_surfstrain(self):
         """Test derived result surfstrain."""

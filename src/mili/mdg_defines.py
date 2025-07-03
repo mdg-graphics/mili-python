@@ -364,6 +364,7 @@ class DerivedVariables(StateVariableName):
 
     ELEMENT_VOLUME = "element_volume"
     AREA = "area"
+    CENTROID = "centroid"
 
     SURFACE_STRAIN_X = "surfstrainx"
     SURFACE_STRAIN_Y = "surfstrainy"
