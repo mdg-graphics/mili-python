@@ -14,6 +14,12 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Added
 
+## [v0.9.4] - 2025-7-24
+
+### Fixed
+
+- Fixed bug in the `Milidatabase.query` method where the `material` argument would be ignored when the `labels` argument was not provided.
+
 ## [v0.9.3] - 2025-7-3
 
 - Added the derived variable `centroid` to calculate the centroid of an element.

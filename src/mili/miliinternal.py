@@ -974,14 +974,14 @@ class _MiliInternal:
       labels = self.__labels.get( class_sname, np.empty([0],np.int32) )
     else:
       labels = argument_to_ndarray(labels, np.int32)
+
+    # Filter labels queried by material if provided, or select all labels of given material if no other labels are given
+    if labels is not None and material is not None:
+      mat_labels = self.class_labels_of_material(material, class_sname)
       if labels is not None:
-        # Filter labels queried by material if provided, or select all labels of given material if no other labels are given
-        if material is not None:
-          mat_labels = self.class_labels_of_material(material, class_sname)
-          if labels is not None:
-            labels = np.intersect1d( labels, mat_labels )
-          else:
-            labels = mat_labels
+        labels = np.intersect1d( labels, mat_labels )
+      else:
+        labels = mat_labels
 
     if not isinstance( labels, np.ndarray ):
       self.__return_code = (ReturnCode.ERROR, f"'labels' must be None, an integer, or a list of integers" )
