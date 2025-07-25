@@ -7,6 +7,7 @@ All notable changes to Mili-python will be documented in this file.
 ### Added
 
 ### Fixed
+- Fixed bug in `AdjacencyMapping.compute_centroid` causing incorrect results for beam elements.
 
 ### Changed
 

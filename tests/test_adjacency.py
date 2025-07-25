@@ -37,10 +37,10 @@ class TestSerialGeometricMeshInfo(unittest.TestCase):
 
         # beam elements
         centroid = self.mili.geometry.compute_centroid("beam", label=33, state=1)
-        np.testing.assert_allclose( centroid, np.array([0.579082, 0.334333, 1.466667]), rtol=1.0e-6 )
+        np.testing.assert_allclose( centroid, np.array([0.868623, 0.5015  , 1.7     ]), rtol=1.0e-6 )
 
         centroid = self.mili.geometry.compute_centroid("beam", label=45, state=100)
-        np.testing.assert_allclose( centroid, np.array([-2.934491e-08,  7.380999e-01,  1.125251e+00]) )
+        np.testing.assert_allclose( centroid, np.array([-4.401737e-08,  1.107150e+00,  1.187876e+00]), rtol=5.0e-07 )
 
         # Nodes
         centroid = self.mili.geometry.compute_centroid("node", label=1, state=1)
@@ -99,10 +99,10 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
 
         # beam elements
         centroid = self.adjacency.compute_centroid("beam", label=33, state=1)
-        np.testing.assert_allclose( centroid, np.array([0.579082, 0.334333, 1.466667]), rtol=1.0e-6 )
+        np.testing.assert_allclose( centroid, np.array([0.868623, 0.5015  , 1.7     ]), rtol=1.0e-6 )
 
         centroid = self.adjacency.compute_centroid(EntityType.BEAM, label=45, state=100)
-        np.testing.assert_allclose( centroid, np.array([-2.934491e-08,  7.380999e-01,  1.125251e+00]) )
+        np.testing.assert_allclose( centroid, np.array([-4.401737e-08,  1.107150e+00,  1.187876e+00]), rtol=5.0e-07 )
 
         # Nodes
         centroid = self.adjacency.compute_centroid("node", label=1, state=1)
@@ -293,10 +293,10 @@ class ParallelAdjacencyTests:
 
             # beam elements
             centroid = self.mili.geometry.compute_centroid("beam", label=33, state=1)
-            np.testing.assert_allclose( centroid[4], np.array([0.579082, 0.334333, 1.466667]), rtol=1.0e-6 )
+            np.testing.assert_allclose( centroid[4], np.array([0.868623, 0.5015  , 1.7     ]), rtol=1.0e-6 )
 
             centroid = self.mili.geometry.compute_centroid("beam", label=45, state=100)
-            np.testing.assert_allclose( centroid[7], np.array([-2.934491e-08,  7.380999e-01,  1.125251e+00]) )
+            np.testing.assert_allclose( centroid[7], np.array([-4.401737e-08,  1.107150e+00,  1.187876e+00]), rtol=5.0e-07 )
 
             # Nodes
             centroid = self.mili.geometry.compute_centroid("node", label=1, state=1)

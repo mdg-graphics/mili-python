@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Union, List, Tuple, Dict, Optional
 import numpy as np
 from numpy.typing import NDArray, ArrayLike
 from mili.utils import argument_to_ndarray
+from mili.datatypes import Superclass
 
 if TYPE_CHECKING:
     from mili.miliinternal import _MiliInternal
@@ -100,6 +101,10 @@ class GeometricMeshInfo:
     if labels is None or label not in labels:
       return None
 
+    class_def = self.db.mesh_object_classes().get(class_name)
+    if class_def is None:
+        return None
+
     elem_conns = np.empty([0], dtype=np.int32)
     if class_name == "node":
       elem_conns = np.array([label], dtype = np.int32)
@@ -108,7 +113,10 @@ class GeometricMeshInfo:
       if connectivity is None:
         return None
       elem_idx = np.where( np.isin(labels, label) )[0][0]
-      elem_conns = self.db.labels("node")[connectivity[elem_idx][:-1]]
+      if class_def.sclass == Superclass.M_BEAM:
+        elem_conns = self.db.labels("node")[connectivity[elem_idx][:-2]] # We ignore the 3rd node for beams
+      else:
+        elem_conns = self.db.labels("node")[connectivity[elem_idx][:-1]]
 
     if len(elem_conns) != 0:
       centroid = np.array([0.0, 0.0, 0.0], dtype=np.float32)
