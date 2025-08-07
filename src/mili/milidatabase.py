@@ -795,3 +795,46 @@ class MiliDatabase:
     self.__postprocess(
       results = self._mili.copy_non_state_data(new_base_name),  # type: ignore  # mypy errors because function returns None.
       reduce_function = reductions.zeroth_entry)
+
+  def measure(self,
+              A_entity_type: Union[str,EntityType],
+              A_label: int,
+              B_entity_type: Union[str,EntityType],
+              B_label: int,
+              states: Optional[Union[List[int],int]] = None) -> Tuple[NDArray[np.float32],NDArray[np.int32]]:
+    """Measure the distance between two elements A and B for a set of states.
+
+    Args:
+      A_entity_type (Union[str,EntityType]): The entity type/class of the first element (e.g. brick. shell, node).
+      A_label (int): The label of the first element.
+      B_entity_type (Union[str,EntityType]): The entity type/class of the second element (e.g. brick. shell, node).
+      B_label (int): The label of the second element.
+      states (Optional[Union[List[int],int]], default=None): The states to get the distances at. If no states are provided,
+        then the distances at all states are returned.
+
+    Returns:
+      Tuple[NDArray[np.float32],NDArray[np.int32]]: An array containing the distance between the two elements at each state
+        and an array containing the state numbers that correspond to each index in the first array.
+    """
+    # Query the centroid for element A
+    A_centroid = reductions.combine(self.query("centroid", A_entity_type, labels=[A_label], states=states))
+    A_states = A_centroid['centroid']['layout']['states']
+    A_data = A_centroid['centroid']['data']
+
+    # Query the centroid for element B
+    B_centroid = reductions.combine(self.query("centroid", B_entity_type, labels=[B_label], states=states))
+    B_states = B_centroid['centroid']['layout']['states']
+    B_data = B_centroid['centroid']['data']
+
+    # Compute the distance between the two elements
+    x_dist = B_data[:,:,0] - A_data[:,:,0]
+    y_dist = B_data[:,:,1] - A_data[:,:,1]
+    z_dist = B_data[:,:,2] - A_data[:,:,2]
+
+    x_dist = x_dist * x_dist
+    y_dist = y_dist * y_dist
+    z_dist = z_dist * z_dist
+
+    distance = np.sqrt( x_dist + y_dist + z_dist ).ravel()
+
+    return distance, A_states

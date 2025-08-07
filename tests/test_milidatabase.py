@@ -527,6 +527,27 @@ class SharedSerialTests:
             answer = self.mili.class_labels_of_material("slide1m",'cseg')
             np.testing.assert_equal(answer, np.array([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],dtype=np.int32))
 
+        #==============================================================================
+        def test_measure(self):
+            distance, states = self.mili.measure("node", 1, "node", 2, states=[1])
+            np.testing.assert_allclose(distance, np.array([10.003407],dtype=np.float32))
+            np.testing.assert_equal(states, [1])
+
+            distance, states = self.mili.measure("node", 1, "brick", 1, states=[60])
+            np.testing.assert_allclose(distance, np.array([2.026083],dtype=np.float32), rtol=2.4e-07)
+            np.testing.assert_equal(states, [60])
+
+            distance, states = self.mili.measure("brick", 1, "brick", 1, states=[60])
+            np.testing.assert_allclose(distance, np.array([0.0],dtype=np.float32))
+            np.testing.assert_equal(states, [60])
+
+            distance, states = self.mili.measure("brick", 1, "brick", 30, states=[4])
+            np.testing.assert_allclose(distance, np.array([1.182260],dtype=np.float32))
+            np.testing.assert_equal(states, [4])
+
+            distance, states = self.mili.measure("shell", 1, "cseg", 12, states=[10])
+            np.testing.assert_allclose(distance, np.array([1.1517903],dtype=np.float32), rtol=2.9e-06)
+            np.testing.assert_equal(states, [10])
 
 class SerialSingleStateFile(SharedSerialTests.SerialTests):
     file_name = os.path.join(dir_path,'data','serial','sstate','d3samp6.plt')
@@ -2276,6 +2297,27 @@ class ParallelTests:
             np.testing.assert_allclose(df["stddev"][97], 0.025586, rtol=1.6e-05)
             np.testing.assert_allclose(df["stddev"][98], 0.025499, rtol=1.1e-05)
             np.testing.assert_allclose(df["stddev"][99], 0.025357, rtol=3.3e-06)
+
+        def test_measure(self):
+            distance, states = self.mili.measure("node", 1, "node", 2, states=[1])
+            np.testing.assert_allclose(distance, np.array([10.003407],dtype=np.float32))
+            np.testing.assert_equal(states, [1])
+
+            distance, states = self.mili.measure("node", 1, "brick", 1, states=[60])
+            np.testing.assert_allclose(distance, np.array([2.026083],dtype=np.float32), rtol=2.4e-07)
+            np.testing.assert_equal(states, [60])
+
+            distance, states = self.mili.measure("brick", 1, "brick", 1, states=[60])
+            np.testing.assert_allclose(distance, np.array([0.0],dtype=np.float32))
+            np.testing.assert_equal(states, [60])
+
+            distance, states = self.mili.measure("brick", 1, "brick", 30, states=[4])
+            np.testing.assert_allclose(distance, np.array([1.182260],dtype=np.float32))
+            np.testing.assert_equal(states, [4])
+
+            distance, states = self.mili.measure("shell", 1, "cseg", 12, states=[10])
+            np.testing.assert_allclose(distance, np.array([1.1517903],dtype=np.float32), rtol=2.9e-06)
+            np.testing.assert_equal(states, [10])
 
 ###############################################
 # Tests for each parallel wrapper class
