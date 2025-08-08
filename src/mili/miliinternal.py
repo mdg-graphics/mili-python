@@ -414,6 +414,15 @@ class _MiliInternal:
       NDArray[np.int32]: Array of integration points.
     """
     int_points = np_empty(np.int32)
+
+    if svar_name not in self.__svars:
+      self.__return_code = (ReturnCode.ERROR, f"The svar '{svar_name}' does not exist.")
+      return int_points
+
+    if class_name not in self.__MO_class_data:
+      self.__return_code = (ReturnCode.ERROR, f"The class '{class_name}' does not exist.")
+      return int_points
+
     if svar_name in self.__int_points:
       for es_name in self.__int_points[svar_name]:
         if class_name in self.classes_of_state_variable(es_name):
@@ -513,6 +522,9 @@ class _MiliInternal:
     Returns:
       List[str]: List of derived variables that can be calculated for the specified class.
     """
+    if class_name not in self.__MO_class_data:
+      self.__return_code = (ReturnCode.ERROR, f"The class '{class_name}' does not exist.")
+      return []
     return self.__derived.derived_variables_of_class(class_name)
 
   def classes_of_derived_variable(self, var_name: str) -> List[str]:
@@ -524,6 +536,9 @@ class _MiliInternal:
     Returns:
       List[str]: List of element class names for which var_name can be calculated.
     """
+    if var_name not in self.__derived.supported_variables():
+      self.__return_code = (ReturnCode.ERROR, f"The derived variable '{var_name}' does not exist.")
+      return []
     return self.__derived.classes_of_derived_variable(var_name)
 
   @overload
@@ -580,6 +595,8 @@ class _MiliInternal:
         class does not exists then an empty array is returned.
     """
     if class_name is not None:
+      if class_name not in self.__MO_class_data:
+        self.__return_code = (ReturnCode.ERROR, f"The class '{class_name}' does not exist.")
       return self.__conns_labels.get(class_name, np.empty([0], np.int32))
     return self.__conns_labels
 
@@ -601,6 +618,8 @@ class _MiliInternal:
         class does not exists then an empty array is returned.
     """
     if class_name is not None:
+      if class_name not in self.__MO_class_data:
+        self.__return_code = (ReturnCode.ERROR, f"The class '{class_name}' does not exist.")
       return self.__conns_ids.get(class_name, np.empty([0], np.int32))
     return self.__conns_ids
 
@@ -682,9 +701,12 @@ class _MiliInternal:
       List[str]: List of element classes the state variable exists for.
     """
     classes: List[str] = []
-    state_variable: Optional[StateVariable] = self.__svars.get(svar, None)
+    _, svar_name, _, _ = self.__parse_query_name_and_source( svar, 'primal' )
+    state_variable: Optional[StateVariable] = self.__svars.get(svar_name, None)
     if state_variable is not None:
       classes = list(set([ srec.class_name for srec in state_variable.srecs ]))
+    else:
+      self.__return_code = (ReturnCode.ERROR, f"The state variable {svar} does not exists")
     return classes
 
   def state_variables_of_class(self, class_name: str) -> List[str]:
@@ -696,11 +718,17 @@ class _MiliInternal:
     Returns:
       List[str]: A list of primal state variables that can be queried for the specified element class.
     """
-    state_variables = []
+    state_variables: List[str] = []
+
+    if class_name not in self.__MO_class_data:
+      self.__return_code = (ReturnCode.ERROR, f"The class '{class_name}' does not exist.")
+      return state_variables
+
     for svar_name, svar in self.__svars.items():
       for srec in svar.srecs:
         if srec.class_name == class_name and svar_name not in state_variables:
           state_variables.append(svar_name)
+
     return state_variables
 
   def state_variable_titles(self) -> dict[str,str]:
@@ -726,10 +754,20 @@ class _MiliInternal:
       List[str]: List of containing state variables.
     """
     containing_svars: List[str] = []
+
+    if svar not in self.__svars:
+      self.__return_code = (ReturnCode.ERROR, f"The svar '{svar}' does not exist.")
+      return containing_svars
+
+    if class_name not in self.__MO_class_data:
+      self.__return_code = (ReturnCode.ERROR, f"The class '{class_name}' does not exist.")
+      return containing_svars
+
     if svar in self.__svars:
       potential_containing_svars = np.array(self.__svars[svar].containing_svar_names)
       of_same_class = np.array([class_name in self.classes_of_state_variable(containing_svar) for containing_svar in potential_containing_svars])
       containing_svars = list(potential_containing_svars[np.nonzero(of_same_class)[0]])
+
     return containing_svars
 
   def components_of_vector_svar(self, svar: str) -> List[str]:
@@ -762,6 +800,11 @@ class _MiliInternal:
     """
     elem_parts = np.zeros( self.__labels.get( class_name, np_empty(np.int32) ).shape, dtype=np.int32 )
     elem_parts[:] = -1
+
+    if class_name not in self.__MO_class_data:
+      self.__return_code = (ReturnCode.ERROR, f"The class '{class_name}' does not exist.")
+      return elem_parts
+
     for part, labels in self.__elems_of_part.items():
       idxs = labels.get( class_name, np_empty(np.int32) )
       elem_parts[ idxs ] = part
@@ -778,6 +821,11 @@ class _MiliInternal:
     """
     elem_mats = np.zeros( self.__labels.get( class_name, np_empty(np.int32) ).shape, dtype=np.int32 )
     elem_mats[:] = -1
+
+    if class_name not in self.__MO_class_data:
+      self.__return_code = (ReturnCode.ERROR, f"The class '{class_name}' does not exist.")
+      return elem_mats
+
     for mat, labels in self.__elems_of_mat.items():
       idxs = labels.get( class_name, np_empty(np.int32) )
       elem_mats[ idxs ] = mat
@@ -794,6 +842,7 @@ class _MiliInternal:
       NDArray[np.int32]: array of labels of the specified class name and material.
     """
     if class_name not in self.__labels.keys():
+      self.__return_code = (ReturnCode.ERROR, f"The class '{class_name}' does not exist.")
       return np_empty(np.int32)
 
     if not self.__valid_material_type(material):
@@ -808,6 +857,7 @@ class _MiliInternal:
 
     integer_reps = list( itertools.chain.from_iterable(self.__mats.values()) )
     if material not in integer_reps and material not in string_reps and material not in self.__elems_of_mat.keys():
+      self.__return_code = (ReturnCode.ERROR, f"The material '{material} does not exist.")
       return np_empty(np.int32)
 
     elem_idxs: NDArray[np.int32] = np_empty(np.int32)
@@ -856,13 +906,17 @@ class _MiliInternal:
     """
     labels_array = argument_to_ndarray(elem_labels, dtype=np.int32)
     if labels_array is None:
+      self.__return_code = (ReturnCode.ERROR, f"The provided labels are None.")
       return np.empty([1,0],dtype=np.int32), np.empty([1,0],dtype=np.int32)
 
     if class_sname not in self.__class_to_sclass:
+      self.__return_code = (ReturnCode.ERROR, f"The class '{class_sname}' does not exist.")
       return np.empty([1,0],dtype=np.int32), np.empty([1,0],dtype=np.int32)
     if all( label not in self.__labels[class_sname] for label in labels_array ):
+      self.__return_code = (ReturnCode.ERROR, f"None of the provided labels exist for class '{class_sname}'.")
       return np.empty([1,0],dtype=np.int32), np.empty([1,0],dtype=np.int32)
     if class_sname not in self.__conns_labels:
+      self.__return_code = (ReturnCode.ERROR, f"The class '{class_sname}' does not have element connectivity.")
       return np.empty([1,0],dtype=np.int32), np.empty([1,0],dtype=np.int32)
 
     # Only search for labels that actually exist for this processor/database

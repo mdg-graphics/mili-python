@@ -565,6 +565,7 @@ class DerivedExpressions:
       derived_exists = class_name in self.db.classes_of_derived_variable(variable)
     except:
       derived_exists = False
+    self.db.clear_return_code()
     return primal_exists or derived_exists
 
   def derived_variables_of_class(self, class_name: str) -> List[str]:

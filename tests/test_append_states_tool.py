@@ -11,6 +11,7 @@ import unittest
 import numpy as np
 from mili import reader
 from mili.append_states import AppendStatesTool
+from mili.milidatabase import MiliPythonError
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -155,7 +156,7 @@ class TestAppendStateToolInvalidInput(unittest.TestCase):
                 }
             }
         }
-        with self.assertRaises(ValueError):
+        with self.assertRaises(MiliPythonError):
             tool = AppendStatesTool(append_states_spec)
 
     def test_invalid_labels(self):

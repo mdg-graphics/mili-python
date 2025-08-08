@@ -7,13 +7,24 @@ All notable changes to Mili-python will be documented in this file.
 ### Added
 
 ### Fixed
-- Fixed bug in `AdjacencyMapping.compute_centroid` causing incorrect results for beam elements.
 
 ### Changed
 
 ### Removed
 
+## [v0.9.5] - 2025-8-8
+
 ### Added
+- Added the method `MiliDatabase.measure` to compute the distance between two nodes or elements.
+- Updated the `AdjacencyMapping.nearest_element` method to support filtering by entity type (e.g 'brick', 'shell', etc) or by element superclass (e.g. QUAD, HEX, etc.).
+
+### Fixed
+- Fixed bug in `AdjacencyMapping.compute_centroid` causing incorrect results for beam elements.
+- Added additional error messaging to many function to better indicate if a state variable or entity type does not exist.
+
+### Changed
+
+### Removed
 
 ## [v0.9.4] - 2025-7-24
 

@@ -210,6 +210,9 @@ class SharedSerialTests:
             self.assertTrue( all( self.mili.connectivity(EntityType.CONTACT_SEGMENT)[1:12,-1] == 4) )  # Csegs 1-12 are material 4
             self.assertTrue( all( self.mili.connectivity(EntityType.CONTACT_SEGMENT)[12:24,-1] == 5) )  # Csegs 12-24 are material 5
 
+            with self.assertRaises(MiliPythonError):
+                self.mili.connectivity("bbbrick")
+
         #==============================================================================
         def test_faces(self):
             with self.assertRaises(MiliPythonError):
@@ -295,6 +298,11 @@ class SharedSerialTests:
 
         #==============================================================================
         def test_int_points_of_state_variable(self):
+            with self.assertRaises(MiliPythonError):
+                ipts = self.mili.int_points_of_state_variable("sxxxxx", "brick")
+            with self.assertRaises(MiliPythonError):
+                ipts = self.mili.int_points_of_state_variable("sx", "nnnnode")
+
             ipts = self.mili.int_points_of_state_variable("sx", "brick")
             np.testing.assert_equal(ipts, [])
 
@@ -357,6 +365,9 @@ class SharedSerialTests:
             self.assertEqual( self.mili.derived_variables_of_class(EntityType.CONTACT_SEGMENT), CSEG_DERIVED )
             self.assertEqual( self.mili.derived_variables_of_class(EntityType.NODE), NODE_DERIVED )
 
+            with self.assertRaises(MiliPythonError):
+                self.mili.derived_variables_of_class("nnnnoode")
+
         #==============================================================================
         def test_classes_of_state_variable(self):
             sx_classes = self.mili.classes_of_state_variable('sx')
@@ -367,6 +378,9 @@ class SharedSerialTests:
 
             axf_classes = self.mili.classes_of_state_variable('axf')
             self.assertEqual(axf_classes, ["beam"])
+
+            with self.assertRaises(MiliPythonError):
+                self.mili.classes_of_state_variable("does-not-exist")
 
         #==============================================================================
         def test_materials_of_class_name(self):
@@ -388,6 +402,9 @@ class SharedSerialTests:
             np.testing.assert_equal( cseg_mats, np.array([4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
                                                         5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5]) )
 
+            with self.assertRaises(MiliPythonError):
+                self.mili.materials_of_class_name("ssshell")
+
         #==============================================================================
         def test_parts_of_class_name(self):
             brick_parts = self.mili.parts_of_class_name("brick")
@@ -406,6 +423,9 @@ class SharedSerialTests:
 
             self.assertEqual( cseg_parts.size, 24 )
             np.testing.assert_equal( np.unique(cseg_parts), np.array([1]) )
+
+            with self.assertRaises(MiliPythonError):
+                self.mili.parts_of_class_name("ssshell")
 
         #==============================================================================
         def test_mesh_object_classes_getter(self):
@@ -516,8 +536,11 @@ class SharedSerialTests:
             self.assertEqual(nodes.size, 8)
             np.testing.assert_equal(nodes, np.array( [[65, 81, 85, 69, 66, 82, 86, 70]], dtype = np.int32 ))
 
+            with self.assertRaises(MiliPythonError):
+                self.mili.nodes_of_elems("bbbrick", 1)
+
         #==============================================================================
-        def test_class_labels_of_mat(self):
+        def test_class_labels_of_material(self):
             answer = self.mili.class_labels_of_material(5,'cseg')
             np.testing.assert_equal(answer, np.array([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],dtype=np.int32))
 
@@ -526,6 +549,9 @@ class SharedSerialTests:
 
             answer = self.mili.class_labels_of_material("slide1m",'cseg')
             np.testing.assert_equal(answer, np.array([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],dtype=np.int32))
+
+            with self.assertRaises(MiliPythonError):
+                self.mili.class_labels_of_material("5", "cccccseg")
 
         #==============================================================================
         def test_measure(self):
@@ -628,6 +654,9 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         self.assertEqual(beam_vars, BEAM_SVARS)
         self.assertEqual(brick_vars, BRICK_SVARS)
 
+        with self.assertRaises(MiliPythonError):
+            self.mili.state_variables_of_class("bbbeam")
+
     #==============================================================================
     def test_containing_state_variables_of_class(self):
         containing = self.mili.containing_state_variables_of_class("sx", "brick")
@@ -638,6 +667,11 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
 
         containing = self.mili.containing_state_variables_of_class("ux", EntityType.BRICK)
         self.assertEqual(containing, [])
+
+        with self.assertRaises(MiliPythonError):
+            self.mili.containing_state_variables_of_class("uuux", "node")
+        with self.assertRaises(MiliPythonError):
+            self.mili.containing_state_variables_of_class("ux", "nnnode")
 
     #==============================================================================
     def test_state_variable(self):
@@ -1541,6 +1575,9 @@ class ParallelTests:
             self.assertEqual(axf_classes[6], ["beam"])
             self.assertEqual(axf_classes[7], ["beam"])
 
+            with self.assertRaises(MiliPythonError):
+                self.mili.classes_of_state_variable("does-not-exist")
+
         #==============================================================================
         def test_materials_of_class_name(self):
             """Test the materials_of_class_name method of Mili Class."""
@@ -1601,6 +1638,9 @@ class ParallelTests:
             np.testing.assert_equal( cseg_mats[3], np.array([4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5]) )
             np.testing.assert_equal( cseg_mats[5], np.array([4, 4, 4, 5, 5, 5]))
 
+            with self.assertRaises(MiliPythonError):
+                self.mili.materials_of_class_name("ssshell")
+
         #==============================================================================
         def test_parts_of_class_name(self):
             """Test the parts_of_class_name method of Mili Class."""
@@ -1660,6 +1700,9 @@ class ParallelTests:
             np.testing.assert_equal( np.unique(cseg_parts[2]), np.array([1]) )
             np.testing.assert_equal( np.unique(cseg_parts[3]), np.array([1]) )
             np.testing.assert_equal( np.unique(cseg_parts[5]), np.array([1]) )
+
+            with self.assertRaises(MiliPythonError):
+                self.mili.parts_of_class_name("ssshell")
 
         #==============================================================================
         def test_mesh_object_classes_getter(self):
@@ -1807,6 +1850,9 @@ class ParallelTests:
             """Testing what nodes are associated with a label"""
             answer = self.mili.nodes_of_elems('brick', 1)
             np.testing.assert_equal( answer[3][0][0,:], np.array([65,81,85,69,66,82,86,70],dtype=np.int32) )
+
+            with self.assertRaises(MiliPythonError):
+                self.mili.nodes_of_elems("bbbrick", 1)
 
         #==============================================================================
         def test_state_variable(self):
