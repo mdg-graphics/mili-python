@@ -9,6 +9,7 @@ import os
 import unittest
 from mili import reader, adjacency
 from mili.mdg_defines import EntityType
+from mili.datatypes import Superclass
 import numpy as np
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -246,6 +247,26 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
         self.assertEqual(label, 1)
         self.assertEqual(dist, 2.089128544941847)
 
+        class_name, label, dist = self.adjacency.nearest_element([0.0,0.0,0.0], 1, entity_type="shell")
+        self.assertEqual(class_name, "shell")
+        self.assertEqual(label, 1)
+        self.assertEqual(dist, 2.089128544941847)
+
+        class_name, label, dist = self.adjacency.nearest_element([0.0,0.0,0.0], 1, superclass = Superclass.M_QUAD)
+        self.assertEqual(class_name, "shell")
+        self.assertEqual(label, 1)
+        self.assertEqual(dist, 2.089128544941847)
+
+        class_name, label, dist = self.adjacency.nearest_element([0.0,0.0,0.0], 1, entity_type = "cseg", superclass = Superclass.M_QUAD)
+        self.assertEqual(class_name, "cseg")
+        self.assertEqual(label, 1)
+        self.assertEqual(dist, 2.089128544941847)
+
+        class_name, label, dist = self.adjacency.nearest_element([0.0,0.0,0.0], 1, superclass = Superclass.M_BEAM)
+        self.assertEqual(class_name, "beam")
+        self.assertEqual(label, 12)
+        self.assertEqual(dist, 0.778031964849994)
+
     def test_neighbor_elements(self):
         """Test the neighbor_elements funcion."""
         elems = self.adjacency.neighbor_elements("brick", 1)
@@ -470,6 +491,26 @@ class ParallelAdjacencyTests:
             self.assertEqual(class_name, "shell")
             self.assertEqual(label, 1)
             self.assertEqual(dist, 2.089128544941847)
+
+            class_name, label, dist = self.adjacency.nearest_element([0.0,0.0,0.0], 1, entity_type = "shell")
+            self.assertEqual(class_name, "shell")
+            self.assertEqual(label, 1)
+            self.assertEqual(dist, 2.089128544941847)
+
+            class_name, label, dist = self.adjacency.nearest_element([0.0,0.0,0.0], 1, superclass = Superclass.M_QUAD )
+            self.assertEqual(class_name, "shell")
+            self.assertEqual(label, 1)
+            self.assertEqual(dist, 2.089128544941847)
+
+            class_name, label, dist = self.adjacency.nearest_element([0.0,0.0,0.0], 1, entity_type = "cseg", superclass = Superclass.M_QUAD)
+            self.assertEqual(class_name, "cseg")
+            self.assertEqual(label, 1)
+            self.assertEqual(dist, 2.089128544941847)
+
+            class_name, label, dist = self.adjacency.nearest_element([0.0,0.0,0.0], 1, superclass = Superclass.M_BEAM )
+            self.assertEqual(class_name, "beam")
+            self.assertEqual(label, 12)
+            self.assertEqual(dist, 0.778031964849994)
 
         def test_neighbor_elements(self):
             """Test the neighbor_elements funcion."""

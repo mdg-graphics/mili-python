@@ -1027,15 +1027,25 @@ argument :code:`material` that limits the search to specific material name(s) or
     nearest_node, distance = adj.nearest_node( [0.0, 0.0, 0.0], 1)
 
 The function :code:`nearest_element` finds the element whose centroid is closest to a given 3d coordinate at a specified time step. This function also takes the optional
-argument :code:`material` that limits the search to specific material name(s) or number(s).
+argument :code:`material` that limits the search to specific material name(s) or number(s), the optional argument :code:`entity_type` that limits the search to a specific
+entity type e.g. "brick" or "shell", and the optional argument :code:`superclass` to limit the search to a specific element superclass e.g. M_QUAD or M_HEX.
 
 .. code-block:: python
 
+    from mili.datatypes import Superclass
     from mili import adjacency
     adj = adjacency.AdjacencyMapping(db)
 
     # Get the closest element (class name and label) and its distance from the point (0.0, 0.0, 0.0) at state 1.
     class_name, label, distance = adj.nearest_element( [0.0, 0.0, 0.0], 1)
+
+    # Get the closest element (class name and label) and its distance from the point (0.0, 0.0, 0.0) at state 100
+    # that is of the entity type "cseg".
+    class_name, label, distance = adj.nearest_element( [0.0, 0.0, 0.0], 100, entity_type = "cseg")
+
+    # Get the closest element (class name and label) and its distance from the point (0.0, 0.0, 0.0) at state 100
+    # that is a QUAD element.
+    class_name, label, distance = adj.nearest_element( [0.0, 0.0, 0.0], 100, superclass = Superclass.M_QUAD)
 
 The function :code:`neighbor_elements` finds all elements that neighbor the specified element. A neighbor element
 is defined as any element that shares a node with the specified element. The :code:`neighbor_radius`
@@ -1045,6 +1055,7 @@ specified material names or numbers.
 
 .. code-block:: python
 
+    from mili.datatypes import Superclass
     from mili import adjacency
     adj = adjacency.AdjacencyMapping(db)
 

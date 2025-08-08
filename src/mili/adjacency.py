@@ -11,6 +11,7 @@ from numpy.typing import NDArray, ArrayLike
 from mili.reductions import dictionary_merge_concat_unique
 from mili.milidatabase import MiliDatabase
 from mili.mdg_defines import mdg_enum_to_string
+from mili.datatypes import Superclass
 
 if TYPE_CHECKING:
   # NOTE: We only import these when Type checking. These enums should not
@@ -127,13 +128,17 @@ class AdjacencyMapping:
     return nearest_node
 
   def nearest_element(self, point: Union[List[float],NDArray[np.floating]], state: int,
-                      material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Tuple[str,int,float]:
+                      material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None,
+                      entity_type: Optional[Union[EntityType,str]] = None,
+                      superclass: Optional[Superclass] = None) -> Tuple[str,int,float]:
     """Get the nearest element to a specified point.
 
     Args:
       point (List[float]): The coordinates of the point.
       state (int): The state number.
       material (Optional[Union[Union[str,int],List[Union[str,int]]]] = None): Limit gathered elements to a specific material(s).
+      entity_type (Optional[Union[EntityType,str]], default=None): Limit search to specific entity type (e.g 'shell', 'brick', etc.).
+      superclass (Optional[Superclass], default=None): Limit search to a specific super class.
 
     Returns:
       Tuple[str,int,float]: The element entity type, label, and distance.
@@ -143,7 +148,7 @@ class AdjacencyMapping:
     if isinstance(material, (str,int)):
       material = [material]
 
-    nearest_per_proc = self.mili.geometry.nearest_element(point, state, material)
+    nearest_per_proc = self.mili.geometry.nearest_element(point, state, material, entity_type, superclass)
     if not self.serial:
       nearest_per_proc = min(nearest_per_proc, key=lambda x: x[2])  # type: ignore   # mypy error caused by different results for serial vs parallel.
     return nearest_per_proc

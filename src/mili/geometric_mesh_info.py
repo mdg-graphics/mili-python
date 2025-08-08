@@ -7,6 +7,7 @@ import numpy as np
 from numpy.typing import NDArray, ArrayLike
 from mili.utils import argument_to_ndarray
 from mili.datatypes import Superclass
+from mili.mdg_defines import mdg_enum_to_string, EntityType
 
 if TYPE_CHECKING:
     from mili.miliinternal import _MiliInternal
@@ -53,13 +54,17 @@ class GeometricMeshInfo:
     return nodal_coordinates['nodpos']['layout']['labels'][node_index], distances_from_point[node_index]
 
   def nearest_element(self, point: Union[List[float],NDArray[np.floating]], state: int,
-                      material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None) -> Tuple[str,int,float]:
+                      material: Optional[Union[Union[str,int],List[Union[str,int]]]] = None,
+                      entity_type: Optional[Union[EntityType,str]] = None,
+                      superclass: Optional[Superclass] = None) -> Tuple[str,int,float]:
     """Get the nearest element to a specified point.
 
     Args:
       point (List[float]): The coordinates of the point.
       state (int): The state number.
       material (Optional[Union[Union[str,int],List[Union[str,int]]]], default=None): Limit search to specific material(s).
+      entity_type (Optional[Union[EntityType,str]], default=None): Limit search to specific entity type.
+      superclass (Optional[Superclass], default=None): Limit search to a specific super class.
 
     Returns:
       Tuple[str,int,float]: The element class, label, and distance.
@@ -73,23 +78,44 @@ class GeometricMeshInfo:
       material_dict = self.db.materials()
       material = [ material_dict.get(str(mat), mat) for mat in material ]  # type: ignore  # mypy thinks material could still be str|int, but can't be.
 
+    # Get nodal position for requested state and element connectivity
     nodal_coordinates = self.db.query("nodpos", "node", states=[state], output_object_labels=False)
     nodpos_data = nodal_coordinates['nodpos']['data']
     element_connectivity = self.db.connectivity_ids()
+
+    # Get list of class names to search through. default is all,
+    # but can be filtered by class_name or element superclass.
+    class_names_to_search = []
+    if entity_type:
+      entity_type_str = mdg_enum_to_string(entity_type)
+      if entity_type_str in element_connectivity:
+        class_names_to_search = [entity_type_str]
+    else:
+      class_names_to_search = list(element_connectivity.keys())
+
+    if superclass is not None:
+      mesh_object_classes = self.db.mesh_object_classes()
+      class_names_to_search = [cname for cname in class_names_to_search if mesh_object_classes[cname].sclass == superclass]
+
+    if len(class_names_to_search) == 0:
+      return ("", -1, float(np.finfo(np.float32).max) )
+
     minimums = []
-    for elem_class, elem_conns in element_connectivity.items():
-      # Calculate centroids and distances for each element class
-      conns = elem_conns[:,:-1]
-      elem_centroids = np.sum(nodpos_data[0][conns], axis=1) / float(conns.shape[1])
-      distances_from_point = np.linalg.norm(elem_centroids - point, axis=1)
-      # If filtering by material, mark any distance of an invalid material as max float32 value
-      if material:
-        mats = elem_conns[:,-1]
-        invalid_mats = np.where( np.isin(mats, material, invert=True))
-        distances_from_point[invalid_mats] = np.finfo(np.float32).max
-      # Store minumum
-      min_elem_index = np.argmin(distances_from_point)
-      minimums.append([elem_class, min_elem_index, distances_from_point[min_elem_index]])
+    for elem_class in class_names_to_search:
+      elem_conns = element_connectivity.get(elem_class, None)
+      if elem_conns is not None:
+        # Calculate centroids and distances for each element class
+        conns = elem_conns[:,:-1]
+        elem_centroids = np.sum(nodpos_data[0][conns], axis=1) / float(conns.shape[1])
+        distances_from_point = np.linalg.norm(elem_centroids - point, axis=1)
+        # If filtering by material, mark any distance of an invalid material as max float32 value
+        if material:
+          mats = elem_conns[:,-1]
+          invalid_mats = np.where( np.isin(mats, material, invert=True))
+          distances_from_point[invalid_mats] = np.finfo(np.float32).max
+        # Store minumum
+        min_elem_index = np.argmin(distances_from_point)
+        minimums.append([elem_class, min_elem_index, distances_from_point[min_elem_index]])
     nearest_element = min(minimums, key=lambda x: x[2])
     # covert elem id to label before returning
     nearest_element[1] = self.db.labels(nearest_element[0])[nearest_element[1]]
