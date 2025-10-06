@@ -96,9 +96,13 @@ class MiliDatabase:
 
   def __check_for_exceptions(self, results: Any) -> None:
     """Catch any unhandled exception from parallel wrappers."""
+    # if self.serial is true, then there is a single mili database file, which means
+    # there will be a single result. Check if that is an Exception.
     if self.serial and isinstance(results, Exception):
       raise results
-    elif iterable(results):
+    # if self.serial is False, then there is more than one mili database file, which means
+    # a list of results will be returned (one for each processor), check if any are execptions.
+    if not self.serial and isinstance(results, list):
       for res in results:
         if isinstance(res, Exception):
           raise res

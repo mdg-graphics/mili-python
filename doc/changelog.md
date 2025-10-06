@@ -12,6 +12,11 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Removed
 
+## [v0.9.6] - 2025-10-6
+
+### Fixed
+- Fixed issue with result post-processing that caused decreased performance when returning numpy arrays for serial databases.
+
 ## [v0.9.5] - 2025-8-8
 
 ### Added
