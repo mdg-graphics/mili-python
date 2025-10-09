@@ -136,6 +136,11 @@ class TestMiliInternal(unittest.TestCase):
         self.assertEqual(dims, 3)
 
     #==============================================================================
+    def test_state_count(self):
+        states = self.mili.state_count()
+        self.assertEqual(states, 101)
+
+    #==============================================================================
     def test_class_names(self):
         class_names = self.mili.class_names()
         self.assertEqual(class_names, ["glob", "mat", "node", "beam", "brick", "shell", "cseg"])

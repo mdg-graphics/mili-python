@@ -199,6 +199,17 @@ class MiliDatabase:
                                 reduce_function = reductions.zeroth_entry)
     return result
 
+  def state_count(self) -> int:
+    """Getter for the number of states.
+
+    Returns:
+      int: The number of states in the database.
+    """
+    result: int
+    result = self.__postprocess(results = self._mili.state_count(),
+                                reduce_function = reductions.zeroth_entry)
+    return result
+
   def class_names(self) -> List[str]:
     """Getter for all class names (entity types) in the database.
 

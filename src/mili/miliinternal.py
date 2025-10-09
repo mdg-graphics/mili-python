@@ -383,6 +383,14 @@ class _MiliInternal:
     """
     return self.__mesh_dim
 
+  def state_count(self) -> int:
+    """Getter for the number of states.
+
+    Returns:
+      int: The number of states in the database.
+    """
+    return len(self.__smaps)
+
   def class_names(self) -> List[str]:
     """Getter for all class names in the database.
 
