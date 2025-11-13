@@ -8,8 +8,9 @@ SPDX-License-Identifier: (MIT)
 import re
 import os
 import unittest
-from mili import reader
 import numpy as np
+from mili import reader
+from mili.milidatabase import MiliPythonError
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -247,3 +248,234 @@ class Bugfixes0_2_5(unittest.TestCase):
 
         self.assertEqual( result, desired )
 
+class SerialArrayStateVariables(unittest.TestCase):
+    """Test bugfixes for querying array state variables in serial."""
+
+    file_name = os.path.join(dir_path,'data','th','serial','d3samp6.th')
+
+    def setUp(self):
+        self.mili = reader.open_database( SerialArrayStateVariables.file_name, suppress_parallel=True )
+
+    def test_query_array_exceptions(self):
+        """Test error cases with array state variables."""
+        with self.assertRaises(MiliPythonError):
+            self.mili.query("hx[0]", "brick")
+        with self.assertRaises(MiliPythonError):
+            self.mili.query("hx[9]", "brick")
+        with self.assertRaises(MiliPythonError):
+            self.mili.query("hx[-2]", "brick")
+        with self.assertRaises(MiliPythonError):
+            self.mili.query("hx[1,1]", "brick")
+
+    def test_query_full_array(self):
+        """Query all components of the array state variable."""
+        res = self.mili.query("hx", "brick", states=[6])
+        expected = {
+            'hx': {
+                'data': np.array([[[ 7.5000000e-01,  1.0000000e+00,  8.6602551e-01,  6.4951903e-01, 7.5000006e-01,  1.0000002e+00,  8.6602551e-01,  6.4951921e-01],
+                                   [ 4.3301272e-01,  6.4951903e-01,  3.7499997e-01,  2.4999999e-01, 4.3301275e-01,  6.4951921e-01,  3.7500003e-01,  2.4999999e-01],
+                                   [ 6.4951903e-01,  8.6602551e-01,  4.9999997e-01,  3.7499997e-01, 6.4951921e-01,  8.6602551e-01,  4.9999997e-01,  3.7500003e-01],
+                                   [ 2.4999999e-01,  3.7499997e-01, -3.2783543e-08, -2.1855694e-08, 2.4999999e-01,  3.7500003e-01, -3.2783543e-08, -2.1855694e-08],
+                                   [ 3.7499997e-01,  4.9999997e-01, -4.3711388e-08, -3.2783543e-08, 3.7500003e-01,  4.9999997e-01, -4.3711388e-08, -3.2783543e-08],
+                                   [ 5.0000012e-01,  7.5000006e-01,  6.4951921e-01,  4.3301275e-01, 5.0000006e-01,  7.5000000e-01,  6.4951903e-01,  4.3301272e-01],
+                                   [ 7.5000006e-01,  1.0000002e+00,  8.6602551e-01,  6.4951921e-01, 7.5000000e-01,  1.0000000e+00,  8.6602545e-01,  6.4951903e-01],
+                                   [ 4.3301275e-01,  6.4951921e-01,  3.7500003e-01,  2.4999999e-01, 4.3301272e-01,  6.4951903e-01,  3.7499997e-01,  2.5000003e-01],
+                                   [ 6.4951921e-01,  8.6602551e-01,  4.9999997e-01,  3.7500003e-01, 6.4951903e-01,  8.6602545e-01,  5.0000000e-01,  3.7499997e-01]]], dtype=np.float32),
+                'layout': {
+                    'states': np.array([6], dtype=np.int32),
+                    'labels': np.array([ 2,  3,  4,  5,  6,  7,  8,  9, 10], dtype=np.int32),
+                    'components': ['hx[1]', 'hx[2]', 'hx[3]', 'hx[4]', 'hx[5]', 'hx[6]', 'hx[7]', 'hx[8]'],
+                    'times': np.array([0.0005], dtype=np.float32)
+                },
+                'source': 'primal',
+                'class_name': 'brick',
+                'title': 'Hex X Coord',
+                'modifier': ''
+            }
+        }
+        np.testing.assert_equal(res, expected)
+
+        res = self.mili.query(["hx", "hz"], "brick", states=[6])
+        expected = {
+            'hx': {
+                'data': np.array([[[ 7.5000000e-01,  1.0000000e+00,  8.6602551e-01,  6.4951903e-01, 7.5000006e-01,  1.0000002e+00,  8.6602551e-01,  6.4951921e-01],
+                                   [ 4.3301272e-01,  6.4951903e-01,  3.7499997e-01,  2.4999999e-01, 4.3301275e-01,  6.4951921e-01,  3.7500003e-01,  2.4999999e-01],
+                                   [ 6.4951903e-01,  8.6602551e-01,  4.9999997e-01,  3.7499997e-01, 6.4951921e-01,  8.6602551e-01,  4.9999997e-01,  3.7500003e-01],
+                                   [ 2.4999999e-01,  3.7499997e-01, -3.2783543e-08, -2.1855694e-08, 2.4999999e-01,  3.7500003e-01, -3.2783543e-08, -2.1855694e-08],
+                                   [ 3.7499997e-01,  4.9999997e-01, -4.3711388e-08, -3.2783543e-08, 3.7500003e-01,  4.9999997e-01, -4.3711388e-08, -3.2783543e-08],
+                                   [ 5.0000012e-01,  7.5000006e-01,  6.4951921e-01,  4.3301275e-01, 5.0000006e-01,  7.5000000e-01,  6.4951903e-01,  4.3301272e-01],
+                                   [ 7.5000006e-01,  1.0000002e+00,  8.6602551e-01,  6.4951921e-01, 7.5000000e-01,  1.0000000e+00,  8.6602545e-01,  6.4951903e-01],
+                                   [ 4.3301275e-01,  6.4951921e-01,  3.7500003e-01,  2.4999999e-01, 4.3301272e-01,  6.4951903e-01,  3.7499997e-01,  2.5000003e-01],
+                                   [ 6.4951921e-01,  8.6602551e-01,  4.9999997e-01,  3.7500003e-01, 6.4951903e-01,  8.6602545e-01,  5.0000000e-01,  3.7499997e-01]]], dtype=np.float32),
+                'layout': {
+                    'states': np.array([6], dtype=np.int32),
+                    'labels': np.array([ 2,  3,  4,  5,  6,  7,  8,  9, 10], dtype=np.int32),
+                    'components': ['hx[1]', 'hx[2]', 'hx[3]', 'hx[4]', 'hx[5]', 'hx[6]', 'hx[7]', 'hx[8]'],
+                    'times': np.array([0.0005], dtype=np.float32)
+                },
+                'source': 'primal',
+                'class_name': 'brick',
+                'title': 'Hex X Coord',
+                'modifier': ''
+            },
+            'hz': {
+                'data': np.array([[[1.8486835, 1.8487167, 1.8486865, 1.8486844, 2.1153505, 2.115362 , 2.1153522, 2.1153471],
+                                   [1.8486768, 1.8486844, 1.8486844, 1.8486762, 2.11535  , 2.1153471, 2.115347 , 2.1153498],
+                                   [1.8486844, 1.8486865, 1.848686 , 1.8486844, 2.1153471, 2.1153522, 2.115352 , 2.115347 ],
+                                   [1.8486762, 1.8486844, 1.8486835, 1.8486791, 2.1153498, 2.115347 , 2.1153505, 2.1153498],
+                                   [1.8486844, 1.848686 , 1.8487166, 1.8486835, 2.115347 , 2.115352 , 2.1153615, 2.1153505],
+                                   [2.1153502, 2.1153505, 2.1153471, 2.11535  , 2.3820174, 2.3820128, 2.3820128, 2.3820152],
+                                   [2.1153505, 2.115362 , 2.1153522, 2.1153471, 2.3820128, 2.382025 , 2.3820183, 2.3820128],
+                                   [2.11535  , 2.1153471, 2.115347 , 2.1153498, 2.3820152, 2.3820128, 2.3820128, 2.3820157],
+                                   [2.1153471, 2.1153522, 2.115352 , 2.115347 , 2.3820128, 2.3820183, 2.3820188, 2.3820128]]], dtype=np.float32),
+                'layout': {
+                    'states': np.array([6], dtype=np.int32),
+                    'labels': np.array([ 2,  3,  4,  5,  6,  7,  8,  9, 10], dtype=np.int32),
+                    'components': ['hz[1]', 'hz[2]', 'hz[3]', 'hz[4]', 'hz[5]', 'hz[6]', 'hz[7]', 'hz[8]'],
+                    'times': np.array([0.0005], dtype=np.float32)
+                },
+                'source': 'primal',
+                'class_name': 'brick',
+                'title': 'Hex Z Coord',
+                'modifier': ''
+            }
+        }
+        np.testing.assert_equal(res, expected)
+
+    def test_query_array_components(self):
+        """Query a component on an array state variable"""
+        res = self.mili.query("hx[3]", "brick", states=[6], labels=[2,5,10])
+        expected = {
+            'hx[3]': {
+                'data': np.array([[[  8.6602551e-01, ],
+                                   [ -3.2783543e-08, ],
+                                   [  4.9999997e-01, ]]], dtype=np.float32),
+                'layout': {
+                    'states': np.array([6], dtype=np.int32),
+                    'labels': np.array([ 2, 5, 10 ], dtype=np.int32),
+                    'components': ['hx[3]'],
+                    'times': np.array([0.0005], dtype=np.float32)
+                },
+                'source': 'primal',
+                'class_name': 'brick',
+                'title': 'Hex X Coord',
+                'modifier': ''
+            }
+        }
+        np.testing.assert_equal(res, expected)
+
+class ParallelArrayStateVariables(unittest.TestCase):
+    """Test bugfixes for querying array state variables in parallel."""
+
+    file_name = os.path.join(dir_path,'data','th','parallel','d3samp6.th')
+
+    def setUp(self):
+        self.mili = reader.open_database( ParallelArrayStateVariables.file_name, suppress_parallel=False )
+
+    def test_query_array_exceptions(self):
+        """Test error cases with array state variables."""
+        with self.assertRaises(MiliPythonError):
+            self.mili.query("hx[0]", "brick")
+        with self.assertRaises(MiliPythonError):
+            self.mili.query("hx[9]", "brick")
+        with self.assertRaises(MiliPythonError):
+            self.mili.query("hx[-2]", "brick")
+        with self.assertRaises(MiliPythonError):
+            self.mili.query("hx[1,1]", "brick")
+
+    def test_query_full_array(self):
+        """Query all components of the array state variable."""
+        res = self.mili.query("hx", "brick", states=[6])
+        expected = {
+            'hx': {
+                'data': np.array([[[ 7.5000000e-01,  1.0000000e+00,  8.6602551e-01,  6.4951903e-01, 7.5000006e-01,  1.0000002e+00,  8.6602551e-01,  6.4951921e-01],
+                                   [ 4.3301272e-01,  6.4951903e-01,  3.7499997e-01,  2.4999999e-01, 4.3301275e-01,  6.4951921e-01,  3.7500003e-01,  2.4999999e-01],
+                                   [ 6.4951903e-01,  8.6602551e-01,  4.9999997e-01,  3.7499997e-01, 6.4951921e-01,  8.6602551e-01,  4.9999997e-01,  3.7500003e-01],
+                                   [ 2.4999999e-01,  3.7499997e-01, -3.2783543e-08, -2.1855694e-08, 2.4999999e-01,  3.7500003e-01, -3.2783543e-08, -2.1855694e-08],
+                                   [ 3.7499997e-01,  4.9999997e-01, -4.3711388e-08, -3.2783543e-08, 3.7500003e-01,  4.9999997e-01, -4.3711388e-08, -3.2783543e-08],
+                                   [ 5.0000012e-01,  7.5000006e-01,  6.4951921e-01,  4.3301275e-01, 5.0000006e-01,  7.5000000e-01,  6.4951903e-01,  4.3301272e-01],
+                                   [ 7.5000006e-01,  1.0000002e+00,  8.6602551e-01,  6.4951921e-01, 7.5000000e-01,  1.0000000e+00,  8.6602545e-01,  6.4951903e-01],
+                                   [ 4.3301275e-01,  6.4951921e-01,  3.7500003e-01,  2.4999999e-01, 4.3301272e-01,  6.4951903e-01,  3.7499997e-01,  2.5000003e-01],
+                                   [ 6.4951921e-01,  8.6602551e-01,  4.9999997e-01,  3.7500003e-01, 6.4951903e-01,  8.6602545e-01,  5.0000000e-01,  3.7499997e-01]]], dtype=np.float32),
+                'layout': {
+                    'states': np.array([6], dtype=np.int32),
+                    'labels': np.array([ 2,  3,  4,  5,  6,  7,  8,  9, 10], dtype=np.int32),
+                    'components': ['hx[1]', 'hx[2]', 'hx[3]', 'hx[4]', 'hx[5]', 'hx[6]', 'hx[7]', 'hx[8]'],
+                    'times': np.array([0.0005], dtype=np.float32)
+                },
+                'source': 'primal',
+                'class_name': 'brick',
+                'title': 'Hex X Coord',
+                'modifier': ''
+            }
+        }
+        np.testing.assert_equal(res, expected)
+
+        res = self.mili.query(["hx", "hz"], "brick", states=[6])
+        expected = {
+            'hx': {
+                'data': np.array([[[ 7.5000000e-01,  1.0000000e+00,  8.6602551e-01,  6.4951903e-01, 7.5000006e-01,  1.0000002e+00,  8.6602551e-01,  6.4951921e-01],
+                                   [ 4.3301272e-01,  6.4951903e-01,  3.7499997e-01,  2.4999999e-01, 4.3301275e-01,  6.4951921e-01,  3.7500003e-01,  2.4999999e-01],
+                                   [ 6.4951903e-01,  8.6602551e-01,  4.9999997e-01,  3.7499997e-01, 6.4951921e-01,  8.6602551e-01,  4.9999997e-01,  3.7500003e-01],
+                                   [ 2.4999999e-01,  3.7499997e-01, -3.2783543e-08, -2.1855694e-08, 2.4999999e-01,  3.7500003e-01, -3.2783543e-08, -2.1855694e-08],
+                                   [ 3.7499997e-01,  4.9999997e-01, -4.3711388e-08, -3.2783543e-08, 3.7500003e-01,  4.9999997e-01, -4.3711388e-08, -3.2783543e-08],
+                                   [ 5.0000012e-01,  7.5000006e-01,  6.4951921e-01,  4.3301275e-01, 5.0000006e-01,  7.5000000e-01,  6.4951903e-01,  4.3301272e-01],
+                                   [ 7.5000006e-01,  1.0000002e+00,  8.6602551e-01,  6.4951921e-01, 7.5000000e-01,  1.0000000e+00,  8.6602545e-01,  6.4951903e-01],
+                                   [ 4.3301275e-01,  6.4951921e-01,  3.7500003e-01,  2.4999999e-01, 4.3301272e-01,  6.4951903e-01,  3.7499997e-01,  2.5000003e-01],
+                                   [ 6.4951921e-01,  8.6602551e-01,  4.9999997e-01,  3.7500003e-01, 6.4951903e-01,  8.6602545e-01,  5.0000000e-01,  3.7499997e-01]]], dtype=np.float32),
+                'layout': {
+                    'states': np.array([6], dtype=np.int32),
+                    'labels': np.array([ 2,  3,  4,  5,  6,  7,  8,  9, 10], dtype=np.int32),
+                    'components': ['hx[1]', 'hx[2]', 'hx[3]', 'hx[4]', 'hx[5]', 'hx[6]', 'hx[7]', 'hx[8]'],
+                    'times': np.array([0.0005], dtype=np.float32)
+                },
+                'source': 'primal',
+                'class_name': 'brick',
+                'title': 'Hex X Coord',
+                'modifier': ''
+            },
+            'hz': {
+                'data': np.array([[[1.8486835, 1.8487167, 1.8486865, 1.8486844, 2.1153505, 2.115362 , 2.1153522, 2.1153471],
+                                   [1.8486768, 1.8486844, 1.8486844, 1.8486762, 2.11535  , 2.1153471, 2.115347 , 2.1153498],
+                                   [1.8486844, 1.8486865, 1.848686 , 1.8486844, 2.1153471, 2.1153522, 2.115352 , 2.115347 ],
+                                   [1.8486762, 1.8486844, 1.8486835, 1.8486791, 2.1153498, 2.115347 , 2.1153505, 2.1153498],
+                                   [1.8486844, 1.848686 , 1.8487166, 1.8486835, 2.115347 , 2.115352 , 2.1153615, 2.1153505],
+                                   [2.1153502, 2.1153505, 2.1153471, 2.11535  , 2.3820174, 2.3820128, 2.3820128, 2.3820152],
+                                   [2.1153505, 2.115362 , 2.1153522, 2.1153471, 2.3820128, 2.382025 , 2.3820183, 2.3820128],
+                                   [2.11535  , 2.1153471, 2.115347 , 2.1153498, 2.3820152, 2.3820128, 2.3820128, 2.3820157],
+                                   [2.1153471, 2.1153522, 2.115352 , 2.115347 , 2.3820128, 2.3820183, 2.3820188, 2.3820128]]], dtype=np.float32),
+                'layout': {
+                    'states': np.array([6], dtype=np.int32),
+                    'labels': np.array([ 2,  3,  4,  5,  6,  7,  8,  9, 10], dtype=np.int32),
+                    'components': ['hz[1]', 'hz[2]', 'hz[3]', 'hz[4]', 'hz[5]', 'hz[6]', 'hz[7]', 'hz[8]'],
+                    'times': np.array([0.0005], dtype=np.float32)
+                },
+                'source': 'primal',
+                'class_name': 'brick',
+                'title': 'Hex Z Coord',
+                'modifier': ''
+            }
+        }
+        np.testing.assert_equal(res, expected)
+
+    def test_query_array_components(self):
+        """Query a component on an array state variable"""
+        res = self.mili.query("hx[3]", "brick", states=[6], labels=[2,5,10])
+        expected = {
+            'hx[3]': {
+                'data': np.array([[[  8.6602551e-01, ],
+                                   [ -3.2783543e-08, ],
+                                   [  4.9999997e-01, ]]], dtype=np.float32),
+                'layout': {
+                    'states': np.array([6], dtype=np.int32),
+                    'labels': np.array([ 2, 5, 10 ], dtype=np.int32),
+                    'components': ['hx[3]'],
+                    'times': np.array([0.0005], dtype=np.float32)
+                },
+                'source': 'primal',
+                'class_name': 'brick',
+                'title': 'Hex X Coord',
+                'modifier': ''
+            }
+        }
+        np.testing.assert_equal(res, expected)

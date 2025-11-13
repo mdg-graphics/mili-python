@@ -256,7 +256,7 @@ class _MiliInternal:
 
       srec.svar_comp_offsets = []
       for svar_comp in srec.svar_comp_layout:
-        svar_length = [ self.__svars[svar].list_size if self.__svars[svar].agg_type != StateVariable.Aggregation.SCALAR.value else 1 for svar in svar_comp ]
+        svar_length = [ self.__svars[svar].list_size if self.__svars[svar].agg_type in [StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY] else 1 for svar in svar_comp ]
         srec.svar_comp_offsets.append( np.cumsum( np.insert( svar_length, 0, 0 ) ) )
 
       # the ordinal blocks are set during the parse, these are only precomputed to make the query easier so we don't deal with them during the parse, only the query setup
@@ -970,8 +970,12 @@ class _MiliInternal:
     derived_exists = False
     if svar_name in self.__svars.keys():
       primal_exists = True
-    if not all([comp_svar_name in self.__svars.keys() for comp_svar_name in svar_comps]):
-      primal_exists = False
+
+      state_variable = self.__svars[svar_name]
+      if state_variable.agg_type in (StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY) :
+        if not all([comp_svar_name in self.__svars.keys() for comp_svar_name in svar_comps]):
+          primal_exists = False
+
     if svar_name in self.__derived.supported_variables():
       derived_exists = True
 
@@ -1202,13 +1206,13 @@ class _MiliInternal:
 
       # if svar is an aggregate svar and we're not querying specific comps, query all the comps
       svars_to_query: List[StateVariable] = []
-      if comp_svar_names == []:
-        if self.__svars[queried_svar_name].agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:
+      if self.__svars[queried_svar_name].agg_type in [ StateVariable.Aggregation.SCALAR, StateVariable.Aggregation.ARRAY ]:
+        svars_to_query = [ self.__svars[ queried_svar_name ] ]
+      elif self.__svars[queried_svar_name].agg_type in [ StateVariable.Aggregation.VECTOR, StateVariable.Aggregation.VEC_ARRAY ]:
+        if comp_svar_names == []:
           svars_to_query = self.__svars[queried_svar_name].svars
         else:
-          svars_to_query = [ self.__svars[ queried_svar_name ] ]
-      else:
-        svars_to_query = [ self.__svars[ comp_svar_name ] for comp_svar_name in comp_svar_names ]
+          svars_to_query = [ self.__svars[ comp_svar_name ] for comp_svar_name in comp_svar_names ]
 
       # discover subrecords holding the queried svars, should precompute this if it becomes a bottleneck
       srecs_to_query : List[Subrecord] = []
@@ -1249,13 +1253,29 @@ class _MiliInternal:
                 int_point_labels[ comp_svar_name ] = []
               int_point_labels[ comp_svar_name ] = [ self.__int_points[comp_svar_name][candidate][idx] for idx in matching_int_points[comp_svar_name][srec.name] ]
 
+      # If we're looking at an array state variable at a specific index set up and verify indicies.
+      array_indices: Dict[str,List[int]] = {}
+      for svar in svars_to_query:
+        array_indices[svar.name] = []
+        if svar.agg_type == StateVariable.Aggregation.ARRAY:
+          array_indices[svar.name] = [ int(x) for x in comp_svar_names]  # Convert from strings to integers
+          # Validate indices
+          if len(array_indices[svar.name]) > svar.order:
+            self.__return_code = (ReturnCode.ERROR, f"Too many indicies ({array_indices[svar.name]}) specified for the state variable {svar.name} (order={svar.order}).")
+            return res
+          # TODO: Need to test these on uncombined TH database where results only exist on some of the processors
+          if np.any( [val < 1 or val > svar.dims[idx] for idx, val in enumerate(array_indices[svar.name])] ):
+            self.__return_code = (ReturnCode.ERROR, f"Invalid indexing ({array_indices[svar.name]}) specified for state variable {svar.name} (dims={svar.dims}, 1-based).")
+            return res
+          array_indices[svar.name] = [ x - 1 for x in array_indices[svar.name]]  # Convert from 1-based to 0-based indexing
+
       # For each subrecord, determine which elements (labels) appear in that subrecord
       # and create a dictionary entry for each subrecord that contains the labels in that
       # subrecord and the indexes at which the data for that label appears in the subrecord
       srec_element_ordinals = {}
       srec_internal_offsets = {} # { subrecord name --> [ label_cols, index_cols... ] }
       for srec in srecs_to_query:
-        srec_memory_offsets, ordinals_in_srec = srec.calculate_memory_offsets( match_aggregate_svar, svars_to_query, ordinals, matching_int_points )
+        srec_memory_offsets, ordinals_in_srec = srec.calculate_memory_offsets( match_aggregate_svar, svars_to_query, ordinals, matching_int_points, array_indices )
         if len( ordinals_in_srec ) > 0:
           if output_object_labels:
             res[queried_name]['layout']['labels'] = np.concatenate( ( res[queried_name]['layout']['labels'], self.__labels[ class_sname ][ ordinals_in_srec ] ) )
@@ -1329,6 +1349,15 @@ class _MiliInternal:
         if len(int_points) > 0:
           for label in int_points:
             res[queried_name]['layout']['components'].append(f"{svar.name} ipt. {label}")
+        elif svar.agg_type in [StateVariable.Aggregation.ARRAY]:
+          arr_idxs = array_indices.get(svar.name, [])
+          if len(arr_idxs) > 0:
+            res[queried_name]['layout']['components'].append(f"{svar.name}[{','.join([str(idx+1) for idx in arr_idxs])}]")
+          else:
+            # NOTE: This will only be valid for one-dimensional array data which is all we put out currently. Need to see
+            #       actual 2+d data to correctly order here.
+            for idx in range(1, svar.dims[0]+1):
+              res[queried_name]['layout']['components'].append(f"{svar.name}[{idx}]")
         else:
           res[queried_name]['layout']['components'].append(f"{svar.name}")
 

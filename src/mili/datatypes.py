@@ -283,8 +283,12 @@ class Subrecord:
     coords = [[item for sublist in coords for item in sublist]]
     return np.array( *coords )
 
-  def calculate_memory_offsets(self, match_aggregate_svar: str, svars_to_query: List[StateVariable],
-                               ordinals: NDArray[np.integer], matching_int_points: Dict[str,Dict[str,List[int]]]) -> Tuple[NDArray[np.int64],NDArray[np.int32]]:
+  def calculate_memory_offsets(self,
+                               match_aggregate_svar: str,
+                               svars_to_query: List[StateVariable],
+                               ordinals: NDArray[np.integer],
+                               matching_int_points: Dict[str,Dict[str,List[int]]],
+                               array_indices: Dict[str,List[int]]) -> Tuple[NDArray[np.int64],NDArray[np.int32]]:
     """Calculate the memory offsets into the subrecord for the passed in ordinals"""
     #  determine if any of the queried svar components are in the StateRecord.. and extract only the comps we're querying for
     # col 0 is supposed to be the svar, col 2 is supposed to be the comp in the svar for agg svars
@@ -294,9 +298,14 @@ class Subrecord:
     svar: StateVariable
     for svar in svars_to_query:
       svar_coords = self.scalar_svar_coords( match_aggregate_svar, svar.name )
+      # Special handling for integration point data
       ipts = matching_int_points.get( svar.name, {} ).get( self.name, [] )
       if len( ipts ) > 0:
         svar_coords = svar_coords[ ipts ]
+      # Special handling for array data
+      arr_idxs = array_indices.get(svar.name, [])
+      if len(arr_idxs) > 0:
+        svar_coords = svar_coords[arr_idxs]
       qd_svar_comps = np.concatenate( ( qd_svar_comps, svar_coords ), axis = 0 )
 
     # at this point we use the StateRecord mo_blocks to find which block each label belongs to using a bining algorithym from numpy
