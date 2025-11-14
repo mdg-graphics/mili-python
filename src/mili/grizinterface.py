@@ -29,7 +29,7 @@ def open_griz_interface( base_filename : os.PathLike, procs = [] ):
                        experimental=True,
                        merge_results=False,
                        log_validator=False,
-                       shared_memory=False)
+                       use_shared_memory=False)
     gdb = GrizInterface(db)
   except MiliAParseError as e:
     print(f"\nMili AFile Parsing Error: {str(e)}")
@@ -80,7 +80,7 @@ class GrizInterface:
     self.srec_fmt_qty = db.srec_fmt_qty()[0]
 
     self.nodes = db.nodes()
-    self.connectivity = db.connectivity()
+    self.connectivity = db._mili.connectivity_ids()
     self.labels = db.labels()
     self.mesh_object_classes = db._mili.mesh_object_classes()
     self.element_sets = db.element_sets()

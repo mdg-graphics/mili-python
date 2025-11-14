@@ -78,9 +78,9 @@ class MiliDatabase:
     if parallel_handler == _MiliInternal:
       self._mili = _MiliInternal( *proc_pargs[0], **proc_kwargs[0] )  # type: ignore  # mypy doesn't like the list/dict unpacking for _MiliInternal args.
     else:
-      shared_mem = kwargs.get("shared_mem", False)
-      if shared_mem and parallel_handler == ServerWrapper:
-        self._mili = parallel_handler( _MiliInternal, proc_pargs, proc_kwargs, use_shared_memory=True )  # type: ignore  # mypy thinks parallel_handler could be _MiliInternal, but it can't be.
+      use_shared_memory = kwargs.get("use_shared_memory", True)
+      if parallel_handler == ServerWrapper:
+        self._mili = parallel_handler( _MiliInternal, proc_pargs, proc_kwargs, use_shared_memory=use_shared_memory )  # type: ignore  # mypy thinks parallel_handler could be _MiliInternal, but it can't be.
       else:
         self._mili = parallel_handler( _MiliInternal, proc_pargs, proc_kwargs )  # type: ignore  # mypy thinks parallel_handler could be _MiliInternal, but it can't be.
 
