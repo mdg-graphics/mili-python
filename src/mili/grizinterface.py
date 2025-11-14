@@ -3,9 +3,12 @@ SPDX-License-Identifier: (MIT)
 """
 # mypy: ignore-errors
 
-
 # defer evaluation of type-annotations until after the module is processed, allowing class members to refer to the class
 from __future__ import annotations
+
+import warnings
+warnings.filterwarnings("ignore", message="The value of the smallest subnormal*")
+
 import os
 import traceback
 from typing import *
