@@ -5,6 +5,7 @@ All notable changes to Mili-python will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Added the derived variable `relative_volume`.
 - Added the function `MiliDatabase.state_count` to get the number of states in a database.
 
 ### Fixed

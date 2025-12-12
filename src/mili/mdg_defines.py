@@ -329,6 +329,7 @@ class DerivedVariables(StateVariableName):
     Z_ACCELERATION = "acc_z"
     TANGENTIAL_TRACTION_MAGNITUDE = "nodtangmag"
 
+    RELATIVE_VOLUME = "relative_volume"
     VOLUMETRIC_STRAIN = "vol_strain"
     PRINCIPAL_STRAIN_1 = "prin_strain1"
     PRINCIPAL_STRAIN_2 = "prin_strain2"

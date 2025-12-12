@@ -33,7 +33,7 @@ class SerialDerivedExpressions(unittest.TestCase):
                     'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress',
                     'triaxiality', 'norm_press', 'eps_rate', 'nodtangmag', 'mat_cog_disp_x', 'mat_cog_disp_y',
                     'mat_cog_disp_z', 'element_volume', 'area', 'centroid', 'surfstrainx', 'surfstrainy',
-                    'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx',
+                    'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx', 'relative_volume'
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
@@ -43,7 +43,8 @@ class SerialDerivedExpressions(unittest.TestCase):
                          'prin_dev_strain3', 'prin_strain1_alt', 'prin_strain2_alt', 'prin_strain3_alt', 'prin_dev_strain1_alt',
                          'prin_dev_strain2_alt', 'prin_dev_strain3_alt', 'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress',
                          'pressure', 'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'norm_press',
-                         'element_volume', 'centroid', 'surfstrainx', 'surfstrainy', 'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx']
+                         'element_volume', 'centroid', 'surfstrainx', 'surfstrainy', 'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx',
+                         'relative_volume']
         BEAM_DERIVED = ['prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure', 'prin_dev_stress1', 'prin_dev_stress2',
                         'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'norm_press', 'eps_rate', 'centroid']
         SHELL_DERIVED = ['vol_strain', 'prin_strain1', 'prin_strain2', 'prin_strain3', 'prin_dev_strain1', 'prin_dev_strain2', 'prin_dev_strain3',
@@ -1115,6 +1116,52 @@ class SerialDerivedExpressions(unittest.TestCase):
         self.assertAlmostEqual(result["surfstrainy"]["data"][2,0,0], 0.00040497)
         self.assertAlmostEqual(result["surfstrainy"]["data"][2,1,0], 0.00053024)
         self.assertAlmostEqual(result["surfstrainy"]["data"][2,2,0], 0.00036156)
+
+    def test_hex_relative_volume(self):
+        """Test relative_volume calculation for hex elements."""
+        file_name = os.path.join(dir_path,'data','serial','dbl_nodtang','dblplt')
+        db = open_database( file_name, suppress_parallel=True )
+        result = db.query("relative_volume", "brick", labels=[6,16], states=[1,40,60])
+
+        np.testing.assert_equal( result["relative_volume"]["layout"]["labels"], [6,16])
+        np.testing.assert_equal( result["relative_volume"]["layout"]["states"], [1,40,60])
+        np.testing.assert_allclose( result["relative_volume"]["layout"]["times"], [0. , 3.9, 5.9])
+        self.assertEqual( result["relative_volume"]["source"], "derived")
+        self.assertEqual( result["relative_volume"]["class_name"], "brick")
+        self.assertEqual( result["relative_volume"]["title"], "Relative Volume")
+
+        # State 1
+        np.testing.assert_allclose(result["relative_volume"]["data"][0,0,0], 1.0)
+        np.testing.assert_allclose(result["relative_volume"]["data"][0,1,0], 1.0)
+        # State 40
+        np.testing.assert_allclose(result["relative_volume"]["data"][1,0,0], 0.995619)
+        np.testing.assert_allclose(result["relative_volume"]["data"][1,1,0], 0.856058, rtol=3.0e-07)
+        # State 80
+        np.testing.assert_allclose(result["relative_volume"]["data"][2,0,0], 0.991287, rtol=2.0e-07)
+        np.testing.assert_allclose(result["relative_volume"]["data"][2,1,0], 0.938787, rtol=3.0e-07)
+
+    def test_tet_relative_volume(self):
+        """Test relative_volume calculation for tet elements."""
+        file_name = os.path.join(dir_path,'data','serial','tet','tet1_t4.plt')
+        db = open_database( file_name, suppress_parallel=True )
+        result = db.query("relative_volume", "tet", labels=[1,1875], states=[1,6,45])
+
+        np.testing.assert_equal( result["relative_volume"]["layout"]["labels"], [1,1875])
+        np.testing.assert_equal( result["relative_volume"]["layout"]["states"], [1,6,45])
+        np.testing.assert_allclose( result["relative_volume"]["layout"]["times"], [ 0.,  5., 44.])
+        self.assertEqual( result["relative_volume"]["source"], "derived")
+        self.assertEqual( result["relative_volume"]["class_name"], "tet")
+        self.assertEqual( result["relative_volume"]["title"], "Relative Volume")
+
+        # State 1
+        np.testing.assert_allclose(result["relative_volume"]["data"][0,0,0], 1.0)
+        np.testing.assert_allclose(result["relative_volume"]["data"][0,1,0], 1.0)
+        # State 40
+        np.testing.assert_allclose(result["relative_volume"]["data"][1,0,0], 0.994019, rtol=3.0e-07)
+        np.testing.assert_allclose(result["relative_volume"]["data"][1,1,0], 0.967612, rtol=5.0e-07)
+        # State 80
+        np.testing.assert_allclose(result["relative_volume"]["data"][2,0,0], 1.01123, rtol=2.0e-07)
+        np.testing.assert_allclose(result["relative_volume"]["data"][2,1,0], 0.936295, rtol=2.0e-07)
 
 
 class ParallelDerivedExpressions(unittest.TestCase):

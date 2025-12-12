@@ -544,6 +544,14 @@ class DerivedExpressions:
         compute_function = self.__compute_surface_strain,
         only_sclasses = [Superclass.M_HEX],
       ),
+      DerivedVariables.RELATIVE_VOLUME.value: DerivedSpec(
+        title = "Relative Volume",
+        primals = [NodalStateVariables.NODAL_POSITION.value],
+        primals_class = [EntityType.NODE.value],
+        supports_batching = False,
+        compute_function = self.__compute_relative_volume,
+        only_sclasses = [Superclass.M_HEX, Superclass.M_TET]
+      ),
       # TODO: Add more primals here
     }
 
@@ -770,6 +778,8 @@ class DerivedExpressions:
       elem_node_map = np.empty([0], dtype=np.int32)
     )
 
+    superclass = self.db.mesh_object_classes()[class_name].sclass
+
     # Group required primals by class_name
     unique_classes = list(set(primal_classes))
     primals_grouped_by_class: List[Tuple[List[str],str]] = []
@@ -789,10 +799,15 @@ class DerivedExpressions:
         # Element class of derived result does not match element class of one or more required primal
         # so we need to map the labels from one super class to another. Most commonly this
         # will be getting all the nodes that make up each of the requested elements.
-        if primal_class_name == 'node':
+        if primal_class_name == 'node' and superclass.node_count() > 0:
           associated_nodes = self.db.nodes_of_elems( class_name, labels )
           labels_to_query, elem_node_map = self.__generate_elem_node_map( associated_nodes )
           query_args['elem_node_map'] = elem_node_map
+        elif primal_class_name == 'node' and superclass.node_count() == 0:
+          # Special case for superclass G_MAT, G_MESH, etc.
+          # For now we just skip querying the primal results and do it manually
+          # in the derived result function.
+          continue
         else:
           # Don't know if there are any other cases, skip for now...
           continue
@@ -2179,5 +2194,120 @@ class DerivedExpressions:
     else:
       # This should never happen, but just in case.
       raise ValueError(f"Invalid value for result_name ({result_name})")
+
+    return derived_result
+
+  def __compute_relative_volume(self,
+                                result_name: str,
+                                primal_data: Dict[str,QueryDict],
+                                query_args: QueryArgs,
+                                reference_state: int = 0) -> Dict[str,QueryDict]:
+    """Compute the relative volume of the M_HEX or M_TET superclass."""
+    labels = query_args['labels']
+    states = query_args['states']
+    times = self.db.times(states)
+    class_name = query_args['result_class_name']
+    qty_elems = len(labels)
+    qty_states = len(states)
+
+    # Manually construct derived result dictionary since result element class
+    # does not match primal data element class.
+    derived_result = {
+      result_name: QueryDict(
+        class_name=class_name,
+        source='derived',
+        title=self.__derived_expressions[result_name]["title"],
+        data=np.empty( (len(states), len(labels), 1), dtype=np.float32 ),
+        layout=QueryLayout(
+          states=states,
+          labels=labels,
+          components=[result_name],
+          times=times,
+        )
+      )
+    }
+
+    elem_node_map = query_args['elem_node_map']
+    nodpos = primal_data['nodpos']['data']
+    node_labels = primal_data['nodpos']['layout']['labels']
+    reference_data = self.__get_nodal_reference_positions( ["ux", "uy", "uz"], reference_state, node_labels )
+
+    # Differentiate between M_HEX and M_TET Superclass.
+    class_def = self.db.mesh_object_classes().get(class_name)
+    if class_def is None:
+      raise ValueError(f"Failed to find class data for {class_name}")
+
+    if class_def.sclass == Superclass.M_HEX:
+      cur_ux = nodpos[:,elem_node_map[:,:],0]
+      cur_uy = nodpos[:,elem_node_map[:,:],1]
+      cur_uz = nodpos[:,elem_node_map[:,:],2]
+      ref_ux = reference_data[elem_node_map[:,:], 0]
+      ref_uy = reference_data[elem_node_map[:,:], 1]
+      ref_uz = reference_data[elem_node_map[:,:], 2]
+
+    elif class_def.sclass == Superclass.M_TET:
+      tet_to_hex_node_map = np.array([0,1,2,2,3,3,3,3], dtype=np.int32)
+      cur_ux = nodpos[:,elem_node_map[:,tet_to_hex_node_map],0]
+      cur_uy = nodpos[:,elem_node_map[:,tet_to_hex_node_map],1]
+      cur_uz = nodpos[:,elem_node_map[:,tet_to_hex_node_map],2]
+      ref_ux = reference_data[elem_node_map[:,tet_to_hex_node_map], 0]
+      ref_uy = reference_data[elem_node_map[:,tet_to_hex_node_map], 1]
+      ref_uz = reference_data[elem_node_map[:,tet_to_hex_node_map], 2]
+
+    dNx = np.empty([qty_elems,8], dtype=np.float64)
+    dNy = np.empty([qty_elems,8], dtype=np.float64)
+    dNz = np.empty([qty_elems,8], dtype=np.float64)
+
+    dN1 = np.array([-.125, -.125, .125, .125, -.125, -.125, .125, .125], dtype=np.float64)
+    dN2 = np.array([-.125, -.125, -.125, -.125, .125, .125, .125, .125], dtype=np.float64)
+    dN3 = np.array([-.125, .125, .125, -.125, -.125, .125, .125, -.125], dtype=np.float64)
+
+    jacob = np.zeros([qty_elems,9], dtype=np.float64)
+    invJacob = np.zeros([qty_elems,9], dtype=np.float64)
+    F_arr = np.zeros([qty_states,qty_elems,9], dtype=np.float64)
+
+    jacob[:,0] += np.sum( dN1 * ref_ux, axis=1 )
+    jacob[:,1] += np.sum( dN1 * ref_uy, axis=1 )
+    jacob[:,2] += np.sum( dN1 * ref_uz, axis=1 )
+    jacob[:,3] += np.sum( dN2 * ref_ux, axis=1 )
+    jacob[:,4] += np.sum( dN2 * ref_uy, axis=1 )
+    jacob[:,5] += np.sum( dN2 * ref_uz, axis=1 )
+    jacob[:,6] += np.sum( dN3 * ref_ux, axis=1 )
+    jacob[:,7] += np.sum( dN3 * ref_uy, axis=1 )
+    jacob[:,8] += np.sum( dN3 * ref_uz, axis=1 )
+
+    detJacob = (jacob[:,0] * jacob[:,4] * jacob[:,8] + jacob[:,1] * jacob[:,5] * jacob[:,6] + jacob[:,2] * jacob[:,3] * jacob[:,7] -
+                jacob[:,2] * jacob[:,4] * jacob[:,6] - jacob[:,1] * jacob[:,3] * jacob[:,8] - jacob[:,0] * jacob[:,5] * jacob[:,7])
+    detJacob = 1.0 / detJacob
+
+    invJacob[:,0] = detJacob * (jacob[:,4] * jacob[:,8] - jacob[:,5] * jacob[:,7])
+    invJacob[:,1] = detJacob * (-jacob[:,1] * jacob[:,8] + jacob[:,2] * jacob[:,7])
+    invJacob[:,2] = detJacob * (jacob[:,1] * jacob[:,5] - jacob[:,2] * jacob[:,4])
+    invJacob[:,3] = detJacob * (-jacob[:,3] * jacob[:,8] + jacob[:,5] * jacob[:,6])
+    invJacob[:,4] = detJacob * (jacob[:,0] * jacob[:,8] - jacob[:,2] * jacob[:,6])
+    invJacob[:,5] = detJacob * (-jacob[:,0] * jacob[:,5] + jacob[:,2] * jacob[:,3])
+    invJacob[:,6] = detJacob * (jacob[:,3] * jacob[:,7] - jacob[:,4] * jacob[:,6])
+    invJacob[:,7] = detJacob * (-jacob[:,0] * jacob[:,7] + jacob[:,1] * jacob[:,6])
+    invJacob[:,8] = detJacob * (jacob[:,0] * jacob[:,4] - jacob[:,1] * jacob[:,3])
+
+    for k in range(8):
+      dNx[:,k] = invJacob[:,0] * dN1[k] + invJacob[:,1] * dN2[k] + invJacob[:,2] * dN3[k]
+      dNy[:,k] = invJacob[:,3] * dN1[k] + invJacob[:,4] * dN2[k] + invJacob[:,5] * dN3[k]
+      dNz[:,k] = invJacob[:,6] * dN1[k] + invJacob[:,7] * dN2[k] + invJacob[:,8] * dN3[k]
+
+    F_arr[:,:,0] += np.sum( dNx * cur_ux, axis=2 )
+    F_arr[:,:,1] += np.sum( dNy * cur_ux, axis=2 )
+    F_arr[:,:,2] += np.sum( dNz * cur_ux, axis=2 )
+    F_arr[:,:,3] += np.sum( dNx * cur_uy, axis=2 )
+    F_arr[:,:,4] += np.sum( dNy * cur_uy, axis=2 )
+    F_arr[:,:,5] += np.sum( dNz * cur_uy, axis=2 )
+    F_arr[:,:,6] += np.sum( dNx * cur_uz, axis=2 )
+    F_arr[:,:,7] += np.sum( dNy * cur_uz, axis=2 )
+    F_arr[:,:,8] += np.sum( dNz * cur_uz, axis=2 )
+
+    detF = F_arr[:,:,0] * F_arr[:,:,4] * F_arr[:,:,8] + F_arr[:,:,1] * F_arr[:,:,5] * F_arr[:,:,6] + F_arr[:,:,2] * F_arr[:,:,3] * F_arr[:,:,7] - F_arr[:,:,2] * F_arr[:,:,4] * F_arr[:,:,6] - F_arr[:,:,1] * F_arr[:,:,3] * F_arr[:,:,8] - F_arr[:,:,0] * F_arr[:,:,5] * F_arr[:,:,7]
+
+    detF = np.reshape( detF, detF.shape + (1,) )
+    derived_result["relative_volume"]["data"][:,:,:] = detF
 
     return derived_result

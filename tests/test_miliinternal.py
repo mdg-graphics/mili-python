@@ -343,7 +343,7 @@ class TestMiliInternal(unittest.TestCase):
                     'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress',
                     'triaxiality', 'norm_press', 'eps_rate', 'nodtangmag', 'mat_cog_disp_x', 'mat_cog_disp_y',
                     'mat_cog_disp_z', 'element_volume', 'area', 'centroid', 'surfstrainx', 'surfstrainy',
-                    'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx',
+                    'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx', 'relative_volume',
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
@@ -355,6 +355,7 @@ class TestMiliInternal(unittest.TestCase):
                          'prin_dev_strain2_alt', 'prin_dev_strain3_alt', 'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress',
                          'pressure', 'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'norm_press',
                          'element_volume', 'centroid', 'surfstrainx', 'surfstrainy', 'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx',
+                         'relative_volume',
                          ]
         BEAM_DERIVED = ['prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure', 'prin_dev_stress1', 'prin_dev_stress2',
                         'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'norm_press', 'eps_rate', 'centroid'
