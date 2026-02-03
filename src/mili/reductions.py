@@ -7,7 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 import pandas as pd
 
-from mili.datatypes import QueryDict, QueryLayout
+from mili.datatypes import QueryDict, QueryLayout, Superclass
 
 # Dictionary Key and Value type vars
 KT = TypeVar('KT')
@@ -136,6 +136,13 @@ def list_concatenate(l: Union[List[List[Any]],NDArray[Any]]) -> NDArray[Any]:
 def zeroth_entry(l: List[Any]) -> Any:
   """Every value in the list is the same, just return the zero-th entry"""
   return l[0]
+
+def reduce_superclass_from_class_names(parallel_results: List[Superclass]):
+  """Merge results from the function superclass_from_class_name."""
+  for sclass in parallel_results:
+    if sclass is not Superclass.M_INVALID_LABEL:
+      return sclass
+  return Superclass.M_INVALID_LABEL
 
 def reduce_nodes_of_elems(parallel_results: List[Tuple[NDArray[np.int32],NDArray[np.int32]]]) -> Tuple[NDArray[np.int32],NDArray[np.int32]]:
   """Merge the results from the function nodes_of_elems"""

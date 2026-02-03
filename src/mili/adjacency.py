@@ -8,10 +8,11 @@ from typing import *
 import numpy as np
 from numpy.typing import NDArray, ArrayLike
 
-from mili.reductions import dictionary_merge_concat_unique
+from mili.reductions import dictionary_merge_concat_unique, reduce_superclass_from_class_names
 from mili.milidatabase import MiliDatabase
-from mili.mdg_defines import mdg_enum_to_string
+from mili.mdg_defines import mdg_enum_to_string, EntityType
 from mili.datatypes import Superclass
+from mili.utils import argument_to_ndarray
 
 if TYPE_CHECKING:
   # NOTE: We only import these when Type checking. These enums should not
@@ -158,6 +159,8 @@ class AdjacencyMapping:
                         neighbor_radius: int = 1) -> Dict[str,NDArray[np.int32]]:
     """Gather all neighbor elements to a specified element.
 
+    NOTE: A neighbor element is defined as any element that shares a node with the specified element.
+
     Args:
       entity_type (Union[str,EntityType]): The entity type ("brick", "node", etc.).
       label (int): The element label.
@@ -175,6 +178,10 @@ class AdjacencyMapping:
       labels = np.unique(np.concatenate(list(filter(lambda x : x is not None, labels))))
     if label not in labels:
       raise ValueError(f"The label '{label}' was not found for the entity type '{entity_type_str}'")
+
+    entity_sclass = self.mili.superclass_from_class_name(entity_type_str)
+    if not self.serial and not self.mili.merge_results:
+      entity_sclass = reduce_superclass_from_class_names(entity_sclass)  # type: ignore
 
     def nodes_of_elems(entity_type: str, element_labels: ArrayLike) -> NDArray[np.int32]:
       """Wrap call to MiliDatabase.nodes_of_elems to handle serial vs parallel."""
@@ -211,7 +218,11 @@ class AdjacencyMapping:
       return class_labels
 
     elements: Dict[str,NDArray[np.int32]] = {}
-    nodes = nodes_of_elems(entity_type_str, label)
+
+    if entity_sclass == Superclass.M_NODE:
+      nodes = np.array([label])
+    else:
+      nodes = nodes_of_elems(entity_type_str, label)
     nodes_processed = set()
     nodes_to_process = set(nodes)
     steps_from_elem = 0
@@ -243,3 +254,60 @@ class AdjacencyMapping:
         elements[elem_class] = elements[elem_class][where]
 
     return elements
+
+
+  def neighbor_nodes(self, entity_type: Union[str,EntityType], label: int):
+    """Given an entity_type + label, find all neighboring nodes.
+
+    NOTE: A neighboring node is defined as any node that shares an element edge with one of the nodes
+          associated with the entity_type + label combination.
+
+    Args:
+      entity_type (Union[str,EntityType]): The entity type ("brick", "node", etc.).
+      label (int): The element label.
+
+    Returns:
+      NDArray[np.int32]: A list of neighboring node labels.
+    """
+    neighbor_nodes = np.empty([0], dtype=np.int32)
+    entity_type_str = mdg_enum_to_string(entity_type)
+    entity_sclass = self.mili.superclass_from_class_name(entity_type_str)
+    if not self.serial and not self.mili.merge_results:
+      entity_sclass = reduce_superclass_from_class_names(entity_sclass)  # type: ignore
+
+    def nodes_of_elems(entity_type: str, element_label: ArrayLike) -> NDArray[np.int32]:
+      """Wrap call to MiliDatabase.nodes_of_elems to handle serial vs parallel."""
+      nodes_of_elems = self.mili.nodes_of_elems(entity_type, element_label)
+      if not self.serial and not self.mili.merge_results:
+        nodes = np.concatenate([n[0] for n in nodes_of_elems if n[0].size > 0], dtype=np.int32)
+      else:
+        nodes = nodes_of_elems[0]
+      return nodes
+
+    if entity_sclass == Superclass.M_NODE:
+      node_labels = np.array([label])
+    else:
+      node_labels = nodes_of_elems(entity_type_str, label).ravel()
+      if entity_sclass == Superclass.M_BEAM:
+        node_labels = node_labels[:-1]
+
+    elems_of_nodes_by_class = self.elems_of_nodes(node_labels)
+
+    for class_name, class_labels in elems_of_nodes_by_class.items():
+      superclass = self.mili.superclass_from_class_name(class_name)
+      if not self.serial and not self.mili.merge_results:
+        superclass = reduce_superclass_from_class_names(superclass)  # type: ignore
+      n_connects = superclass.node_connections()
+
+      nodal_connectivity_by_element = nodes_of_elems(class_name, class_labels)
+
+      idx1, idx2 = np.where(np.isin(nodal_connectivity_by_element, node_labels))
+      conn_matches = nodal_connectivity_by_element[idx1]
+      conn_indexes = n_connects[idx2]
+      rows = np.arange(conn_matches.shape[0])[:,None]
+      neighbor_nodes = conn_matches[rows,conn_indexes]
+
+    # Remove the searched nodes from the results
+    neighbor_nodes = np.setdiff1d( np.unique(neighbor_nodes), node_labels )
+
+    return neighbor_nodes

@@ -5,6 +5,7 @@ Testing for the plotting module.
 SPDX-License-Identifier: (MIT)
 """
 
+import sys
 import os
 import unittest
 from mili.reader import open_database
@@ -25,8 +26,12 @@ def areImagesEqual(image1_path, image2_path):
             return False
 
         # Convert images to grayscale and get the pixels
-        im1_data = np.array( image1.convert("L").getdata() )
-        im2_data = np.array( image2.convert("L").getdata() )
+        if sys.version_info < (3,10):
+            im1_data = np.array( image1.convert("L").getdata() )
+            im2_data = np.array( image2.convert("L").getdata() )
+        else:
+            im1_data = np.array( image1.convert("L").get_flattened_data() )
+            im2_data = np.array( image2.convert("L").get_flattened_data() )
 
         # Convert grayscale pixels to [0.0, 1.0]
         im1_data = im1_data / 255.0

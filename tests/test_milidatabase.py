@@ -101,6 +101,23 @@ class SharedSerialTests:
             self.assertEqual(LAST_STATE, state_maps[-1].time)
 
         #==============================================================================
+        def test_superclass_from_class_name(self):
+            superclass = self.mili.superclass_from_class_name("brick")
+            self.assertEqual(superclass, Superclass.M_HEX)
+
+            superclass = self.mili.superclass_from_class_name("beam")
+            self.assertEqual(superclass, Superclass.M_BEAM)
+
+            superclass = self.mili.superclass_from_class_name("shell")
+            self.assertEqual(superclass, Superclass.M_QUAD)
+
+            superclass = self.mili.superclass_from_class_name("cseg")
+            self.assertEqual(superclass, Superclass.M_QUAD)
+
+            with self.assertRaises(MiliPythonError):
+                superclass = self.mili.superclass_from_class_name("does-not-exist")
+
+        #==============================================================================
         def test_times(self):
             FIRST_STATE = 0.0
             LAST_STATE = 0.0010000000474974513
@@ -1316,6 +1333,51 @@ class ParallelTests:
                 self.assertEqual(len(state_map), STATE_COUNT)
                 self.assertEqual(state_map[0].time, FIRST_STATE)
                 self.assertEqual(state_map[-1].time, LAST_STATE)
+
+        #==============================================================================
+        def test_superclass_from_class_name(self):
+            superclass = self.mili.superclass_from_class_name("brick")
+            self.assertEqual(superclass[0], Superclass.M_HEX)
+            self.assertEqual(superclass[1], Superclass.M_HEX)
+            self.assertEqual(superclass[2], Superclass.M_HEX)
+            self.assertEqual(superclass[3], Superclass.M_HEX)
+            self.assertEqual(superclass[4], Superclass.M_INVALID_LABEL)
+            self.assertEqual(superclass[5], Superclass.M_HEX)
+            self.assertEqual(superclass[6], Superclass.M_INVALID_LABEL)
+            self.assertEqual(superclass[7], Superclass.M_INVALID_LABEL)
+
+            superclass = self.mili.superclass_from_class_name("beam")
+            self.assertEqual(superclass[0], Superclass.M_INVALID_LABEL)
+            self.assertEqual(superclass[1], Superclass.M_INVALID_LABEL)
+            self.assertEqual(superclass[2], Superclass.M_BEAM)
+            self.assertEqual(superclass[3], Superclass.M_INVALID_LABEL)
+            self.assertEqual(superclass[4], Superclass.M_BEAM)
+            self.assertEqual(superclass[5], Superclass.M_BEAM)
+            self.assertEqual(superclass[6], Superclass.M_BEAM)
+            self.assertEqual(superclass[7], Superclass.M_BEAM)
+
+            superclass = self.mili.superclass_from_class_name("shell")
+            self.assertEqual(superclass[0], Superclass.M_INVALID_LABEL)
+            self.assertEqual(superclass[1], Superclass.M_INVALID_LABEL)
+            self.assertEqual(superclass[2], Superclass.M_QUAD)
+            self.assertEqual(superclass[3], Superclass.M_QUAD)
+            self.assertEqual(superclass[4], Superclass.M_INVALID_LABEL)
+            self.assertEqual(superclass[5], Superclass.M_QUAD)
+            self.assertEqual(superclass[6], Superclass.M_INVALID_LABEL)
+            self.assertEqual(superclass[7], Superclass.M_INVALID_LABEL)
+
+            superclass = self.mili.superclass_from_class_name("cseg")
+            self.assertEqual(superclass[0], Superclass.M_INVALID_LABEL)
+            self.assertEqual(superclass[1], Superclass.M_INVALID_LABEL)
+            self.assertEqual(superclass[2], Superclass.M_QUAD)
+            self.assertEqual(superclass[3], Superclass.M_QUAD)
+            self.assertEqual(superclass[4], Superclass.M_INVALID_LABEL)
+            self.assertEqual(superclass[5], Superclass.M_QUAD)
+            self.assertEqual(superclass[6], Superclass.M_INVALID_LABEL)
+            self.assertEqual(superclass[7], Superclass.M_INVALID_LABEL)
+
+            with self.assertRaises(MiliPythonError):
+                superclass = self.mili.superclass_from_class_name("does-not-exist")
 
         #==============================================================================
         def test_times(self):

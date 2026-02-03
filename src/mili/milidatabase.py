@@ -18,7 +18,7 @@ from enum import Enum
 import mili.reductions as reductions
 from mili.parallel import ServerWrapper, LoopWrapper
 from mili.miliinternal import _MiliInternal, ReturnCode
-from mili.datatypes import StateMap, QueryDict, ReturnCode, ReturnCodeTuple, Metadata
+from mili.datatypes import StateMap, QueryDict, ReturnCode, ReturnCodeTuple, Metadata, Superclass
 from mili.mdg_defines import mdg_enum_to_string
 from mili.utils import result_dictionary_to_dataframe
 from mili.geometric_mesh_info import GeometricMeshInfo
@@ -145,6 +145,21 @@ class MiliDatabase:
     result: Metadata
     result = self.__postprocess(results = self._mili.metadata(),
                                 reduce_function = reductions.zeroth_entry)
+    return result
+
+  def superclass_from_class_name(self, entity_type: Union[str,EntityType]) -> Superclass:
+    """Get the superclass from entity_type.
+
+    Args:
+      entity_type (Union[str,EntityType]): The entity type ("brick", "node", etc.).
+
+    Returns:
+      Superclass: The element superclass.
+    """
+    result: Superclass
+    entity_type_str = mdg_enum_to_string(entity_type)
+    result = self.__postprocess(results = self._mili.superclass_from_class_name(entity_type_str),
+                                reduce_function = reductions.reduce_superclass_from_class_names)
     return result
 
   def nodes(self) -> NDArray[np.floating]:

@@ -10,7 +10,8 @@ import unittest
 from mili import miliinternal
 from mili.miliinternal import *
 from mili.geometric_mesh_info import GeometricMeshInfo
-from mili.datatypes import Metadata
+from mili.datatypes import Metadata, Superclass
+from mili.milidatabase import MiliPythonError
 import numpy as np
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -62,6 +63,23 @@ class TestMiliInternal(unittest.TestCase):
             library_version = "V16_01"
         )
         np.testing.assert_equal(metadata, EXPECTED)
+
+    #==============================================================================
+    def test_superclass_from_class_name(self):
+        superclass = self.mili.superclass_from_class_name("brick")
+        self.assertEqual(superclass, Superclass.M_HEX)
+
+        superclass = self.mili.superclass_from_class_name("beam")
+        self.assertEqual(superclass, Superclass.M_BEAM)
+
+        superclass = self.mili.superclass_from_class_name("shell")
+        self.assertEqual(superclass, Superclass.M_QUAD)
+
+        superclass = self.mili.superclass_from_class_name("cseg")
+        self.assertEqual(superclass, Superclass.M_QUAD)
+
+        superclass = self.mili.superclass_from_class_name("does-not-exist")
+        self.assertEqual(superclass, Superclass.M_INVALID_LABEL)
 
     #==============================================================================
     def test_nodes(self):

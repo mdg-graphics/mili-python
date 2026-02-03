@@ -269,6 +269,10 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
 
     def test_neighbor_elements(self):
         """Test the neighbor_elements funcion."""
+        elems = self.adjacency.neighbor_elements("node", 120)
+        self.assertEqual(list(elems.keys()), ["brick"])
+        np.testing.assert_equal(sorted(elems["brick"]), [31,32,33,34])
+
         elems = self.adjacency.neighbor_elements("brick", 1)
         self.assertEqual(list(elems.keys()), ["brick", "cseg"])
         np.testing.assert_equal(sorted(elems["brick"]), [1, 2, 3, 4, 7, 8, 9, 10])
@@ -292,6 +296,20 @@ class TestSerialAdjacencyMapping(unittest.TestCase):
         elems = self.adjacency.neighbor_elements(EntityType.BRICK, 1, material=[2,3], neighbor_radius = 3)
         self.assertEqual(list(elems.keys()), ["brick"])
         np.testing.assert_equal(sorted(elems["brick"]), np.arange(1, 37)) # All brick elements are within 3 neighbors of brick 1
+
+    def test_neighbor_nodes(self):
+        """Test the neighbor_nodes function."""
+        nodes = self.adjacency.neighbor_nodes("node", 120)
+        np.testing.assert_equal(nodes, [104, 116, 119, 124, 136])
+
+        nodes = self.adjacency.neighbor_nodes("beam", 15)
+        np.testing.assert_equal(nodes, [9, 22])
+
+        nodes = self.adjacency.neighbor_nodes("shell", 1)
+        np.testing.assert_equal(nodes, [12, 13, 51, 55])
+
+        nodes = self.adjacency.neighbor_nodes("brick", 32)
+        np.testing.assert_equal(nodes, [99, 100, 103, 104, 114, 118, 123, 124, 130, 134, 139, 140,])
 
 
 class ParallelAdjacencyTests:
@@ -514,6 +532,10 @@ class ParallelAdjacencyTests:
 
         def test_neighbor_elements(self):
             """Test the neighbor_elements funcion."""
+            elems = self.adjacency.neighbor_elements("node", 120)
+            self.assertEqual(list(elems.keys()), ["brick"])
+            np.testing.assert_equal(sorted(elems["brick"]), [31,32,33,34])
+
             elems = self.adjacency.neighbor_elements("brick", 1)
             self.assertEqual(list(elems.keys()), ["brick", "cseg"])
             np.testing.assert_equal(sorted(elems["brick"]), [1, 2, 3, 4, 7, 8, 9, 10])
@@ -541,6 +563,20 @@ class ParallelAdjacencyTests:
             elems = self.adjacency.neighbor_elements("brick", 1, material=[2,3], neighbor_radius = 3)
             self.assertEqual(list(elems.keys()), ["brick"])
             np.testing.assert_equal(sorted(elems["brick"]), np.arange(1, 37)) # All brick elements are within 3 neighbors of brick 1
+
+        def test_neighbor_nodes(self):
+            """Test the neighbor_nodes function."""
+            nodes = self.adjacency.neighbor_nodes("node", 120)
+            np.testing.assert_equal(sorted(nodes), [104, 116, 119, 124, 136])
+
+            nodes = self.adjacency.neighbor_nodes("beam", 15)
+            np.testing.assert_equal(sorted(nodes), [9, 22])
+
+            nodes = self.adjacency.neighbor_nodes("shell", 1)
+            np.testing.assert_equal(sorted(nodes), [12, 13, 51, 55])
+
+            nodes = self.adjacency.neighbor_nodes("brick", 32)
+            np.testing.assert_equal(sorted(nodes), [99, 100, 103, 104, 114, 118, 123, 124, 130, 134, 139, 140,])
 
 ###############################################
 # Tests for each parallel wrapper class with and without merge_results=True

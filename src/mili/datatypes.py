@@ -85,7 +85,44 @@ class Superclass(IntEnum):
   M_INVALID_LABEL = -1
 
   def node_count(self) -> int:
+    """Return the node count for each superclass."""
     return [ 0, 0, 2, 3, 3, 4, 4, 5, 6, 8, 0, 0, 0, 1, 10, 1 ][self.value]
+
+  def node_connections(self) -> NDArray[np.int32]:
+    """Return the nodal connections map for each superclass."""
+    # This dictionary specifies for each element superclass the the index of the nodes that share an element
+    # edge with each node in the element connectivity.
+    node_connections = {
+      Superclass.M_TRUSS: np.array([[1],
+                                    [0]]),
+      Superclass.M_BEAM: np.array([[1],
+                                   [0]]),
+      Superclass.M_TRI: np.array([[1,2],
+                                  [0,2],
+                                  [0,1]]),
+      Superclass.M_QUAD: np.array([[1,3],
+                                   [0,2],
+                                   [1,3],
+                                   [0,2]]),
+      Superclass.M_TET: np.array([[1,2,3],
+                                  [0,2,3],
+                                  [0,1,3],
+                                  [0,1,2]]),
+      Superclass.M_HEX: np.array([[1,3,4],
+                                  [0,2,5],
+                                  [1,3,6],
+                                  [0,2,7],
+                                  [0,5,7],
+                                  [1,4,6],
+                                  [2,5,7],
+                                  [3,4,6]]),
+      Superclass.M_PARTICLE: np.array([[0]]),
+      Superclass.M_INODE: np.array([[0]]),
+    }
+    if self.value not in node_connections:
+      raise NotImplementedError(f"This function does not support the superclass {self}. Please reach out to the mili-python developers.")
+    return node_connections[self]
+
 
 @dataclass
 class StateMap:

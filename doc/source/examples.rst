@@ -1055,7 +1055,6 @@ specified material names or numbers.
 
 .. code-block:: python
 
-    from mili.datatypes import Superclass
     from mili import adjacency
     adj = adjacency.AdjacencyMapping(db)
 

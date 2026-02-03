@@ -323,6 +323,21 @@ class _MiliInternal:
     """
     return self.__metadata
 
+  def superclass_from_class_name(self, class_name: str) -> Superclass:
+    """Get the superclass from element class name.
+
+    Args:
+      class_name (str): The element class name.
+
+    Returns:
+      Superclass: The element superclass.
+    """
+    if class_name not in self.__MO_class_data:
+      self.__return_code = (ReturnCode.ERROR, f"The class '{class_name}' does not exist.")
+      return Superclass.M_INVALID_LABEL
+
+    return self.__class_to_sclass.get(class_name, Superclass.M_INVALID_LABEL)
+
   def nodes(self) -> NDArray[np.floating]:
     """Getter for initial nodal coordinates.
 
@@ -923,6 +938,7 @@ class _MiliInternal:
     if all( label not in self.__labels[class_sname] for label in labels_array ):
       self.__return_code = (ReturnCode.ERROR, f"None of the provided labels exist for class '{class_sname}'.")
       return np.empty([1,0],dtype=np.int32), np.empty([1,0],dtype=np.int32)
+
     if class_sname not in self.__conns_labels:
       self.__return_code = (ReturnCode.ERROR, f"The class '{class_sname}' does not have element connectivity.")
       return np.empty([1,0],dtype=np.int32), np.empty([1,0],dtype=np.int32)

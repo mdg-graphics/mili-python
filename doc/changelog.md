@@ -5,15 +5,25 @@ All notable changes to Mili-python will be documented in this file.
 ## [Unreleased]
 
 ### Added
+
+### Fixed
+
+### Changed
+
+### Removed
+
+## [v0.9.7] - 2026-2-3
+
+### Added
 - Added the derived variable `relative_volume`.
 - Added the function `MiliDatabase.state_count` to get the number of states in a database.
+- Added the function `AdjacencyMapping.neighbor_nodes` which takes a entity type + label and returns the neighboring nodes. Neighboring nodes are defined as any node that shares an edge with the specified node/element on the mesh.
 
 ### Fixed
 - Fixed bugs related to querying array state variables
 
 ### Changed
-
-### Removed
+- Updated the `AdjacencyMapping.neighbor_elements` function to allow querying the neighbor elements of node classes.
 
 ## [v0.9.6] - 2025-10-6
 
