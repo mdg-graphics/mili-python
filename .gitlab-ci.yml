@@ -95,6 +95,12 @@ unit_tests_py312:
     variables:
         TOX_CI_PYTHON_VERSION: "py312"
 
+unit_tests_py313:
+    extends:
+        - .unit_tests
+    variables:
+        TOX_CI_PYTHON_VERSION: "py313"
+
 coverage:
     stage: test
     tags:
