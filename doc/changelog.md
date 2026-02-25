@@ -5,6 +5,7 @@ All notable changes to Mili-python will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Added the `project_to_nodes` flag to the `MiliDatabase.query` method to project element results to the associated nodes. For hex/tet elements this is done as a volume weighted average of the elements associated with the node. For other elements it is an average of the adjacent elements.
 
 ### Fixed
 

@@ -4,6 +4,7 @@ SPDX-License-Identifier: (MIT)
 """
 from __future__ import annotations
 
+import warnings
 import numpy as np
 from numpy.typing import NDArray, ArrayLike
 from numpy import iterable
@@ -22,6 +23,8 @@ from mili.datatypes import StateMap, QueryDict, ReturnCode, ReturnCodeTuple, Met
 from mili.mdg_defines import mdg_enum_to_string
 from mili.utils import result_dictionary_to_dataframe
 from mili.geometric_mesh_info import GeometricMeshInfo
+from mili.projection import (hex_to_nodal, quad_to_nodal, tri_to_nodal, beam_to_nodal,
+                             truss_to_nodal, tet_to_nodal, particle_to_nodal)
 
 if TYPE_CHECKING:
   # NOTE: We only import these when Type checking. These enums should not
@@ -725,12 +728,51 @@ class MiliDatabase:
 
     return merged_results
 
+  def __project_result(self, result: Union[Dict[str,QueryDict],List[Dict[str,QueryDict]]]) -> Dict[str,QueryDict]:
+    """Project an element result to associated nodes."""
+    nodal_result: Dict[str,QueryDict] = {}
+    result = reductions.combine(result)
+
+    warnings.warn(
+      "Nodal values are computed by averaging the adjacent element results. This is an "
+      "approximation and may introduce error into the field values. Please exercise caution "
+      "when using these results for analysis work.",
+      UserWarning,
+      stacklevel=3
+    )
+
+    for result_name, result_dict in result.items():
+      class_name = result_dict["class_name"]
+      superclass = self.superclass_from_class_name(class_name)
+
+      if superclass == Superclass.M_NODE:
+        nodal_result[result_name] = result_dict
+      elif superclass == Superclass.M_HEX:
+        nodal_result[result_name] = hex_to_nodal(self, result_dict)
+      elif superclass == Superclass.M_QUAD:
+        nodal_result[result_name] = quad_to_nodal(self, result_dict)
+      elif superclass == Superclass.M_TRI:
+        nodal_result[result_name] = tri_to_nodal(self, result_dict)
+      elif superclass == Superclass.M_BEAM:
+        nodal_result[result_name] = beam_to_nodal(self, result_dict)
+      elif superclass == Superclass.M_TRUSS:
+        nodal_result[result_name] = truss_to_nodal(self, result_dict)
+      elif superclass == Superclass.M_TET:
+        nodal_result[result_name] = tet_to_nodal(self, result_dict)
+      elif superclass == Superclass.M_PARTICLE or superclass == Superclass.M_INODE:
+        nodal_result[result_name] = particle_to_nodal(self, result_dict)
+      else:
+        raise NotImplementedError(f"Projection is not supported for the type {superclass}")
+
+    return nodal_result
+
   @overload
   def query(self, svar_names: Union[List[str],List[StateVariableName],str,StateVariableName],
             entity_type: Union[str,EntityType], material: Optional[Union[str,int]] = None,
             labels: Optional[Union[List[int],int]] = None, states: Optional[Union[List[int],int]] = None,
             ips: Optional[Union[List[int],int]] = None, write_data: Optional[Dict[str,QueryDict]] = None,
             as_dataframe: Literal[False] = False, modifier: Optional[ResultModifier] = None,
+            project_to_nodes: bool = False,
             **kwargs: Any) -> Dict[str,QueryDict]: ...
 
   @overload
@@ -739,6 +781,7 @@ class MiliDatabase:
             labels: Optional[Union[List[int],int]] = None, states: Optional[Union[List[int],int]] = None,
             ips: Optional[Union[List[int],int]] = None, write_data: Optional[Dict[str,QueryDict]] = None,
             as_dataframe: Literal[True] = ..., modifier: Optional[ResultModifier] = None,
+            project_to_nodes: bool = False,
             **kwargs: Any) -> Dict[str,pd.DataFrame]: ...
 
   def query(self,
@@ -751,6 +794,7 @@ class MiliDatabase:
             write_data: Optional[Dict[str,QueryDict]] = None,
             as_dataframe: bool = False,
             modifier: Optional[ResultModifier] = None,
+            project_to_nodes: bool = False,
             **kwargs: Any) -> Union[Dict[str,pd.DataFrame],Dict[str,QueryDict]]:
     """Query the database for state variables or derived variables, returning data for the specified parameters, optionally writing data to the database.
 
@@ -767,9 +811,15 @@ class MiliDatabase:
         then modify the values desired, then query again with the modified result in this param
       as_dataframe (bool, default = False): If True the result is returned as a Pandas DataFrame.
       modifier (Optional[ResultModifier]): Optional modifer to apply to results.
+      project_to_nodes (bool, default = False): Project an element result to the associated nodes.
     """
     if write_data and modifier:
       raise ValueError("Result modifiers may not be used when the write_data argument is passed.")
+
+    if project_to_nodes and modifier:
+      raise ValueError("Result modifiers may not be used when the project_to_nodes flag is True.")
+    if project_to_nodes and write_data:
+      raise ValueError("write_data argument may not be used when the project_to_nodes flag is True.")
 
     result: Union[Dict[str,pd.DataFrame],Dict[str,QueryDict]]
 
@@ -785,6 +835,9 @@ class MiliDatabase:
 
     if modifier:
       result = self.__process_query_modifier(modifier, result, as_dataframe)  # type: ignore  # mypy errors because of pd.DataFrame
+
+    if project_to_nodes:
+      result = self.__project_result(result)  # type: ignore  # mypy errors because of pd.DataFrame
 
     if as_dataframe:
       return result_dictionary_to_dataframe(result)  # type: ignore  # mypy errors because of pd.DataFrame

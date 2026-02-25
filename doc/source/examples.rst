@@ -572,6 +572,48 @@ stddev
     23  1.596484e+03
     """
 
+Nodal Projection
+========================
+
+Mili-python supports projecting element results out to the associated nodes using the `project_to_nodes=True` flag for the `MiliDatabase.query` method.
+When this flag is set to `True`, mili-python queries the result for the specified elements, gathers the nodes that are associated with the set of elements
+in the query, and then projects the result to those nodes. For Hex and Tet elements this is done as a volume weighted average (same as Griz) and for all
+other elements this is done as an average of the adjacent elements results (same as Griz).
+
+.. code-block:: python
+
+    result = db.query("sx", "brick", labels=[1,2,3], states=[21,22,23], project_to_nodes=True)
+    print(result)
+    """
+    {'sx': {
+        'class_name': 'node',
+        'modifier': '',
+        'title': 'X Stress',
+        'source': 'primal',
+        'data': array([[[-1.3410004e-08],
+                        [-1.3410004e-08],
+                        [-1.6425643e-09],
+                        [-1.6425643e-09],
+                        [ 1.0124875e-08],
+                        [ 1.0124875e-08],
+                        [-3.3418046e-09],
+                        [-3.3418046e-09],
+                        [ 6.1898198e-10],
+                        [ 6.1898198e-10],
+                        [ 1.0124875e-08],
+                        [ 1.0124875e-08],
+                        [ 3.8497601e-09],
+                        [ 3.8497601e-09],
+                        [ 3.8497601e-09],
+                        [ 3.8497601e-09]]], dtype=float32),
+        'layout': {
+            'labels': array([ 65,  66,  69,  70,  73,  74,  81,  82,  85,  86,  89,  90,  97, 98, 101, 102], dtype=int32),
+            'states': array([21], dtype=int32),
+            'times': array([0.0002]),
+            'components': ['sx']
+        }
+    }}
+    """
 
 Modifying Results
 ========================

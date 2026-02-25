@@ -1223,6 +1223,51 @@ class SerialSingleStateFile(SharedSerialTests.SerialTests):
         np.testing.assert_allclose(df["stddev"][98], 0.025499, rtol=1.0e-05)
         np.testing.assert_allclose(df["stddev"][99], 0.025357, rtol=3.3e-06)
 
+    def test_query_project_to_nodes(self):
+        """Test project_to_nodes=True with query method"""
+        import warnings
+        warnings.filterwarnings(
+            "ignore",
+            message="Nodal values are computed by averaging the adjacent element results. This is an ",
+            category=UserWarning,
+        )
+        node_result = self.mili.query("sx", "brick", states=[40,41], labels=[31,32], project_to_nodes=True)['sx']
+
+        self.assertEqual( node_result['class_name'], 'node')
+        self.assertEqual( node_result['modifier'], '')
+        self.assertEqual( node_result['title'], 'X Stress')
+        self.assertEqual( node_result['source'], 'primal')
+        np.testing.assert_equal( node_result['layout']['labels'], [99,100,103,104,115,116,119,120,131,132,135,136])
+        np.testing.assert_equal( node_result['layout']['states'], [40,41])
+        np.testing.assert_allclose( node_result['layout']['times'], [0.00039, 0.00040], rtol=3.0e-08)
+        np.testing.assert_equal( node_result['layout']['components'], ['sx'])
+
+        np.testing.assert_allclose(node_result['data'][0,0,0],  -94.135185)  # Node 99
+        np.testing.assert_allclose(node_result['data'][0,1,0],  -94.135185)  # Node 100
+        np.testing.assert_allclose(node_result['data'][0,2,0],  -94.135185)  # Node 103
+        np.testing.assert_allclose(node_result['data'][0,3,0],  -94.135185)  # Node 104
+        np.testing.assert_allclose(node_result['data'][0,4,0],  -261.15353)  # Node 115
+        np.testing.assert_allclose(node_result['data'][0,5,0],  -261.15353)  # Node 116
+        np.testing.assert_allclose(node_result['data'][0,6,0],  -261.15353)  # Node 119
+        np.testing.assert_allclose(node_result['data'][0,7,0],  -261.15353)  # Node 120
+        np.testing.assert_allclose(node_result['data'][0,8,0],  -397.80515)  # Node 131
+        np.testing.assert_allclose(node_result['data'][0,9,0],  -397.80515)  # Node 132
+        np.testing.assert_allclose(node_result['data'][0,10,0], -397.80515)  # Node 135
+        np.testing.assert_allclose(node_result['data'][0,11,0], -397.80515)  # Node 136
+
+        np.testing.assert_allclose(node_result['data'][1,0,0],  -440.79117)  # Node 99
+        np.testing.assert_allclose(node_result['data'][1,1,0],  -440.79117)  # Node 100
+        np.testing.assert_allclose(node_result['data'][1,2,0],  -440.79117)  # Node 103
+        np.testing.assert_allclose(node_result['data'][1,3,0],  -440.79117)  # Node 104
+        np.testing.assert_allclose(node_result['data'][1,4,0],  -536.29926)  # Node 115
+        np.testing.assert_allclose(node_result['data'][1,5,0],  -536.29926)  # Node 116
+        np.testing.assert_allclose(node_result['data'][1,6,0],  -536.29926)  # Node 119
+        np.testing.assert_allclose(node_result['data'][1,7,0],  -536.29926)  # Node 120
+        np.testing.assert_allclose(node_result['data'][1,8,0],  -614.4423)   # Node 131
+        np.testing.assert_allclose(node_result['data'][1,9,0],  -614.4423)   # Node 132
+        np.testing.assert_allclose(node_result['data'][1,10,0], -614.4423)   # Node 135
+        np.testing.assert_allclose(node_result['data'][1,11,0], -614.4423)   # Node 136
+
 
 class SerialMultiStateFile(SharedSerialTests.SerialTests):
     file_name = os.path.join(dir_path,'data','serial','mstate','d3samp6.plt_c')

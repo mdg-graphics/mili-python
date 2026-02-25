@@ -870,7 +870,8 @@ class DerivedExpressions:
         source = 'derived',
         data = np.empty_like( primal_data[primal]['data'] ),
         title = self.__derived_expressions[result_name]['title'],
-        layout = primal_data[primal]['layout']
+        layout = primal_data[primal]['layout'],
+        modifier = '',
       )
       derived_result[result_name]['layout']['components'] = [result_name]
     return derived_result
