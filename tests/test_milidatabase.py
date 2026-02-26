@@ -369,7 +369,7 @@ class SharedSerialTests:
                             'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure', 'prin_dev_stress1', 'prin_dev_stress2',
                             'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'norm_press', 'area', 'centroid'
                             ]
-            CSEG_DERIVED = ['area', 'centroid']
+            CSEG_DERIVED = ['area', 'centroid', 'normal_force', 'force_x', 'force_y', 'force_z']
             NODE_DERIVED = ['disp_x', 'disp_y', 'disp_z', 'disp_mag', 'disp_rad_mag_xy', 'vel_x', 'vel_y', 'vel_z', 'acc_x', 'acc_y', 'acc_z', 'centroid']
             self.assertEqual( self.mili.derived_variables_of_class("brick"), BRICK_DERIVED )
             self.assertEqual( self.mili.derived_variables_of_class("beam"), BEAM_DERIVED )

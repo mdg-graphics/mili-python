@@ -33,7 +33,8 @@ class SerialDerivedExpressions(unittest.TestCase):
                     'prin_dev_stress1', 'prin_dev_stress2', 'prin_dev_stress3', 'max_shear_stress',
                     'triaxiality', 'norm_press', 'eps_rate', 'nodtangmag', 'mat_cog_disp_x', 'mat_cog_disp_y',
                     'mat_cog_disp_z', 'element_volume', 'area', 'centroid', 'surfstrainx', 'surfstrainy',
-                    'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx', 'relative_volume'
+                    'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx', 'relative_volume', 'normal_force',
+                    'force_x', 'force_y', 'force_z'
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
@@ -51,7 +52,7 @@ class SerialDerivedExpressions(unittest.TestCase):
                          'prin_strain1_alt', 'prin_strain2_alt', 'prin_strain3_alt', 'prin_dev_strain1_alt', 'prin_dev_strain2_alt', 'prin_dev_strain3_alt',
                          'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure', 'prin_dev_stress1', 'prin_dev_stress2',
                          'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'norm_press', 'area', 'centroid']
-        CSEG_DERIVED = ['area', 'centroid']
+        CSEG_DERIVED = ['area', 'centroid', 'normal_force', 'force_x', 'force_y', 'force_z']
         NODE_DERIVED = ['disp_x', 'disp_y', 'disp_z', 'disp_mag', 'disp_rad_mag_xy', 'vel_x', 'vel_y', 'vel_z', 'acc_x', 'acc_y', 'acc_z', 'centroid']
 
         self.assertEqual( self.mili.derived_variables_of_class("brick"), BRICK_DERIVED )
@@ -1162,6 +1163,90 @@ class SerialDerivedExpressions(unittest.TestCase):
         # State 80
         np.testing.assert_allclose(result["relative_volume"]["data"][2,0,0], 1.01123, rtol=2.0e-07)
         np.testing.assert_allclose(result["relative_volume"]["data"][2,1,0], 0.936295, rtol=2.0e-07)
+
+    def test_normal_force(self):
+        """Test normal_force calculation for contact segments."""
+        result = self.mili.query("normal_force", "cseg", labels=[1,10], states=[40,41,42])
+
+        np.testing.assert_equal( result["normal_force"]["layout"]["labels"], [1,10])
+        np.testing.assert_equal( result["normal_force"]["layout"]["states"], [40,41,42])
+        np.testing.assert_allclose( result["normal_force"]["layout"]["times"], [ 0.00039, 0.0004, 0.00041])
+        self.assertEqual( result["normal_force"]["source"], "derived")
+        self.assertEqual( result["normal_force"]["class_name"], "cseg")
+        self.assertEqual( result["normal_force"]["title"], "Normal Force")
+
+        # State 1
+        np.testing.assert_allclose(result["normal_force"]["data"][0,0,0], 0.082737, rtol=3.6e-06)
+        np.testing.assert_allclose(result["normal_force"]["data"][0,1,0], 479.04562)
+        # State 40
+        np.testing.assert_allclose(result["normal_force"]["data"][1,0,0], 0.031194, rtol=9.8e-06)
+        np.testing.assert_allclose(result["normal_force"]["data"][1,1,0], 316.75244)
+        # State 80
+        np.testing.assert_allclose(result["normal_force"]["data"][2,0,0], 0.031203, rtol=5.2e-06)
+        np.testing.assert_allclose(result["normal_force"]["data"][2,1,0], 364.52975)
+
+    def test_force_x(self):
+        """Test X force calculation for contact segments."""
+        result = self.mili.query("force_x", "cseg", labels=[1,10], states=[40,41,42])
+
+        np.testing.assert_equal( result["force_x"]["layout"]["labels"], [1,10])
+        np.testing.assert_equal( result["force_x"]["layout"]["states"], [40,41,42])
+        np.testing.assert_allclose( result["force_x"]["layout"]["times"], [ 0.00039, 0.0004, 0.00041])
+        self.assertEqual( result["force_x"]["source"], "derived")
+        self.assertEqual( result["force_x"]["class_name"], "cseg")
+        self.assertEqual( result["force_x"]["title"], "X Force")
+
+        # State 1
+        np.testing.assert_allclose(result["force_x"]["data"][0,0,0], 0.000311, rtol=9.3e-05)
+        np.testing.assert_allclose(result["force_x"]["data"][0,1,0], -0.013727, rtol=8.7e-06)
+        # State 40
+        np.testing.assert_allclose(result["force_x"]["data"][1,0,0], 0.000127, rtol=0.0035)
+        np.testing.assert_allclose(result["force_x"]["data"][1,1,0], -0.022201, rtol=1.52e-05)
+        # State 80
+        np.testing.assert_allclose(result["force_x"]["data"][2,0,0], 9.320011e-05)
+        np.testing.assert_allclose(result["force_x"]["data"][2,1,0], -0.017044, rtol=2.8e-05)
+
+    def test_force_y(self):
+        """Test Y force calculation for contact segments."""
+        result = self.mili.query("force_y", "cseg", labels=[1,10], states=[40,41,42])
+
+        np.testing.assert_equal( result["force_y"]["layout"]["labels"], [1,10])
+        np.testing.assert_equal( result["force_y"]["layout"]["states"], [40,41,42])
+        np.testing.assert_allclose( result["force_y"]["layout"]["times"], [ 0.00039, 0.0004, 0.00041])
+        self.assertEqual( result["force_y"]["source"], "derived")
+        self.assertEqual( result["force_y"]["class_name"], "cseg")
+        self.assertEqual( result["force_y"]["title"], "Y Force")
+
+        # State 1
+        np.testing.assert_allclose(result["force_y"]["data"][0,0,0], 7.455091e-05)
+        np.testing.assert_allclose(result["force_y"]["data"][0,1,0], -0.007969, rtol=3.35e-05)
+        # State 40
+        np.testing.assert_allclose(result["force_y"]["data"][1,0,0], 3.021044e-05)
+        np.testing.assert_allclose(result["force_y"]["data"][1,1,0], -0.008482, rtol=2.88e-05)
+        # State 80
+        np.testing.assert_allclose(result["force_y"]["data"][2,0,0], 3.758116e-05)
+        np.testing.assert_allclose(result["force_y"]["data"][2,1,0], -0.001703, rtol=8.82e-05)
+
+    def test_force_z(self):
+        """Test Z force calculation for contact segments."""
+        result = self.mili.query("force_z", "cseg", labels=[1,10], states=[40,41,42])
+
+        np.testing.assert_equal( result["force_z"]["layout"]["labels"], [1,10])
+        np.testing.assert_equal( result["force_z"]["layout"]["states"], [40,41,42])
+        np.testing.assert_allclose( result["force_z"]["layout"]["times"], [ 0.00039, 0.0004, 0.00041])
+        self.assertEqual( result["force_z"]["source"], "derived")
+        self.assertEqual( result["force_z"]["class_name"], "cseg")
+        self.assertEqual( result["force_z"]["title"], "Z Force")
+
+        # State 1
+        np.testing.assert_allclose(result["force_z"]["data"][0,0,0], -0.082737, rtol=3.26e-06)
+        np.testing.assert_allclose(result["force_z"]["data"][0,1,0], -479.04703)
+        # State 40
+        np.testing.assert_allclose(result["force_z"]["data"][1,0,0], -0.031194, rtol=1.13e-06)
+        np.testing.assert_allclose(result["force_z"]["data"][1,1,0], -316.75333)
+        # State 80
+        np.testing.assert_allclose(result["force_z"]["data"][2,0,0], -0.031203, rtol=2.95e-07)
+        np.testing.assert_allclose(result["force_z"]["data"][2,1,0], -364.53006)
 
 
 class ParallelDerivedExpressions(unittest.TestCase):

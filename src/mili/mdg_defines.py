@@ -367,6 +367,11 @@ class DerivedVariables(StateVariableName):
     AREA = "area"
     CENTROID = "centroid"
 
+    NORMAL_FORCE = "normal_force"
+    FORCE_X = "force_x"
+    FORCE_Y = "force_y"
+    FORCE_Z = "force_z"
+
     SURFACE_STRAIN_X = "surfstrainx"
     SURFACE_STRAIN_Y = "surfstrainy"
     SURFACE_STRAIN_Z = "surfstrainz"

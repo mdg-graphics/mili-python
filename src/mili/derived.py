@@ -15,7 +15,8 @@ from numpy.typing import NDArray
 from itertools import groupby
 
 from mili.datatypes import Superclass, QueryDict, QueryLayout
-from mili.mdg_defines import DerivedVariables, NodalStateVariables, StressStrainStateVariables, MaterialStateVariables, EntityType
+from mili.mdg_defines import (DerivedVariables, NodalStateVariables, StressStrainStateVariables,
+                              MaterialStateVariables, EntityType, ContactSegmentStateVariables)
 
 if TYPE_CHECKING:
   from mili.miliinternal import _MiliInternal
@@ -551,6 +552,38 @@ class DerivedExpressions:
         supports_batching = False,
         compute_function = self.__compute_relative_volume,
         only_sclasses = [Superclass.M_HEX, Superclass.M_TET]
+      ),
+      DerivedVariables.NORMAL_FORCE.value: DerivedSpec(
+        title = "Normal Force",
+        primals = [ContactSegmentStateVariables.NORMAL_PRESSURE.value],
+        primals_class = [None],
+        supports_batching = False,
+        compute_function = self.__compute_normal_force,
+        only_sclasses = [Superclass.M_QUAD],
+      ),
+      DerivedVariables.FORCE_X.value: DerivedSpec(
+        title = "X Force",
+        primals = [ContactSegmentStateVariables.X_TRACTION.value],
+        primals_class = [None],
+        supports_batching = False,
+        compute_function = self.__compute_force,
+        only_sclasses = [Superclass.M_QUAD],
+      ),
+      DerivedVariables.FORCE_Y.value: DerivedSpec(
+        title = "Y Force",
+        primals = [ContactSegmentStateVariables.Y_TRACTION.value],
+        primals_class = [None],
+        supports_batching = False,
+        compute_function = self.__compute_force,
+        only_sclasses = [Superclass.M_QUAD],
+      ),
+      DerivedVariables.FORCE_Z.value: DerivedSpec(
+        title = "Z Force",
+        primals = [ContactSegmentStateVariables.Z_TRACTION.value],
+        primals_class = [None],
+        supports_batching = False,
+        compute_function = self.__compute_force,
+        only_sclasses = [Superclass.M_QUAD],
       ),
       # TODO: Add more primals here
     }
@@ -2310,5 +2343,49 @@ class DerivedExpressions:
 
     detF = np.reshape( detF, detF.shape + (1,) )
     derived_result["relative_volume"]["data"][:,:,:] = detF
+
+    return derived_result
+
+  def __compute_normal_force(self,
+                             result_name: str,
+                             primal_data: Dict[str,QueryDict],
+                             query_args: QueryArgs) -> Dict[str,QueryDict]:
+    """Compute the normal force for M_QUAD classes."""
+    labels = query_args['labels']
+    states = query_args['states']
+    class_name = query_args['result_class_name']
+    # Create dictionary structure for the final result
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data, class_name )
+
+    # Query the area of the quad elements
+    area = self.db.query("area", class_name, labels=labels, states=states)['area']['data']
+
+    # Compute normal force
+    contact_pressure = primal_data['sn']['data']
+    derived_result[result_name]['data'] = contact_pressure * area
+
+    return derived_result
+
+  def __compute_force(self,
+                      result_name: str,
+                      primal_data: Dict[str,QueryDict],
+                      query_args: QueryArgs) -> Dict[str,QueryDict]:
+    """Compute the X, Y, or Z force for M_QUAD classes."""
+    labels = query_args['labels']
+    states = query_args['states']
+    class_name = query_args['result_class_name']
+    # Create dictionary structure for the final result
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data, class_name )
+
+    # Query the area of the quad elements
+    area = self.db.query("area", class_name, labels=labels, states=states)['area']['data']
+
+    # Determine which force we are calculating and what primal is needed.
+    result_idx = ['force_x', 'force_y', 'force_z'].index( result_name )
+    required_primal = ['s1', 's2', 's3'][result_idx]
+    traction = primal_data[required_primal]['data']
+
+    # Compute normal force
+    derived_result[result_name]['data'] = traction * area
 
     return derived_result
