@@ -268,8 +268,7 @@ class AFileParser:
     directory = DirectoryDecl( *struct.unpack(f'<6{self.__dir_dtype}',dir_data ) )
     directory.dir_type = DirectoryDecl.Type( directory.dir_type )
     idx = len( afile.dir_decls_list )
-    dir_types = [ dmem[1] for dmem in getdatamembers(DirectoryDecl.Type) ]
-    self.verify( f"dir_decls_list[{idx}].dir_type", directory.dir_type, lambda x : x in dir_types )
+    self.verify( f"dir_decls_list[{idx}].dir_type", directory.dir_type, lambda x : isinstance(x, DirectoryDecl.Type))
     self.verify( f"dir_decls_list[{idx}].modifier_idx1", directory.modifier_idx1)
     self.verify( f"dir_decls_list[{idx}].modifier_idx2", directory.modifier_idx2)
     self.verify( f"dir_decls_list[{idx}].string_count", directory.str_cnt)
