@@ -5,18 +5,22 @@ All notable changes to Mili-python will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- Added the derived variables `normal_force`, `force_x`, `force_y`, and `force_z` for contact segments, where:
-  - `normal_force` = `contact pressure` * `area`
-  - `force_x` = `x traction` * `area`
-  - `force_y` = `y traction` * `area`
-  - `force_z` = `z traction` * `area`
-- Added the `project_to_nodes` flag to the `MiliDatabase.query` method to project element results to the associated nodes. For hex/tet elements this is done as a volume weighted average of the elements associated with the node. For other elements it is an average of the adjacent elements.
 
 ### Fixed
 
 ### Changed
 
 ### Removed
+
+## [v0.9.8] - 2026-2-26
+
+### Added
+- Added the derived variables `normal_force`, `force_x`, `force_y`, and `force_z` for contact segments, where:
+  - `normal_force` = `contact pressure` * `area`
+  - `force_x` = `x traction` * `area`
+  - `force_y` = `y traction` * `area`
+  - `force_z` = `z traction` * `area`
+- Added the `project_to_nodes` flag to the `MiliDatabase.query` method to project element results to the associated nodes. For hex/tet elements this is done as a volume weighted average of the elements associated with the node. For other elements it is an average of the adjacent elements.
 
 ## [v0.9.7] - 2026-2-3
 
