@@ -1164,8 +1164,8 @@ class SerialDerivedExpressions(unittest.TestCase):
         np.testing.assert_allclose(result["relative_volume"]["data"][2,0,0], 1.01123, rtol=2.0e-07)
         np.testing.assert_allclose(result["relative_volume"]["data"][2,1,0], 0.936295, rtol=2.0e-07)
 
-    def test_normal_force(self):
-        """Test normal_force calculation for contact segments."""
+    def test_dyna_normal_force(self):
+        """Test normal_force calculation for contact segments in dyna3d."""
         result = self.mili.query("normal_force", "cseg", labels=[1,10], states=[40,41,42])
 
         np.testing.assert_equal( result["normal_force"]["layout"]["labels"], [1,10])
@@ -1184,6 +1184,20 @@ class SerialDerivedExpressions(unittest.TestCase):
         # State 80
         np.testing.assert_allclose(result["normal_force"]["data"][2,0,0], 0.031203, rtol=5.2e-06)
         np.testing.assert_allclose(result["normal_force"]["data"][2,1,0], 364.52975)
+
+    def test_diablo_normal_force(self):
+        """Test normal_force calculation for contact segments in diablo."""
+        file_name = os.path.join(dir_path,'data','serial','dbl_nodtang','dblplt')
+        db = open_database( file_name, suppress_parallel=True )
+
+        result = db.query("normal_force", "cbs1_quad", labels=[49,53], states=[60, 122])
+
+        # State 60
+        np.testing.assert_allclose(result["normal_force"]["data"][0,0,0], 0.0)
+        np.testing.assert_allclose(result["normal_force"]["data"][0,1,0], 9.36367692)
+        # State 112
+        np.testing.assert_allclose(result["normal_force"]["data"][1,0,0], 0.0)
+        np.testing.assert_allclose(result["normal_force"]["data"][1,1,0], 0.0)
 
     def test_force_x(self):
         """Test X force calculation for contact segments."""

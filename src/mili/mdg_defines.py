@@ -274,7 +274,8 @@ class ShellStateVariables(StateVariableName):
 
 class ContactSegmentStateVariables(StateVariableName):
     """Contact Segment (cseg) variables"""
-    NORMAL_PRESSURE = "sn"
+    DYNA_NORMAL_PRESSURE = "sn"
+    DIABLO_NORMAL_PRESSURE = "nodpres"
     SHEAR_MAGNITUDE = "shmag"
     R_SHEAR = "sr"
     S_SHEAR = "ss"

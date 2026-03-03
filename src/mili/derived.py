@@ -24,6 +24,9 @@ if TYPE_CHECKING:
 class DerivedSpec(TypedDict):
   title: str
   primals: List[str]
+  # NOTE: The intention of alternate_primals is to support different naming conventions for primal variables
+  #       between Dyna3d and Diablo.
+  alternate_primals: NotRequired[List[str]]
   primals_class: List[Optional[str]]
   supports_batching: bool
   compute_function: Callable[...,Any]
@@ -555,7 +558,8 @@ class DerivedExpressions:
       ),
       DerivedVariables.NORMAL_FORCE.value: DerivedSpec(
         title = "Normal Force",
-        primals = [ContactSegmentStateVariables.NORMAL_PRESSURE.value],
+        primals = [ContactSegmentStateVariables.DYNA_NORMAL_PRESSURE.value],
+        alternate_primals = [ContactSegmentStateVariables.DIABLO_NORMAL_PRESSURE.value],
         primals_class = [None],
         supports_batching = False,
         compute_function = self.__compute_normal_force,
@@ -615,12 +619,12 @@ class DerivedExpressions:
     if class_name in self.db.class_names():
       class_def = self.db.mesh_object_classes()[class_name]
       queriable_state_variables = self.db.queriable_svars()
-      for var_name, specs in self.__derived_expressions.items():
-        if 'only_sclasses' in specs:
-          if class_def.sclass not in specs['only_sclasses']:
+      for var_name, spec in self.__derived_expressions.items():
+        if 'only_sclasses' in spec:
+          if class_def.sclass not in spec['only_sclasses']:
             continue
         primals_found = []
-        for req_primal, req_primal_class in zip(specs['primals'], specs['primals_class']):
+        for req_primal, req_primal_class in zip(spec['primals'], spec['primals_class']):
           # Check that primal exists
           if req_primal in queriable_state_variables or req_primal in self.__derived_expressions:
             # Check that primal exists for required element class
@@ -628,8 +632,21 @@ class DerivedExpressions:
             if self.__variable_exists_for_class(req_primal, req_primal_class):
               primals_found.append(True)
         # Check if all primals were found
-        if len(primals_found) == len(specs['primals']) and all(primals_found):
+        if len(primals_found) == len(spec['primals']) and all(primals_found):
           derived_list.append(var_name)
+        elif 'alternate_primals' in spec:
+          primals_found = []
+          for req_primal, req_primal_class in zip(spec['alternate_primals'], spec['primals_class']):
+            # Check that primal exists
+            if req_primal in queriable_state_variables or req_primal in self.__derived_expressions:
+              # Check that primal exists for required element class
+              req_primal_class = class_name if req_primal_class is None else req_primal_class
+              if self.__variable_exists_for_class(req_primal, req_primal_class):
+                primals_found.append(True)
+          # Check if all primals were found
+          if len(primals_found) == len(spec['primals']) and all(primals_found):
+            derived_list.append(var_name)
+
     return derived_list
 
   def classes_of_derived_variable(self, var_name: str) -> List[str]:
@@ -722,6 +739,7 @@ class DerivedExpressions:
     result_name = result_names[0]
 
     required_variables = self.__derived_expressions[result_name]['primals']
+    alternate_required_variables = self.__derived_expressions[result_name].get('alternate_primals', None)
     primal_class_names = self.__derived_expressions[result_name]['primals_class']
     primal_classes = [ pclass if pclass is not None else class_name for pclass in primal_class_names]
     compute_function = self.__derived_expressions[result_name]['compute_function']
@@ -736,10 +754,20 @@ class DerivedExpressions:
     primals_found_for_class = []
     for primal, pclass in zip(required_variables, primal_classes):
       primals_found_for_class.append( self.__variable_exists_for_class(primal, pclass) )
-    if not all( primals_found_for_class ):
+    if not all( primals_found_for_class ) and alternate_required_variables is None:
       raise ValueError((f"The required variables do not all exist for the required_classes\n"
                         f"required_variables = {required_variables}\n"
                         f"required_classes = {primal_classes}"))
+    elif not all( primals_found_for_class ) and alternate_required_variables is not None:
+      primals_found_for_class = []
+      for primal, pclass in zip(alternate_required_variables, primal_classes):
+        primals_found_for_class.append( self.__variable_exists_for_class(primal, pclass) )
+      if not all( primals_found_for_class ):
+        raise ValueError((f"The required variables do not all exist for the required_classes\n"
+                          f"required_variables = {required_variables} OR {alternate_required_variables}\n"
+                          f"required_classes = {primal_classes}"))
+      else:
+        required_variables = alternate_required_variables
 
     # Check that computation is supported for this element superclass
     only_sclasses = self.__derived_expressions[result_name].get("only_sclasses", None)
@@ -2351,6 +2379,7 @@ class DerivedExpressions:
                              primal_data: Dict[str,QueryDict],
                              query_args: QueryArgs) -> Dict[str,QueryDict]:
     """Compute the normal force for M_QUAD classes."""
+    primal_name = query_args['svar_names'][0]
     labels = query_args['labels']
     states = query_args['states']
     class_name = query_args['result_class_name']
@@ -2361,7 +2390,7 @@ class DerivedExpressions:
     area = self.db.query("area", class_name, labels=labels, states=states)['area']['data']
 
     # Compute normal force
-    contact_pressure = primal_data['sn']['data']
+    contact_pressure = primal_data[primal_name]['data']
     derived_result[result_name]['data'] = contact_pressure * area
 
     return derived_result
