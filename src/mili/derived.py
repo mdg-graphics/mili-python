@@ -973,7 +973,6 @@ class DerivedExpressions:
                                   query_args: QueryArgs,
                                   reference_state: int = 0) -> Dict[str,QueryDict]:
     """Calculate the derived result 'disp_x', 'disp_y', or 'disp_z'."""
-    labels = query_args['labels']
     class_name = query_args['result_class_name']
     # Create dictionary structure for the final result
     derived_result = self.__initialize_result_dictionary( result_name, primal_data, class_name )
@@ -983,7 +982,7 @@ class DerivedExpressions:
     required_primal = ['ux', 'uy', 'uz'][result_idx]
 
     # Get reference nodal positions
-    reference_data = self.__get_nodal_reference_positions( required_primal, reference_state, labels )
+    reference_data = self.__get_nodal_reference_positions( required_primal, reference_state, primal_data[required_primal]['layout']['labels'] )
 
     # Compute the displacement
     disp = primal_data[required_primal]['data'] - reference_data
@@ -997,13 +996,12 @@ class DerivedExpressions:
                                   query_args: QueryArgs,
                                   reference_state: int = 0) -> Dict[str,QueryDict]:
     """Calculate the derived result 'disp_mag'."""
-    labels = query_args['labels']
     class_name = query_args['result_class_name']
     # Create dictionary structure for the final result
     derived_result = self.__initialize_result_dictionary( result_name, primal_data, class_name )
 
     # Get reference nodal positions
-    reference_data = self.__get_nodal_reference_positions( ['ux', 'uy', 'uz'], reference_state, labels )
+    reference_data = self.__get_nodal_reference_positions( ['ux', 'uy', 'uz'], reference_state, primal_data['ux']['layout']['labels'] )
 
     # Compute the displacement components
     dx = primal_data['ux']['data'] - reference_data[:,:1]
@@ -1020,13 +1018,12 @@ class DerivedExpressions:
                                   query_args: QueryArgs,
                                   reference_state: int = 0) -> Dict[str,QueryDict]:
     """Calculate the derived result 'disp_rad_mag_xy'."""
-    labels = query_args['labels']
     class_name = query_args['result_class_name']
     # Create dictionary structure for the final result
     derived_result = self.__initialize_result_dictionary( result_name, primal_data, class_name )
 
     # Get reference nodal positions
-    reference_data = self.__get_nodal_reference_positions( ['ux', 'uy', 'uz'], reference_state, labels )
+    reference_data = self.__get_nodal_reference_positions( ['ux', 'uy', 'uz'], reference_state, primal_data['ux']['layout']['labels'] )
 
     # Compute the displacement components
     dx = primal_data['ux']['data'] - reference_data[:,:1]
@@ -1041,7 +1038,6 @@ class DerivedExpressions:
                               primal_data: Dict[str,QueryDict],
                               query_args: QueryArgs) -> Dict[str,QueryDict]:
     """Calculate the derived result 'vel_x', 'vel_y', or 'vel_z'."""
-    labels = query_args['labels']
     states = query_args['states']
     class_name = query_args['result_class_name']
     # Create dictionary structure for the final result
@@ -1050,6 +1046,7 @@ class DerivedExpressions:
     # Determine which displacement we are calculating and what primal is needed.
     result_idx = ['vel_x', 'vel_y', 'vel_z'].index( result_name )
     required_primal = ['ux', 'uy', 'uz'][result_idx]
+    labels = primal_data[required_primal]['layout']['labels']
 
     mask = (states != 1)  # Boolean list used to exclude 1st state (if requested)
     states_prev = states[mask] - 1  # list of previous states
@@ -1079,7 +1076,6 @@ class DerivedExpressions:
                                   primal_data: Dict[str,QueryDict],
                                   query_args: QueryArgs) -> Dict[str,QueryDict]:
     """Calculate the derived result 'acc_x', 'acc_y', or 'acc_z'."""
-    labels = query_args['labels']
     states = query_args['states']
     class_name = query_args['result_class_name']
     # Create dictionary structure for the final result
@@ -1088,6 +1084,7 @@ class DerivedExpressions:
     # Determine which displacement we are calculating and what primal is needed.
     result_idx = ['acc_x', 'acc_y', 'acc_z'].index( result_name )
     required_primal = ['ux', 'uy', 'uz'][result_idx]
+    labels = primal_data[required_primal]['layout']['labels']
 
     # Create array masks (boolean lists) for operating on parts of the request
     max_st = len(self.db.state_maps())  # last state in the database
@@ -1676,9 +1673,9 @@ class DerivedExpressions:
     derived_result = self.__initialize_result_dictionary( result_name, primal_data, class_name )
 
     # Get the additional query arguments
-    labels = query_args['labels']
     ips = query_args['ips']
     primal_classes = query_args['class_sname'][0]
+    labels = primal_data['eps']['layout']['labels']
 
     # Create mask that excludes first and last states (only states compatable with center difference)
     max_st = len(self.db.state_maps())  # last state in the database
@@ -1758,7 +1755,6 @@ class DerivedExpressions:
                                           query_args: QueryArgs,
                                           reference_state: int = 1) -> Dict[str,QueryDict]:
     """Compute the derived results mat_cog_disp_[x|y|z]. Material Center of Gravity Displacement."""
-    labels = query_args['labels']
     class_sname = query_args['class_sname'][0]
     class_name = query_args['result_class_name']
     # Create dictionary structure for the final result
@@ -1767,6 +1763,7 @@ class DerivedExpressions:
     # Determine which displacement we are calculating and what primal is needed.
     result_idx = ['mat_cog_disp_x', 'mat_cog_disp_y', 'mat_cog_disp_z'].index( result_name )
     required_primal = ['matcgx', 'matcgy', 'matcgz'][result_idx]
+    labels = primal_data[required_primal]['layout']['labels']
 
     reference_data = self.db.query(required_primal, class_sname, labels=labels, states=[reference_state])
 

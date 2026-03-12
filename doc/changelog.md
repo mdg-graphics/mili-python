@@ -12,6 +12,11 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Removed
 
+## [v0.9.9] - 2026-3-12
+
+### Fixed
+- Fixed bug causing some derived queries to return results missing some of the queried labels.
+
 ## [v0.9.8] - 2026-2-26
 
 ### Added
