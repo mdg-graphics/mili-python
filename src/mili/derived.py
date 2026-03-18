@@ -16,7 +16,8 @@ from itertools import groupby
 
 from mili.datatypes import Superclass, QueryDict, QueryLayout
 from mili.mdg_defines import (DerivedVariables, NodalStateVariables, StressStrainStateVariables,
-                              MaterialStateVariables, EntityType, ContactSegmentStateVariables)
+                              MaterialStateVariables, EntityType, ContactSegmentStateVariables,
+                              ShellStateVariables)
 
 if TYPE_CHECKING:
   from mili.miliinternal import _MiliInternal
@@ -588,6 +589,13 @@ class DerivedExpressions:
         supports_batching = False,
         compute_function = self.__compute_force,
         only_sclasses = [Superclass.M_QUAD],
+      ),
+      DerivedVariables.SHEAR_MAGNITUDE.value: DerivedSpec(
+        title = "Shear Magnitude",
+        primals = [ShellStateVariables.SHEAR_XX.value, ShellStateVariables.SHEAR_YY.value],
+        primals_class = [None,None],
+        supports_batching = False,
+        compute_function = self.__compute_shear_magnitude,
       ),
       # TODO: Add more primals here
     }
@@ -2413,5 +2421,21 @@ class DerivedExpressions:
 
     # Compute normal force
     derived_result[result_name]['data'] = traction * area
+
+    return derived_result
+
+  def __compute_shear_magnitude(self,
+                                result_name: str,
+                                primal_data: Dict[str,QueryDict],
+                                query_args: QueryArgs) -> Dict[str,QueryDict]:
+    """Compute the shear magnitude."""
+    class_name = query_args['result_class_name']
+    # Create dictionary structure for the final result
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data, class_name )
+
+    qxx = primal_data['qxx']['data']
+    qyy = primal_data['qyy']['data']
+
+    derived_result[result_name]['data'] = np.sqrt( (qxx*qxx + qyy*qyy) )
 
     return derived_result

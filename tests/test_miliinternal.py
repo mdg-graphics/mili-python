@@ -362,7 +362,7 @@ class TestMiliInternal(unittest.TestCase):
                     'triaxiality', 'norm_press', 'eps_rate', 'nodtangmag', 'mat_cog_disp_x', 'mat_cog_disp_y',
                     'mat_cog_disp_z', 'element_volume', 'area', 'centroid', 'surfstrainx', 'surfstrainy',
                     'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx', 'relative_volume', 'normal_force',
-                    'force_x', 'force_y', 'force_z'
+                    'force_x', 'force_y', 'force_z', 'shear_magnitude'
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
@@ -382,7 +382,7 @@ class TestMiliInternal(unittest.TestCase):
         SHELL_DERIVED = ['vol_strain', 'prin_strain1', 'prin_strain2', 'prin_strain3', 'prin_dev_strain1', 'prin_dev_strain2', 'prin_dev_strain3',
                          'prin_strain1_alt', 'prin_strain2_alt', 'prin_strain3_alt', 'prin_dev_strain1_alt', 'prin_dev_strain2_alt', 'prin_dev_strain3_alt',
                          'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure', 'prin_dev_stress1', 'prin_dev_stress2',
-                         'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'norm_press', 'area', 'centroid'
+                         'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'norm_press', 'area', 'centroid', 'shear_magnitude'
                          ]
         CSEG_DERIVED = ['area', 'centroid', 'normal_force', 'force_x', 'force_y', 'force_z']
         NODE_DERIVED = ['disp_x', 'disp_y', 'disp_z', 'disp_mag', 'disp_rad_mag_xy', 'vel_x', 'vel_y', 'vel_z', 'acc_x', 'acc_y', 'acc_z', 'centroid']

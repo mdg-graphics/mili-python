@@ -34,7 +34,7 @@ class SerialDerivedExpressions(unittest.TestCase):
                     'triaxiality', 'norm_press', 'eps_rate', 'nodtangmag', 'mat_cog_disp_x', 'mat_cog_disp_y',
                     'mat_cog_disp_z', 'element_volume', 'area', 'centroid', 'surfstrainx', 'surfstrainy',
                     'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx', 'relative_volume', 'normal_force',
-                    'force_x', 'force_y', 'force_z'
+                    'force_x', 'force_y', 'force_z', 'shear_magnitude'
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
@@ -51,7 +51,7 @@ class SerialDerivedExpressions(unittest.TestCase):
         SHELL_DERIVED = ['vol_strain', 'prin_strain1', 'prin_strain2', 'prin_strain3', 'prin_dev_strain1', 'prin_dev_strain2', 'prin_dev_strain3',
                          'prin_strain1_alt', 'prin_strain2_alt', 'prin_strain3_alt', 'prin_dev_strain1_alt', 'prin_dev_strain2_alt', 'prin_dev_strain3_alt',
                          'prin_stress1', 'prin_stress2', 'prin_stress3', 'eff_stress', 'pressure', 'prin_dev_stress1', 'prin_dev_stress2',
-                         'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'norm_press', 'area', 'centroid']
+                         'prin_dev_stress3', 'max_shear_stress', 'triaxiality', 'norm_press', 'area', 'centroid', 'shear_magnitude']
         CSEG_DERIVED = ['area', 'centroid', 'normal_force', 'force_x', 'force_y', 'force_z']
         NODE_DERIVED = ['disp_x', 'disp_y', 'disp_z', 'disp_mag', 'disp_rad_mag_xy', 'vel_x', 'vel_y', 'vel_z', 'acc_x', 'acc_y', 'acc_z', 'centroid']
 
@@ -1261,6 +1261,26 @@ class SerialDerivedExpressions(unittest.TestCase):
         # State 80
         np.testing.assert_allclose(result["force_z"]["data"][2,0,0], -0.031203, rtol=2.95e-07)
         np.testing.assert_allclose(result["force_z"]["data"][2,1,0], -364.53006)
+
+    def test_shear_magnitude(self):
+        """Test Shear magnitude calculation."""
+        result = self.mili.query("shear_magnitude", "shell", labels=[1,2,3], states=[40,41])
+
+        np.testing.assert_equal( result["shear_magnitude"]["layout"]["labels"], [1,2,3])
+        np.testing.assert_equal( result["shear_magnitude"]["layout"]["states"], [40,41])
+        np.testing.assert_allclose( result["shear_magnitude"]["layout"]["times"], [ 0.00039, 0.0004])
+        self.assertEqual( result["shear_magnitude"]["source"], "derived")
+        self.assertEqual( result["shear_magnitude"]["class_name"], "shell")
+        self.assertEqual( result["shear_magnitude"]["title"], "Shear Magnitude")
+
+        # State 40
+        np.testing.assert_allclose(result["shear_magnitude"]["data"][0,0,0], 109.905174)
+        np.testing.assert_allclose(result["shear_magnitude"]["data"][0,1,0], 303.71857)
+        np.testing.assert_allclose(result["shear_magnitude"]["data"][0,2,0], 115.60381)
+        # State 41
+        np.testing.assert_allclose(result["shear_magnitude"]["data"][1,0,0], 20.901354)
+        np.testing.assert_allclose(result["shear_magnitude"]["data"][1,1,0], 209.44281)
+        np.testing.assert_allclose(result["shear_magnitude"]["data"][1,2,0], 0.062676, rtol=1.11e-06)
 
 
 class ParallelDerivedExpressions(unittest.TestCase):

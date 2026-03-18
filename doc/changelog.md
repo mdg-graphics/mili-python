@@ -12,6 +12,11 @@ All notable changes to Mili-python will be documented in this file.
 
 ### Removed
 
+## [v0.9.10] - 2026-3-18
+
+### Added
+- Added the derived variable `shear_magnitude`.
+
 ## [v0.9.9] - 2026-3-12
 
 ### Fixed

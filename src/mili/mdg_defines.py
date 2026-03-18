@@ -379,3 +379,5 @@ class DerivedVariables(StateVariableName):
     SURFACE_STRAIN_XY = "surfstrainxy"
     SURFACE_STRAIN_YZ = "surfstrainyz"
     SURFACE_STRAIN_ZX = "surfstrainzx"
+
+    SHEAR_MAGNITUDE = "shear_magnitude"
