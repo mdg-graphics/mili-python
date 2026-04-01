@@ -2,7 +2,7 @@
 # this is just a source-able file to get developers a working
 #  edit venv quickly, not to be released
 
-PYVS=3.10.8
+PYVS=3.13.2
 
 module load python/${PYVS}
 python3 -m venv .venv-mili-python-${PYVS}

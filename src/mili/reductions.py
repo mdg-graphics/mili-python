@@ -85,8 +85,11 @@ def merge_dataframes(dataframes: List[Dict[str,pd.DataFrame]]) -> Dict[str,pd.Da
   for svar in svars:
     svar_dfs = [df_dict[svar] for df_dict in dataframes]
     svar_dfs = [df for df in svar_dfs if not df.empty]
-    df_merged = pd.concat(svar_dfs, axis=1, copy=False )
-    df_merged = df_merged.loc[:,~df_merged.columns.duplicated()]
+    if not svar_dfs:
+      df_merged = pd.DataFrame()
+    else:
+      df_merged = pd.concat(svar_dfs, axis='columns')
+      df_merged = df_merged.loc[:,~df_merged.columns.duplicated()]
     merged_dataframes[svar] = df_merged
 
   return merged_dataframes

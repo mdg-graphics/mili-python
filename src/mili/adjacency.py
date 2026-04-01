@@ -8,7 +8,7 @@ from typing import *
 import numpy as np
 from numpy.typing import NDArray, ArrayLike
 
-from mili.reductions import dictionary_merge_concat_unique, reduce_superclass_from_class_names
+from mili.reductions import dictionary_merge_concat_unique, reduce_superclass_from_class_names, list_concatenate_unique_str
 from mili.milidatabase import MiliDatabase
 from mili.mdg_defines import mdg_enum_to_string, EntityType
 from mili.datatypes import Superclass
@@ -200,7 +200,7 @@ class AdjacencyMapping:
       for mat in material:
         classes_of_material = self.mili.material_classes(mat)
         if not self.serial and not self.mili.merge_results:
-          classes_of_material = np.unique(np.concatenate(classes_of_material))
+          classes_of_material = list_concatenate_unique_str(classes_of_material)  # type: ignore
         class_names.extend( classes_of_material )
       class_names = list(set(class_names))
       return class_names
