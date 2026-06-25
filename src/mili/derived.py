@@ -17,7 +17,7 @@ from itertools import groupby
 from mili.datatypes import Superclass, QueryDict, QueryLayout
 from mili.mdg_defines import (DerivedVariables, NodalStateVariables, StressStrainStateVariables,
                               MaterialStateVariables, EntityType, ContactSegmentStateVariables,
-                              ShellStateVariables)
+                              ShellStateVariables, DiabloStateVariables)
 
 if TYPE_CHECKING:
   from mili.miliinternal import _MiliInternal
@@ -597,6 +597,48 @@ class DerivedExpressions:
         supports_batching = False,
         compute_function = self.__compute_shear_magnitude,
       ),
+      DerivedVariables.MECHANICAL_STRAIN_X.value: DerivedSpec(
+        title = "Mechanical Strain X",
+        primals = [StressStrainStateVariables.X_STRAIN.value, DiabloStateVariables.THERMAL_STRAIN.value],
+        primals_class = [None,None],
+        supports_batching = False,
+        compute_function = self.__compute_mechanical_strain,
+      ),
+      DerivedVariables.MECHANICAL_STRAIN_Y.value: DerivedSpec(
+        title = "Mechanical Strain Y",
+        primals = [StressStrainStateVariables.Y_STRAIN.value, DiabloStateVariables.THERMAL_STRAIN.value],
+        primals_class = [None,None],
+        supports_batching = False,
+        compute_function = self.__compute_mechanical_strain,
+      ),
+      DerivedVariables.MECHANICAL_STRAIN_Z.value: DerivedSpec(
+        title = "Mechanical Strain Z",
+        primals = [StressStrainStateVariables.Z_STRAIN.value, DiabloStateVariables.THERMAL_STRAIN.value],
+        primals_class = [None,None],
+        supports_batching = False,
+        compute_function = self.__compute_mechanical_strain,
+      ),
+      DerivedVariables.MECHANICAL_STRAIN_XY.value: DerivedSpec(
+        title = "Mechanical Strain XY",
+        primals = [StressStrainStateVariables.XY_STRAIN.value, DiabloStateVariables.THERMAL_STRAIN.value],
+        primals_class = [None,None],
+        supports_batching = False,
+        compute_function = self.__compute_mechanical_strain,
+      ),
+      DerivedVariables.MECHANICAL_STRAIN_YZ.value: DerivedSpec(
+        title = "Mechanical Strain YZ",
+        primals = [StressStrainStateVariables.YZ_STRAIN.value, DiabloStateVariables.THERMAL_STRAIN.value],
+        primals_class = [None,None],
+        supports_batching = False,
+        compute_function = self.__compute_mechanical_strain,
+      ),
+      DerivedVariables.MECHANICAL_STRAIN_ZX.value: DerivedSpec(
+        title = "Mechanical Strain ZX",
+        primals = [StressStrainStateVariables.ZX_STRAIN.value, DiabloStateVariables.THERMAL_STRAIN.value],
+        primals_class = [None,None],
+        supports_batching = False,
+        compute_function = self.__compute_mechanical_strain,
+      ),
       # TODO: Add more primals here
     }
 
@@ -939,7 +981,7 @@ class DerivedExpressions:
         source = 'derived',
         data = np.empty_like( primal_data[primal]['data'] ),
         title = self.__derived_expressions[result_name]['title'],
-        layout = primal_data[primal]['layout'],
+        layout = primal_data[primal]['layout'].copy(),
         modifier = '',
       )
       derived_result[result_name]['layout']['components'] = [result_name]
@@ -2437,5 +2479,29 @@ class DerivedExpressions:
     qyy = primal_data['qyy']['data']
 
     derived_result[result_name]['data'] = np.sqrt( (qxx*qxx + qyy*qyy) )
+
+    return derived_result
+
+  def __compute_mechanical_strain(self,
+                                  result_name: str,
+                                  primal_data: Dict[str,QueryDict],
+                                  query_args: QueryArgs) -> Dict[str,QueryDict]:
+    """Compute the shear magnitude."""
+    class_name = query_args['result_class_name']
+    # Create dictionary structure for the final result
+    derived_result = self.__initialize_result_dictionary( result_name, primal_data, class_name )
+
+    result_idx = [DerivedVariables.MECHANICAL_STRAIN_X.value,
+                  DerivedVariables.MECHANICAL_STRAIN_Y.value,
+                  DerivedVariables.MECHANICAL_STRAIN_Z.value,
+                  DerivedVariables.MECHANICAL_STRAIN_XY.value,
+                  DerivedVariables.MECHANICAL_STRAIN_YZ.value,
+                  DerivedVariables.MECHANICAL_STRAIN_ZX.value].index( result_name )
+    required_primal = ['ex', 'ey', 'ez', 'exy', 'eyz', 'ezx'][result_idx]
+
+    total_strain = primal_data[required_primal]['data']
+    thermal_strain = primal_data[DiabloStateVariables.THERMAL_STRAIN.value]['data']
+
+    derived_result[result_name]['data'] = total_strain - thermal_strain
 
     return derived_result

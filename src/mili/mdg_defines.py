@@ -90,6 +90,7 @@ class DiabloStateVariables(StateVariableName):
     GLOBAL_RIGID_BODY_Z_VEL = "rigz"
     NODAL_TEMPERATURE_RATE = "dtemp/dt"
     NODAL_EIGENVECTOR = "evec"
+    THERMAL_STRAIN = "tstrn"
 
 class GlobalStateVariables(StateVariableName):
     """Global (glob) variables"""
@@ -381,3 +382,10 @@ class DerivedVariables(StateVariableName):
     SURFACE_STRAIN_ZX = "surfstrainzx"
 
     SHEAR_MAGNITUDE = "shear_magnitude"
+
+    MECHANICAL_STRAIN_X = "mech_strain_x"
+    MECHANICAL_STRAIN_Y = "mech_strain_y"
+    MECHANICAL_STRAIN_Z = "mech_strain_z"
+    MECHANICAL_STRAIN_XY = "mech_strain_xy"
+    MECHANICAL_STRAIN_YZ = "mech_strain_yz"
+    MECHANICAL_STRAIN_ZX = "mech_strain_zx"

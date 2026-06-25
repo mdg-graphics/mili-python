@@ -34,7 +34,8 @@ class SerialDerivedExpressions(unittest.TestCase):
                     'triaxiality', 'norm_press', 'eps_rate', 'nodtangmag', 'mat_cog_disp_x', 'mat_cog_disp_y',
                     'mat_cog_disp_z', 'element_volume', 'area', 'centroid', 'surfstrainx', 'surfstrainy',
                     'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx', 'relative_volume', 'normal_force',
-                    'force_x', 'force_y', 'force_z', 'shear_magnitude'
+                    'force_x', 'force_y', 'force_z', 'shear_magnitude', 'mech_strain_x', 'mech_strain_y', 'mech_strain_z',
+                    'mech_strain_xy', 'mech_strain_yz', 'mech_strain_zx'
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )
@@ -1281,6 +1282,32 @@ class SerialDerivedExpressions(unittest.TestCase):
         np.testing.assert_allclose(result["shear_magnitude"]["data"][1,0,0], 20.901354)
         np.testing.assert_allclose(result["shear_magnitude"]["data"][1,1,0], 209.44281)
         np.testing.assert_allclose(result["shear_magnitude"]["data"][1,2,0], 0.062676, rtol=1.11e-06)
+
+    def test_mechanical_strain(self):
+        """Test Mechanical strain calculation."""
+        file_name = os.path.join(dir_path,'data','serial','solids014','solids014_dblplt')
+        db = open_database( file_name, suppress_parallel=True )
+
+        result = db.query("mech_strain_xy", "brick", labels=[1,2,3,4], states=[1,2,3])
+
+        np.testing.assert_equal( result["mech_strain_xy"]["layout"]["labels"], [1,2,3,4])
+        np.testing.assert_equal( result["mech_strain_xy"]["layout"]["states"], [1,2,3])
+        np.testing.assert_allclose( result["mech_strain_xy"]["layout"]["times"], [ 0.0, 0.1, 0.2])
+        self.assertEqual( result["mech_strain_xy"]["source"], "derived")
+        self.assertEqual( result["mech_strain_xy"]["class_name"], "brick")
+        self.assertEqual( result["mech_strain_xy"]["title"], "Mechanical Strain XY")
+
+        # NOTE: Thermal strain in this problem is 0.0 so mech_strain_xy should equal exy
+        expected = db.query("exy", "brick", labels=[1,2,3,4], states=[1,2,3])
+        np.testing.assert_allclose( result["mech_strain_xy"]["data"], expected["exy"]["data"] )
+
+        result = db.query("mech_strain_y", "brick", labels=[1,2,3,4], states=[1,2,3])
+        expected = db.query("ey", "brick", labels=[1,2,3,4], states=[1,2,3])
+        np.testing.assert_allclose( result["mech_strain_y"]["data"], expected["ey"]["data"] )
+
+        result = db.query("mech_strain_yz", "brick", labels=[1,2,3,4], states=[1,2,3])
+        expected = db.query("eyz", "brick", labels=[1,2,3,4], states=[1,2,3])
+        np.testing.assert_allclose( result["mech_strain_yz"]["data"], expected["eyz"]["data"] )
 
 
 class ParallelDerivedExpressions(unittest.TestCase):

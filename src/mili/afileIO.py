@@ -111,7 +111,7 @@ class AFileReader:
       self.__callback( key, item_data )
       item_data = byte_data.read( item_bytes )
 
-  def register(self, key: Union[AFile.Section,DirectoryDecl.Type], cback: Callable[[bytearray],None]) -> None:
+  def register(self, key: Union[AFile.Section,DirectoryDecl.Type], cback: Callable[[bytes],None]) -> None:
     self.__callbacks[key].append(cback)
 
   def read(self, f: BinaryIO, t: Optional[BinaryIO]) -> None:

@@ -362,7 +362,8 @@ class TestMiliInternal(unittest.TestCase):
                     'triaxiality', 'norm_press', 'eps_rate', 'nodtangmag', 'mat_cog_disp_x', 'mat_cog_disp_y',
                     'mat_cog_disp_z', 'element_volume', 'area', 'centroid', 'surfstrainx', 'surfstrainy',
                     'surfstrainz', 'surfstrainxy', 'surfstrainyz', 'surfstrainzx', 'relative_volume', 'normal_force',
-                    'force_x', 'force_y', 'force_z', 'shear_magnitude'
+                    'force_x', 'force_y', 'force_z', 'shear_magnitude', 'mech_strain_x', 'mech_strain_y', 'mech_strain_z',
+                    'mech_strain_xy', 'mech_strain_yz', 'mech_strain_zx'
                     ]
         supported_variables = self.mili.supported_derived_variables()
         self.assertEqual( EXPECTED, supported_variables )

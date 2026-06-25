@@ -670,7 +670,7 @@ class _MiliInternal:
     elif label not in class_labels:
       self.__return_code = (ReturnCode.ERROR, f"The label ({label}) does not exist for the class ({class_name})")
     else:
-      elem_idx = np.where(label == class_labels)[0]
+      elem_idx = np.where(class_labels == label)[0]
       elem_conn = self.__conns_labels[class_name][elem_idx][0,:-1]
       face_to_nodes = {
         1 : [1, 2, 6, 5],
