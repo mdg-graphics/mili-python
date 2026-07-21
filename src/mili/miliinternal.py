@@ -469,7 +469,7 @@ class _MiliInternal:
     elem_sets = self.element_sets()
     mat_int_points = {}
     for eset, int_points in elem_sets.items():
-      mat = eset[-1:]
+      mat = eset[eset.find("es_")+len("es_"):]
       mat_int_points[mat] = int_points[:-1]
     return mat_int_points
 

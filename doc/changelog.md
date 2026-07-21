@@ -7,6 +7,7 @@ All notable changes to Mili-python will be documented in this file.
 ### Added
 
 ### Fixed
+- Fixed bug in `MiliDatabase.integration_points` function causing it to return incorrect values for materials that were more that 1 digit.
 
 ### Changed
 
