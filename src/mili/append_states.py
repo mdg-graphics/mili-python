@@ -214,8 +214,23 @@ class AppendStatesTool:
         if not np.all(np.isin(svar_labels, orig_labels)):
             raise ValueError( f"Value(s) specified for {svar_class} {svar} labels [{svar_labels}] do not match values in original database." )
 
+        # Get the set of materials of the svar_labels
+        mats = orig_database.materials_of_class_name(svar_class)
+        svar_label_indexes = np.where(np.isin(svar_labels, orig_labels))
+        uniq_svar_mats = np.unique(mats[svar_label_indexes])
+
         # Check if integration points exist for this state variable + class_name
-        available_int_points = orig_database.int_points_of_state_variable(svar, svar_class)
+        all_available_int_points: Dict[int,List[int]] = orig_database.int_points_of_state_variable(svar, svar_class)
+
+        if len(uniq_svar_mats) == 1:
+          available_int_points = all_available_int_points.get(uniq_svar_mats[0], [])
+        else:
+          int_points_per_svar_mat = [all_available_int_points.get(m, []) for m in uniq_svar_mats]
+          all_same = len(int_points_per_svar_mat) == 0 or all(lst == int_points_per_svar_mat[0] for lst in int_points_per_svar_mat)
+          if all_same:
+            available_int_points = all_available_int_points.get(uniq_svar_mats[0], [])
+          else:
+            raise ValueError( f"Label(s) specified for {svar_class} {svar} do not have consistent integration points." )
 
         # If there are multiple integration points
         if len(available_int_points) > 0:

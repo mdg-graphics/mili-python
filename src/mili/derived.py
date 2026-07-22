@@ -642,6 +642,14 @@ class DerivedExpressions:
       # TODO: Add more primals here
     }
 
+  def derived_spec(self, derived_name: str) -> Optional[DerivedSpec]:
+    """Getter for derived spec.
+
+    Args:
+      derived_name (str): The name of the derived variable.
+    """
+    return self.__derived_expressions.get(derived_name, None)
+
   def supported_variables(self) -> List[str]:
     """Return a list of derived expressions that are supported.
 

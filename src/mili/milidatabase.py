@@ -239,7 +239,7 @@ class MiliDatabase:
                                 reduce_function = reductions.list_concatenate_unique_str)
     return result
 
-  def int_points_of_state_variable(self, svar_name: Union[str,StateVariableName], entity_type: Union[str,EntityType]) -> NDArray[np.int32]:
+  def int_points_of_state_variable(self, svar_name: Union[str,StateVariableName], entity_type: Union[str,EntityType]) -> Dict[int,List[int]]:
     """Get the available integration points for a state variable + entity type.
 
     Args:
@@ -247,13 +247,14 @@ class MiliDatabase:
       entity_type (Union[str,EntityType]): The entity type ("brick", "node", etc.).
 
     Returns:
-      NDArray[np.int32]: Array of integration points.
+      Dict[int,List[int]]: Keys are material numbers, values are a list of integration points that exist for the
+                           entity_type + material.
     """
-    result: NDArray[np.int32]
+    result: Dict[int,List[int]]
     entity_type_str = mdg_enum_to_string(entity_type)
     svar_name_str = mdg_enum_to_string(svar_name)
     result = self.__postprocess(results = self._mili.int_points_of_state_variable(svar_name_str, entity_type_str),
-                                reduce_function = reductions.list_concatenate_unique)
+                                reduce_function = reductions.dictionary_merge_no_concat)
     return result
 
   def element_sets(self) -> Dict[str,List[int]]:
@@ -267,13 +268,13 @@ class MiliDatabase:
                                 reduce_function = reductions.dictionary_merge_no_concat)
     return result
 
-  def integration_points(self) -> Dict[str,List[int]]:
+  def integration_points(self) -> Dict[int,List[int]]:
     """Get the available integration points for each material.
 
     Returns:
-      Dict[str,List[int]]: Keys are material numbers, values are a list of integration points.
+      Dict[int,List[int]]: Keys are material numbers, values are a list of integration points.
     """
-    result: Dict[str,List[int]]
+    result: Dict[int,List[int]]
     result = self.__postprocess(results = self._mili.integration_points(),
                                 reduce_function = reductions.dictionary_merge_no_concat)
     return result

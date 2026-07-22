@@ -426,7 +426,7 @@ class _MiliInternal:
     """Getter for internal integration point dictionary."""
     return self.__int_points
 
-  def int_points_of_state_variable(self, svar_name: str, class_name: str) -> NDArray[np.int32]:
+  def int_points_of_state_variable(self, svar_name: str, class_name: str) -> Dict[int,List[int]]:
     """Get the available integration points for a state variable + class_name.
 
     Args:
@@ -434,22 +434,45 @@ class _MiliInternal:
       class_name (str): The element class name.
 
     Returns:
-      NDArray[np.int32]: Array of integration points.
+      Dict[int,List[int]]: Keys are material numbers, values are a list of integration points that exist for the
+                           class_name + material.
     """
-    int_points = np_empty(np.int32)
-
-    if svar_name not in self.__svars:
-      self.__return_code = (ReturnCode.ERROR, f"The svar '{svar_name}' does not exist.")
-      return int_points
+    int_points: Dict[int,List[int]] = {}
 
     if class_name not in self.__MO_class_data:
       self.__return_code = (ReturnCode.ERROR, f"The class '{class_name}' does not exist.")
       return int_points
 
-    if svar_name in self.__int_points:
-      for es_name in self.__int_points[svar_name]:
-        if class_name in self.classes_of_state_variable(es_name):
-          int_points = np.array(self.__int_points[svar_name][es_name][:-1], dtype=np.int32)
+    if svar_name not in self.__svars and svar_name not in self.derived_variables_of_class(class_name):
+      self.__return_code = (ReturnCode.ERROR, f"The svar '{svar_name}' does not exist.")
+      return int_points
+
+    # Primal state variable
+    if svar_name in self.__svars:
+      if svar_name in self.__int_points:
+        for es_name in self.__int_points[svar_name]:
+          if class_name in self.classes_of_state_variable(es_name):
+            mat = int(es_name[es_name.find("es_")+len("es_"):-1])
+            int_points[mat] = self.__int_points[svar_name][es_name][:-1]
+    # Derived state variable
+    else:
+      derived_spec = self.__derived.derived_spec(svar_name)
+      if derived_spec is not None:
+        primal_depends: list[str] = []
+        if all([sv in self.__svars for sv in derived_spec['primals']]):
+          primal_depends = derived_spec['primals']
+        elif all([sv in self.__svars for sv in derived_spec['alternate_primals']]):
+          primal_depends = derived_spec['alternate_primals']
+
+        # NOTE: This assumes that the integration points are the same for the subset of required primals
+        #       that have integration points.
+        for sv in primal_depends:
+          if sv in self.__int_points:
+            for es_name in self.__int_points[sv]:
+              if class_name in self.classes_of_state_variable(es_name):
+                mat = int(es_name[es_name.find("es_")+len("es_"):-1])
+                int_points[mat] = self.__int_points[sv][es_name][:-1]
+
     return int_points
 
   def element_sets(self) -> Dict[str,List[int]]:
@@ -460,16 +483,16 @@ class _MiliInternal:
     """
     return self.__element_sets
 
-  def integration_points(self) -> Dict[str,List[int]]:
+  def integration_points(self) -> Dict[int,List[int]]:
     """Get the available integration points for each material.
 
     Returns:
-      Dict[str,List[int]]: Keys are material numbers, values are a list of integration points.
+      Dict[int,List[int]]: Keys are material numbers, values are a list of integration points.
     """
     elem_sets = self.element_sets()
     mat_int_points = {}
     for eset, int_points in elem_sets.items():
-      mat = eset[eset.find("es_")+len("es_"):]
+      mat = int(eset[eset.find("es_")+len("es_"):])
       mat_int_points[mat] = int_points[:-1]
     return mat_int_points
 

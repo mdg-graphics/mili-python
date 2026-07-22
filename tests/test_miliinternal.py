@@ -232,13 +232,13 @@ class TestMiliInternal(unittest.TestCase):
     #==============================================================================
     def test_int_points_of_state_variable(self):
         ipts = self.mili.int_points_of_state_variable("sx", "brick")
-        np.testing.assert_equal(ipts, [])
+        np.testing.assert_equal(ipts, {})
 
         ipts = self.mili.int_points_of_state_variable("sx", "beam")
-        np.testing.assert_equal(ipts, [1,2,3,4])
+        np.testing.assert_equal(ipts, {1: [1,2,3,4]})
 
         ipts = self.mili.int_points_of_state_variable("sx", "shell")
-        np.testing.assert_equal(ipts, [1,2])
+        np.testing.assert_equal(ipts, {3: [1,2]})
 
     #==============================================================================
     def test_element_set(self):
@@ -248,7 +248,7 @@ class TestMiliInternal(unittest.TestCase):
     #==============================================================================
     def test_integration_points(self):
         ipts = self.mili.integration_points()
-        self.assertEqual( ipts, { "1": [1,2,3,4], "3": [1,2]} )
+        self.assertEqual( ipts, { 1: [1,2,3,4], 3: [1,2]} )
 
     #==============================================================================
     def test_times(self):

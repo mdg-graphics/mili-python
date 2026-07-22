@@ -321,22 +321,22 @@ class SharedSerialTests:
                 ipts = self.mili.int_points_of_state_variable("sx", "nnnnode")
 
             ipts = self.mili.int_points_of_state_variable("sx", "brick")
-            np.testing.assert_equal(ipts, [])
+            np.testing.assert_equal(ipts, {})
 
             ipts = self.mili.int_points_of_state_variable("sx", "beam")
-            np.testing.assert_equal(ipts, [1,2,3,4])
+            np.testing.assert_equal(ipts, {1: [1,2,3,4]})
 
             ipts = self.mili.int_points_of_state_variable("sx", "shell")
-            np.testing.assert_equal(ipts, [1,2])
+            np.testing.assert_equal(ipts, {3: [1,2]})
 
             ipts = self.mili.int_points_of_state_variable("sx", EntityType.BRICK)
-            np.testing.assert_equal(ipts, [])
+            np.testing.assert_equal(ipts, {})
 
             ipts = self.mili.int_points_of_state_variable("sx", EntityType.BEAM)
-            np.testing.assert_equal(ipts, [1,2,3,4])
+            np.testing.assert_equal(ipts, {1: [1,2,3,4]})
 
             ipts = self.mili.int_points_of_state_variable("sx", EntityType.SHELL)
-            np.testing.assert_equal(ipts, [1,2])
+            np.testing.assert_equal(ipts, {3: [1,2]})
 
         #==============================================================================
         def test_element_sets(self):
@@ -348,9 +348,9 @@ class SharedSerialTests:
         #==============================================================================
         def test_integration_points(self):
             int_points = self.mili.integration_points()
-            self.assertEqual( set(int_points.keys()), set(["1", "3"]))
-            self.assertEqual( int_points['1'], [1,2,3,4] )
-            self.assertEqual( int_points['3'], [1,2] )
+            self.assertEqual( set(int_points.keys()), set([1, 3]))
+            self.assertEqual( int_points[1], [1,2,3,4] )
+            self.assertEqual( int_points[3], [1,2] )
 
         #==============================================================================
         def test_derived_variables_of_class(self):
@@ -1461,12 +1461,12 @@ class ParallelTests:
 
             self.assertEqual( int_points[0], {} )
             self.assertEqual( int_points[1], {} )
-            self.assertEqual( int_points[2], {"1": [1,2,3,4], "3": [1,2]} )
-            self.assertEqual( int_points[3], {"3": [1,2]} )
-            self.assertEqual( int_points[4], {"1": [1,2,3,4]} )
-            self.assertEqual( int_points[5], {"1": [1,2,3,4], "3": [1,2]} )
-            self.assertEqual( int_points[6], {"1": [1,2,3,4]} )
-            self.assertEqual( int_points[7], {"1": [1,2,3,4]} )
+            self.assertEqual( int_points[2], {1: [1,2,3,4], 3: [1,2]} )
+            self.assertEqual( int_points[3], {3: [1,2]} )
+            self.assertEqual( int_points[4], {1: [1,2,3,4]} )
+            self.assertEqual( int_points[5], {1: [1,2,3,4], 3: [1,2]} )
+            self.assertEqual( int_points[6], {1: [1,2,3,4]} )
+            self.assertEqual( int_points[7], {1: [1,2,3,4]} )
 
         #==============================================================================
         def test_labels_getter(self):

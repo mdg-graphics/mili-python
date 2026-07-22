@@ -2,14 +2,18 @@
 
 All notable changes to Mili-python will be documented in this file.
 
-## [Unreleased]
+## [0.9.11] - 2026-7-22
 
 ### Added
+- Added the derived variables `mech_strain_x`, `mech_strain_y`, ..., `mech_strain_zx` to calculate mechanical strain for Diablo simualations. Mechanical strain is total strain - thermal strain (e.g. `ey - tstrn`).
 
 ### Fixed
 - Fixed bug in `MiliDatabase.integration_points` function causing it to return incorrect values for materials that were more that 1 digit.
 
 ### Changed
+- Updated the return value of the `MiliDatabase.integration_points` function from `Dict[str,List[int]]` to `Dict[int,List[int]]`.
+- Updated the return value of the `MiliDatabase.int_points_of_state_variable` function. Previously the function returned `NDArray[np.int32]` and now it returns `Dict[int,List[str]]` where the keys are material numbers and the values are lists of integration points. This change was made to properly handle the case where an entity_type has multiple materials some with differing integration points.
+- Updated the `MiliDatabase.int_points_of_state_variable` function to support querying integration points for derived variables. This checks the integration points that exist for the primal results required to calculate the derived value and returns those.
 
 ### Removed
 
