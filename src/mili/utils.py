@@ -88,9 +88,12 @@ def query_data_to_dataframe(data: NDArray[np.floating], states: NDArray[np.int32
   if data.shape[2] == 1:
     df = pd.DataFrame(data.reshape(data.shape[:-1]), columns=labels, index=states)
   else:
-    df = pd.DataFrame.from_records(data) # type: ignore
-    df.index = states  # type: ignore
-    df.columns = labels  # type: ignore
+    df = pd.DataFrame(
+      [[data[state_idx, label_idx] for label_idx in range(data.shape[1])]
+      for state_idx in range(data.shape[0])],
+      index=states,
+      columns=labels,
+    )
 
   return df
 
