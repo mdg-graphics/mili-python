@@ -2,6 +2,21 @@
 
 All notable changes to Mili-python will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+### Changed
+
+### Removed
+
+## [0.9.12] - 2026-10-22
+
+### Fixed
+- Fixed bug causing an Exception to be thrown for databases missing the state variable `sand` when appending states.
+
 ## [0.9.11] - 2026-7-22
 
 ### Added

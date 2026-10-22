@@ -1541,24 +1541,26 @@ class _MiliInternal:
     # We need to write out the nodal positions and sand flags so the database can be visualized.
     if n_states == 0 or zero_out:
       state_to_write = n_states + 1
-      if n_states == 0:
-        # If this is the first state being written to the database
-        # then we need to write out the initial nodal positions (db.nodes())
-        nodpos = self.query("nodpos", "node", states=[state_to_write])
-        nodpos['nodpos']['data'][0] = self.__nodes
-        self.query("nodpos", "node", states=[state_to_write], write_data=nodpos)
-      else:
-        # We need to query the previous states nodal positions and copy them to the current state
-        nodpos = self.query("nodpos", "node", states=[state_to_write-1])
-        nodpos['nodpos']['layout']['states'][0] = state_to_write
-        self.query("nodpos", "node", states=[state_to_write], write_data=nodpos)
+      if self.__svars.get("nodpos", None):
+        if n_states == 0:
+          # If this is the first state being written to the database
+          # then we need to write out the initial nodal positions (db.nodes())
+          nodpos = self.query("nodpos", "node", states=[state_to_write])
+          nodpos['nodpos']['data'][0] = self.__nodes
+          self.query("nodpos", "node", states=[state_to_write], write_data=nodpos)
+        else:
+          # We need to query the previous states nodal positions and copy them to the current state
+          nodpos = self.query("nodpos", "node", states=[state_to_write-1])
+          nodpos['nodpos']['layout']['states'][0] = state_to_write
+          self.query("nodpos", "node", states=[state_to_write], write_data=nodpos)
 
       # Need to set sand flags as well so everything can be visualized
-      sand_classes = self.classes_of_state_variable("sand")
-      for class_name in sand_classes:
-        sand_flags = self.query("sand", class_name, states=[state_to_write])
-        sand_flags['sand']['data'][0] = 1.0
-        self.query("sand", class_name, states=[state_to_write], write_data=sand_flags)
+      if self.__svars.get("sand", None):
+        sand_classes = self.classes_of_state_variable("sand")
+        for class_name in sand_classes:
+          sand_flags = self.query("sand", class_name, states=[state_to_write])
+          sand_flags['sand']['data'][0] = 1.0
+          self.query("sand", class_name, states=[state_to_write], write_data=sand_flags)
 
     return len(self.__smaps)
 
